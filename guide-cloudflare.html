@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloudflare Tunnel — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+
+.main{flex:1;min-width:0;}
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:28%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.amber{color:var(--amber);}
+.kv-table .val.red{color:var(--red);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+
+.le-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+.le-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);}
+.le-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.le-table tr:last-child td{border-bottom:none;}
+.le-table tr:hover td{background:var(--bg3);}
+.le-code{font-family:var(--mono);font-size:12px;color:var(--blue);background:#080b10;white-space:nowrap;width:40%;}
+.le-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+.le-desc b{color:var(--text);font-weight:500;}
+
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:280px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+/* pattern card */
+.pattern-card{background:var(--bg2);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.25rem;}
+.pattern-title{font-family:var(--mono);font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem;}
+
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+  .le-table{display:block;overflow-x:auto;}
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Cloudflare Tunnel</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-tunnel')">What is Cloudflare Tunnel</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-it-works')">How it works</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-cloudflared')">What is cloudflared</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('ingress-rules')">Ingress rules</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-alternatives')">Alternatives</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install cloudflared</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-auth')">Authenticate</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-create')">Create tunnel</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-config')">Write config</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-dns')">Create DNS records</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-service')">Install as service</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-pattern')">Add new service pattern</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-full')">Full config.yml</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-explained')">Line by line</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-ingress')">Ingress rules explained</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-tunnel')">Tunnel commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-service')">Service commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 9 of 14</div>
+      <h1 class="gh-title">Cloudflare <span>Tunnel</span></h1>
+      <p class="gh-sub">Making spserver's services publicly accessible on the internet — despite CG-NAT, without port forwarding, with free SSL, DDoS protection, and zero exposed home IP.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config file</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-tunnel">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is Cloudflare Tunnel</div>
+        <p class="section-body">
+          Cloudflare Tunnel is a service that creates a <b>secure outbound connection</b> from your server to Cloudflare's global network. Once connected, Cloudflare forwards public internet traffic through this tunnel to your server — without your server ever needing to accept unsolicited incoming connections or expose a port to the internet.
+        </p>
+        <p class="section-body">
+          This is the solution to our CG-NAT problem for public-facing services. Where Tailscale handles private SSH access, Cloudflare Tunnel handles everything that needs to be publicly accessible — the website, browser terminal, file server, Flask app.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Without Cloudflare Tunnel</div>
+            <div class="ic-body">CG-NAT means nobody can reach spserver from the internet. Port forwarding doesn't work. Nginx runs but nobody can visit the website. All services are trapped behind Airtel's NAT.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">With Cloudflare Tunnel</div>
+            <div class="ic-body">dustyserver.co.in is publicly accessible worldwide. Free SSL. DDoS protection. Your home IP is never exposed. Adding a new service takes 3 steps. Zero router configuration.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Cloudflare Tunnel is completely free. There are no connection limits, no bandwidth caps, and no time restrictions on the free tier. The only requirement is a Cloudflare account and a domain with DNS managed by Cloudflare.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-it-works">
+        <div class="section-eyebrow">02 — Architecture</div>
+        <div class="section-title">How the tunnel works end to end</div>
+        <p class="section-body">
+          The key insight is the same as Tailscale — <b>outgoing connections always work behind CG-NAT</b>. cloudflared on spserver initiates an outgoing connection to Cloudflare's edge servers and keeps it alive permanently. When a visitor requests your domain, Cloudflare receives the request at their edge and forwards it through the existing persistent connection to your server.
+        </p>
+        <div class="diagram">
+<span class="dm">Setup phase (done once):</span>
+<span class="dg">cloudflared on spserver</span>  <span class="dm">──── outgoing connection ────►</span>  <span class="db">Cloudflare edge</span>
+<span class="dm">   CG-NAT allows this ↑         persistent tunnel maintained</span>
+
+<span class="dm">Request phase (every visitor):</span>
+<span class="db">Visitor browser</span>  <span class="dm">──►</span>  <span class="db">dustyserver.co.in</span>
+                         <span class="dm">↓  DNS resolves to Cloudflare IP (104.21.x.x)</span>
+                   <span class="db">Cloudflare edge</span>  <span class="dm">receives HTTPS request</span>
+                         <span class="dm">↓  forwards through existing tunnel</span>
+                   <span class="dg">cloudflared on spserver</span>
+                         <span class="dm">↓  forwards to local service</span>
+                   <span class="dg">localhost:80 (Nginx)</span>  <span class="dm">or :7681 (ttyd) or :8080 (Filebrowser)</span>
+                         <span class="dm">↓  response travels back the same path</span>
+                   <span class="db">Visitor sees the page</span>
+        </div>
+        <p class="section-body">
+          Notice what the visitor never sees: your home IP address. Their DNS query resolves to Cloudflare's IP (104.21.x.x or 172.67.x.x) — Cloudflare's servers — not your server. This is a significant privacy and security benefit. Even a DDoS attack hits Cloudflare's massive infrastructure, not your home server.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-cloudflared">
+        <div class="section-eyebrow">03 — Component</div>
+        <div class="section-title">What is cloudflared</div>
+        <p class="section-body">
+          <code>cloudflared</code> is the daemon (background service) that runs on spserver and maintains the tunnel connection. It is a single binary downloaded from Cloudflare, installed at <code>/usr/local/bin/cloudflared</code>, and managed by systemd just like sshd or Nginx.
+        </p>
+        <p class="section-body">
+          cloudflared reads a config file (<code>/etc/cloudflared/config.yml</code>) that tells it which tunnel to connect to and how to route incoming requests to local services. It maintains multiple connections to Cloudflare's edge for redundancy — if one connection drops, the others keep the tunnel alive.
+        </p>
+        <div class="diagram">
+<span class="dg">cloudflared process</span>  <span class="dm">← started by systemd at boot</span>
+<span class="dm">  reads: /etc/cloudflared/config.yml</span>
+<span class="dm">  connects to: Cloudflare edge (4 redundant connections)</span>
+<span class="dm">  routes incoming requests based on hostname:</span>
+<span class="dm">    terminal.dustyserver.co.in  ──► http://localhost:7681</span>
+<span class="dm">    fileserver.dustyserver.co.in ──► http://localhost:8080</span>
+<span class="dm">    flask.dustyserver.co.in      ──► http://localhost:5000</span>
+<span class="dm">    dustyserver.co.in            ──► http://localhost:80</span>
+<span class="dm">    www.dustyserver.co.in        ──► http://localhost:80</span>
+<span class="dm">    anything else                ──► 404</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ingress-rules">
+        <div class="section-eyebrow">04 — Routing</div>
+        <div class="section-title">How ingress rules work</div>
+        <p class="section-body">
+          Ingress rules are the routing table for your tunnel. When a request arrives, cloudflared checks the <code>hostname</code> of the request against each rule in order — <b>top to bottom, first match wins</b>. The matched rule's <code>service</code> is where the request gets forwarded.
+        </p>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>Three important rules:</b> (1) Order matters — put more specific hostnames before general ones. (2) The catch-all <code>http_status:404</code> must always be the last rule. (3) Use second-level subdomains only (flask.dustyserver.co.in) — third-level subdomains (flask.test.dustyserver.co.in) caused DNS issues in our setup.</span>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:42%">Rule</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">hostname: terminal.dustyserver.co.in</td><td class="le-desc">Match requests for this exact hostname.</td></tr>
+            <tr><td class="le-code">service: http://localhost:7681</td><td class="le-desc">Forward matching requests to ttyd running on port 7681. localhost here means the server itself — not the internet.</td></tr>
+            <tr><td class="le-code">service: http_status:404</td><td class="le-desc"><b>Catch-all — must be last.</b> Any hostname not matched by a rule above returns a 404 error. Without this, cloudflared will refuse to start.</td></tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          Every time you add a new service — a new Docker container, a new app, a new tool — you follow the same pattern: add an ingress rule, add a DNS record, restart cloudflared. The tunnel itself never changes. You are just adding new routing rules.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-alternatives">
+        <div class="section-eyebrow">05 — Alternatives</div>
+        <div class="section-title">Alternatives to Cloudflare Tunnel</div>
+        <table class="kv-table">
+          <thead><tr><th>Tool</th><th>Cost</th><th>Custom domain</th><th>SSL</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Cloudflare Tunnel <span style="font-size:10px;color:var(--green);font-family:var(--mono);margin-left:4px;">chosen</span></td>
+              <td class="val green">Free</td>
+              <td class="val green">Yes</td>
+              <td class="val green">Free</td>
+              <td class="desc">No limits on connections or bandwidth. DDoS protection. Requires domain with Cloudflare DNS.</td>
+            </tr>
+            <tr>
+              <td class="key">Ngrok</td>
+              <td class="val amber">Free tier limited</td>
+              <td class="val amber">Paid only</td>
+              <td class="val green">Yes</td>
+              <td class="desc">Free tier gives random URLs, limited connections, session timeouts. Custom domain requires paid plan.</td>
+            </tr>
+            <tr>
+              <td class="key">WireGuard + VPS</td>
+              <td class="val amber">~₹300/month</td>
+              <td class="val green">Yes</td>
+              <td class="val amber">Manual</td>
+              <td class="desc">Full control. Must manage VPS, WireGuard, Nginx, SSL yourself. More learning, more cost.</td>
+            </tr>
+            <tr>
+              <td class="key">FRP (Fast Reverse Proxy)</td>
+              <td class="val green">Free (self-host)</td>
+              <td class="val green">Yes</td>
+              <td class="val amber">Manual</td>
+              <td class="desc">Open source. Requires your own VPS with public IP. More complex configuration.</td>
+            </tr>
+            <tr>
+              <td class="key">Tailscale Funnel</td>
+              <td class="val green">Free</td>
+              <td class="val red">No custom domain</td>
+              <td class="val green">Yes</td>
+              <td class="desc">Tailscale's public exposure feature. Limited — uses Tailscale's domain, not yours. Good for quick sharing.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Step 1 — Install cloudflared</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Download and install the cloudflared binary</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">cloudflared is distributed as a single binary — no package manager required. Download the latest release, make it executable, and move it to a system PATH location so it's available to all users including root.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Download the latest cloudflared binary for Linux amd64</span>
+<span class="nm">curl -L</span> https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+
+<span class="cm"># Make it executable</span>
+<span class="nm">chmod +x cloudflared</span>
+
+<span class="cm"># Move to system PATH — accessible by all users and root</span>
+<span class="nm">sudo mv cloudflared</span> /usr/local/bin/
+
+<span class="cm"># Verify installation</span>
+<span class="nm">cloudflared version</span>
+<span class="cm"># Should show: cloudflared version 2026.x.x</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-auth">
+        <div class="section-eyebrow">02 — Authenticate</div>
+        <div class="section-title">Step 2 — Authenticate with Cloudflare</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Login to Cloudflare account</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">This command opens a URL. Open it in your browser, login to your Cloudflare account, and select which domain to associate with this tunnel. Cloudflare then creates a certificate file in <code>~/.cloudflared/cert.pem</code> that proves cloudflared is authorised to act on behalf of your account.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">cloudflared tunnel login</span>
+
+<span class="cm"># A URL is shown — open it in your browser</span>
+<span class="cm"># Login to Cloudflare → select dustyserver.co.in → Authorize</span>
+<span class="cm"># Certificate saved to: /root/.cloudflared/cert.pem (or ~/.cloudflared/cert.pem)</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-create">
+        <div class="section-eyebrow">03 — Create tunnel</div>
+        <div class="section-title">Step 3 — Create the tunnel</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Create a named tunnel</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The tunnel is a named entity in Cloudflare's system. We named it <b>spserver</b> after the machine. The create command generates a unique tunnel ID and a credentials JSON file — both are needed for the config.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create a tunnel named "spserver"</span>
+<span class="nm">cloudflared tunnel create spserver</span>
+
+<span class="cm"># Output shows the tunnel UUID — save this, you need it</span>
+<span class="cm"># Example: Created tunnel spserver with id b72cf76b-0820-44cb-90df-f4c58ed87184</span>
+
+<span class="cm"># Credentials file saved to:</span>
+<span class="cm"># ~/.cloudflared/b72cf76b-0820-44cb-90df-f4c58ed87184.json</span>
+
+<span class="cm"># Verify the tunnel was created</span>
+<span class="nm">cloudflared tunnel list</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>Our tunnel details: Name: <b>spserver</b> — ID: <b>b72cf76b-0820-44cb-90df-f4c58ed87184</b>. The credentials JSON is the private key for this tunnel — keep it safe and never commit it to version control.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-config">
+        <div class="section-eyebrow">04 — Configure</div>
+        <div class="section-title">Step 4 — Create the config file</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Create /etc/cloudflared/ and write config.yml</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why"><b>Why /etc/cloudflared/ and not ~/.cloudflared/?</b> When cloudflared runs as a systemd service, it runs as root. The <code>~</code> for root is <code>/root/</code> — not your user's home directory. If you put config in <code>/home/sipu/.cloudflared/</code>, the service cannot find it. <code>/etc/cloudflared/</code> is always accessible by root regardless of which user created the files.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create the system-wide config directory</span>
+<span class="nm">sudo mkdir -p</span> /etc/cloudflared
+
+<span class="cm"># Copy credentials JSON to system location</span>
+<span class="nm">sudo cp</span> ~/.cloudflared/b72cf76b-0820-44cb-90df-f4c58ed87184.json /etc/cloudflared/
+
+<span class="cm"># Create the config file</span>
+<span class="nm">sudo nano</span> /etc/cloudflared/config.yml</pre>
+            </div>
+            <p class="step-why">Paste this into config.yml:</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/cloudflared/config.yml</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">tunnel</span>: <span class="str">b72cf76b-0820-44cb-90df-f4c58ed87184</span>
+<span class="nm">credentials-file</span>: <span class="str">/etc/cloudflared/b72cf76b-0820-44cb-90df-f4c58ed87184.json</span>
+
+<span class="kw">ingress</span>:
+  - <span class="nm">hostname</span>: <span class="str">terminal.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:7681</span>
+  - <span class="nm">hostname</span>: <span class="str">fileserver.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:8080</span>
+  - <span class="nm">hostname</span>: <span class="str">flask.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:5000</span>
+  - <span class="nm">hostname</span>: <span class="str">dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">hostname</span>: <span class="str">www.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">service</span>: <span class="str">http_status:404</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-dns">
+        <div class="section-eyebrow">05 — DNS</div>
+        <div class="section-title">Step 5 — Create DNS CNAME records</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Route DNS records to the tunnel</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Each hostname in the ingress rules needs a DNS CNAME record pointing to the tunnel. The <code>tunnel route dns</code> command creates these automatically in Cloudflare — no need to touch the Cloudflare dashboard.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — create DNS for each hostname</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">cloudflared tunnel route dns spserver</span> dustyserver.co.in
+<span class="nm">cloudflared tunnel route dns spserver</span> www.dustyserver.co.in
+<span class="nm">cloudflared tunnel route dns spserver</span> terminal.dustyserver.co.in
+<span class="nm">cloudflared tunnel route dns spserver</span> fileserver.dustyserver.co.in
+<span class="nm">cloudflared tunnel route dns spserver</span> flask.dustyserver.co.in
+
+<span class="cm"># Each creates a CNAME record like:</span>
+<span class="cm"># terminal.dustyserver.co.in → b72cf76b-....cfargotunnel.com</span>
+
+<span class="cm"># Verify DNS is set up correctly</span>
+<span class="nm">nslookup dustyserver.co.in</span>
+<span class="cm"># Should return Cloudflare IPs: 104.21.x.x and 172.67.x.x</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>DNS propagation takes 1-5 minutes after creating records. If a subdomain isn't working immediately — wait and try again. Check with <code>nslookup subdomain.dustyserver.co.in</code> — when it returns Cloudflare IPs, it's ready.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-service">
+        <div class="section-eyebrow">06 — Service</div>
+        <div class="section-title">Step 6 — Install as systemd service</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">Test manually then install as service</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Always test the tunnel manually first — if it works, you know the config is correct. Then install as a systemd service so it runs automatically on every boot. The service uses the config at <code>/etc/cloudflared/config.yml</code>.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Test manually first — Ctrl+C to stop after confirming it works</span>
+<span class="nm">cloudflared tunnel --config</span> /etc/cloudflared/config.yml run
+
+<span class="cm"># Then visit https://dustyserver.co.in in browser to confirm</span>
+<span class="cm"># Ctrl+C to stop the manual test</span>
+
+<span class="cm"># Install as systemd service</span>
+<span class="nm">sudo cloudflared service install</span>
+
+<span class="cm"># Enable auto-start on boot</span>
+<span class="nm">sudo systemctl enable cloudflared</span>
+
+<span class="cm"># Start it now</span>
+<span class="nm">sudo systemctl start cloudflared</span>
+
+<span class="cm"># Verify it's running</span>
+<span class="nm">sudo systemctl status cloudflared</span>
+<span class="cm"># Look for: Active: active (running)</span>
+<span class="cm"># Look for: Registered tunnel connection connIndex=0,1,2,3</span>
+<span class="cm"># 4 connections = tunnel is fully connected and redundant</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-pattern">
+        <div class="section-eyebrow">07 — Pattern</div>
+        <div class="section-title">Adding a new service — the repeatable pattern</div>
+        <p class="section-body">
+          Every time a new service is added to spserver — a new Docker container, a new app, a new tool — the same three steps are followed. The tunnel itself never changes. Only the config and DNS records are updated.
+        </p>
+        <div class="pattern-card">
+          <div class="pattern-title">→ Pattern — add new service to tunnel</div>
+          <div class="code-block">
+            <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+            <pre><span class="cm"># Step 1: Add ingress rule to config.yml</span>
+<span class="nm">sudo nano</span> /etc/cloudflared/config.yml
+<span class="cm"># Add before the catch-all line:</span>
+<span class="cm">#   - hostname: newapp.dustyserver.co.in</span>
+<span class="cm">#     service: http://localhost:PORT</span>
+
+<span class="cm"># Step 2: Create DNS record for the new subdomain</span>
+<span class="nm">cloudflared tunnel route dns spserver</span> newapp.dustyserver.co.in
+
+<span class="cm"># Step 3: Restart cloudflared to pick up config changes</span>
+<span class="nm">sudo systemctl restart cloudflared</span>
+
+<span class="cm"># Step 4: Wait 1-2 minutes for DNS propagation</span>
+<span class="cm"># Step 5: Test — open https://newapp.dustyserver.co.in</span></pre>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>This pattern has been used for every service: dustyserver.co.in (Nginx), terminal (ttyd), fileserver (Filebrowser), flask (Flask Docker). The same three steps every time — no router config, no port forwarding, no firewall changes needed.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-full">
+        <div class="section-eyebrow">01 — Full file</div>
+        <div class="section-title">Complete config.yml</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/cloudflared/config.yml</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">tunnel</span>: <span class="str">b72cf76b-0820-44cb-90df-f4c58ed87184</span>
+<span class="nm">credentials-file</span>: <span class="str">/etc/cloudflared/b72cf76b-0820-44cb-90df-f4c58ed87184.json</span>
+
+<span class="kw">ingress</span>:
+  - <span class="nm">hostname</span>: <span class="str">terminal.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:7681</span>
+  - <span class="nm">hostname</span>: <span class="str">fileserver.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:8080</span>
+  - <span class="nm">hostname</span>: <span class="str">flask.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:5000</span>
+  - <span class="nm">hostname</span>: <span class="str">dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">hostname</span>: <span class="str">www.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">service</span>: <span class="str">http_status:404</span></pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>File location: <code>/etc/cloudflared/config.yml</code> — not <code>~/.cloudflared/</code>. Must be in /etc/ so the systemd service running as root can read it. The credentials JSON must also be in /etc/cloudflared/.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-explained">
+        <div class="section-eyebrow">02 — Line by line</div>
+        <div class="section-title">Every line explained</div>
+        <table class="le-table">
+          <thead><tr><th style="width:42%">Line</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">tunnel: b72cf76b-...</td><td class="le-desc">The unique ID of this tunnel. Generated when you ran <code>cloudflared tunnel create spserver</code>. Identifies which tunnel to connect to at Cloudflare.</td></tr>
+            <tr><td class="le-code">credentials-file: /etc/cloudflared/...</td><td class="le-desc">Path to the JSON credentials file. This is the private key — it proves cloudflared is authorised to maintain this tunnel. Must be accessible by root.</td></tr>
+            <tr><td class="le-code">ingress:</td><td class="le-desc">Start of the routing rules section. Rules are checked top to bottom — first match wins.</td></tr>
+            <tr><td class="le-code">- hostname: terminal.dustyserver.co.in</td><td class="le-desc">Match requests for this exact hostname. Must match the DNS CNAME record created for this subdomain.</td></tr>
+            <tr><td class="le-code">service: http://localhost:7681</td><td class="le-desc">Forward matched requests to ttyd on port 7681. localhost = the server itself. http:// = plain HTTP (Cloudflare handles HTTPS termination before the tunnel).</td></tr>
+            <tr><td class="le-code">- service: http_status:404</td><td class="le-desc"><b>Required catch-all — must be the last rule.</b> Returns HTTP 404 for any hostname not matched above. cloudflared refuses to start without this.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-ingress">
+        <div class="section-eyebrow">03 — Ingress deep dive</div>
+        <div class="section-title">Ingress rule options and service types</div>
+        <p class="section-body">The <code>service</code> field accepts different formats depending on what you want to forward to:</p>
+        <table class="kv-table">
+          <thead><tr><th>Service format</th><th>Use case</th></tr></thead>
+          <tbody>
+            <tr><td class="key">http://localhost:PORT</td><td class="desc">Standard HTTP service on the same server. Most common — used for Nginx, ttyd, Filebrowser, Flask.</td></tr>
+            <tr><td class="key">https://localhost:PORT</td><td class="desc">HTTPS service running locally. cloudflared connects with TLS to the local service. Use if local service requires HTTPS.</td></tr>
+            <tr><td class="key">ssh://localhost:22</td><td class="desc">SSH service. Enables SSH via browser using cloudflared client on client machine. Requires extra client setup.</td></tr>
+            <tr><td class="key">tcp://localhost:PORT</td><td class="desc">Raw TCP tunnelling. Forward any TCP service — databases, custom protocols. Requires cloudflared on client too.</td></tr>
+            <tr><td class="key">http_status:404</td><td class="desc">Return an HTTP status code directly — no backend service. Used for catch-all.</td></tr>
+            <tr><td class="key">http_status:503</td><td class="desc">Return 503 Service Unavailable — useful for maintenance mode on a specific subdomain.</td></tr>
+          </tbody>
+        </table>
+        <p class="section-body">Additional ingress options you can add per rule:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">config.yml — advanced ingress options</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">ingress</span>:
+  - <span class="nm">hostname</span>: <span class="str">flask.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:5000</span>
+    <span class="kw">originRequest</span>:
+      <span class="nm">connectTimeout</span>: <span class="str">10s</span>         <span class="cm"># timeout connecting to local service</span>
+      <span class="nm">noTLSVerify</span>: <span class="str">false</span>           <span class="cm"># verify TLS cert (for https:// services)</span>
+      <span class="nm">disableChunkedEncoding</span>: <span class="str">false</span></pre>
+        </div>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-tunnel">
+        <div class="section-eyebrow">01 — Tunnel management</div>
+        <div class="section-title">cloudflared tunnel commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel login</div><div class="cmd-desc">Authenticate with Cloudflare — opens browser URL. Run once per machine.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel create NAME</div><div class="cmd-desc">Create a new named tunnel. Generates tunnel ID and credentials JSON.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel list</div><div class="cmd-desc">List all tunnels in your Cloudflare account with their IDs and status.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel info spserver</div><div class="cmd-desc">Show detailed info about the spserver tunnel — connections, config.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel route dns spserver HOSTNAME</div><div class="cmd-desc">Create a CNAME DNS record routing HOSTNAME to the spserver tunnel.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel route dns --overwrite-dns spserver HOSTNAME</div><div class="cmd-desc">Same but overwrites an existing DNS record for this hostname.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel run spserver</div><div class="cmd-desc">Run the tunnel manually (foreground) — useful for testing before installing as service.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel --config /etc/cloudflared/config.yml run</div><div class="cmd-desc">Run with explicit config file path.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel delete spserver</div><div class="cmd-desc">Delete a tunnel from Cloudflare. Removes it from account — use with caution.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cloudflared tunnel cleanup spserver</div><div class="cmd-desc">Clean up inactive connections for a tunnel.</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-service">
+        <div class="section-eyebrow">02 — Service management</div>
+        <div class="section-title">cloudflared systemd service commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo cloudflared service install</div><div class="cmd-desc">Install cloudflared as a systemd service. Reads /etc/cloudflared/config.yml.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo cloudflared service uninstall</div><div class="cmd-desc">Remove the systemd service. Does not delete the tunnel from Cloudflare.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status cloudflared</div><div class="cmd-desc">Check tunnel status. Look for 4 registered connections for full redundancy.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart cloudflared</div><div class="cmd-desc">Restart after changing config.yml. Always run after editing the config.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable cloudflared</div><div class="cmd-desc">Auto-start tunnel on every boot.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u cloudflared -f</div><div class="cmd-desc">Follow live cloudflared logs — shows connections, errors, request routing.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u cloudflared --since "5 minutes ago"</div><div class="cmd-desc">Show cloudflared logs from the last 5 minutes — useful after restarting.</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup subdomain.dustyserver.co.in</div><div class="cmd-desc">Verify DNS record exists and returns Cloudflare IPs (104.21.x.x / 172.67.x.x).</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -I https://dustyserver.co.in</div><div class="cmd-desc">Test the tunnel is working — should return HTTP 200 with Cloudflare headers.</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">sudo cloudflared service install — "No file config.yml found"</div>
+          <div class="bb-body">
+            After creating the tunnel and config file in <code>~/.cloudflared/</code>, running <code>sudo cloudflared service install</code> gave the error: "Cannot determine default configuration path. No file [config.yml config.yaml] in [~/.cloudflared /etc/cloudflared ...]". The config file existed — but in the wrong location.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Root cause and fix</div>
+          <div class="fb-title">~ means /root/ when using sudo — copy config to /etc/cloudflared/</div>
+          <div class="fb-body">
+            When <code>sudo</code> runs a command, it runs as root. The tilde <code>~</code> expands to the home directory of the current user — for root, that is <code>/root/</code>, not <code>/home/sipu/</code>. So <code>sudo cloudflared service install</code> looked in <code>/root/.cloudflared/</code> — which was empty. Fix: copy both the config.yml and the credentials JSON to <code>/etc/cloudflared/</code> — a system-wide path accessible by root from any context. Update the credentials-file path in config.yml to reflect the new location.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">502 Bad Gateway — typo in config.yml service URL</div>
+          <div class="bb-body">
+            After setting up ttyd, opening <code>terminal.dustyserver.co.in</code> showed "502 Bad Gateway". cloudflared logs showed "Unable to reach the origin service". ttyd was running and responding to <code>curl http://localhost:7681</code>. The tunnel config looked correct at first glance.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Typo: "locakhost" instead of "localhost"</div>
+          <div class="fb-body">
+            Careful inspection of config.yml revealed: <code>service: http://locakhost:7681</code> — "locakhost" instead of "localhost". A single transposed character made the service URL completely wrong. cloudflared was trying to connect to a hostname called "locakhost" which doesn't exist. Fixed the typo, restarted cloudflared, terminal immediately accessible.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Third-level subdomain (flask.test.dustyserver.co.in) not working</div>
+          <div class="bb-body">
+            Initially used <code>flask.test.dustyserver.co.in</code> as the hostname for the Flask app — a third-level subdomain. The DNS record was created but the subdomain was not resolving correctly and the site showed errors.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Use second-level subdomains only</div>
+          <div class="fb-body">
+            Cloudflare's free plan has limitations around multi-level wildcard DNS. Third-level subdomains like <code>flask.test.dustyserver.co.in</code> are unreliable on the free tier. The fix was to use a direct second-level subdomain: <code>flask.dustyserver.co.in</code>. Additionally, the ingress rule needed to be moved to the correct position — before the main domain rules.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Cloudflare Tunnel problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">502 Bad Gateway</div>
+          <div class="ts-body">
+            The tunnel is reaching the server but cloudflared can't connect to the local service. Diagnostic steps: (1) Is the service running? <code>sudo systemctl status SERVICE</code>. (2) Is it on the right port? <code>sudo ss -tlnp | grep PORT</code>. (3) Test locally: <code>curl http://localhost:PORT</code> — if this fails, the service isn't running or is on a different port. (4) Check config.yml for typos — especially "locakhost" vs "localhost". (5) Restart cloudflared after fixing: <code>sudo systemctl restart cloudflared</code>.
+          </div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">cloudflared service won't start — "config.yml not found"</div>
+          <div class="ts-body">
+            Config is in the wrong location. Check: <code>ls /etc/cloudflared/</code> — both config.yml and the credentials JSON should be there. If missing: <code>sudo mkdir -p /etc/cloudflared</code>, copy config and JSON from <code>~/.cloudflared/</code>. Update the credentials-file path in config.yml to <code>/etc/cloudflared/UUID.json</code>. Then reinstall service: <code>sudo cloudflared service install</code>.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">DNS not propagated — subdomain not resolving</div>
+          <div class="ts-body">
+            After running <code>cloudflared tunnel route dns</code>, wait 1-5 minutes. Test with <code>nslookup subdomain.dustyserver.co.in</code> — when it returns Cloudflare IPs (104.21.x.x or 172.67.x.x), it's ready. Open in incognito window to bypass browser DNS cache. If nslookup still shows nothing after 10 minutes, check Cloudflare dashboard DNS tab to verify the CNAME was created.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Tunnel shows only 1-2 connections instead of 4</div>
+          <div class="ts-body">
+            cloudflared maintains 4 connections to Cloudflare edge for redundancy. Fewer connections means some failed to establish — usually a temporary issue. Check <code>sudo journalctl -u cloudflared -f</code> for error messages. Usually self-resolves. If persistent: <code>sudo systemctl restart cloudflared</code>. The tunnel still works with fewer connections — it's just less redundant.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Config changes not taking effect after editing config.yml</div>
+          <div class="ts-body">
+            Must restart cloudflared after every config change — it doesn't hot-reload. Run: <code>sudo systemctl restart cloudflared</code>. Then check status: <code>sudo systemctl status cloudflared</code>. If cloudflared fails to start after a config change, there's likely a YAML syntax error — check with <code>cloudflared tunnel --config /etc/cloudflared/config.yml ingress validate</code>.
+          </div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Validate ingress rules without restarting</div>
+          <div class="ts-body">
+            Before restarting cloudflared after editing config, validate the config first: <code>cloudflared tunnel --config /etc/cloudflared/config.yml ingress validate</code>. This checks all ingress rules for syntax errors and confirms the catch-all is present. Saves you from a restart that fails.
+          </div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to check which tunnel connection is handling a request</div>
+          <div class="ts-body">
+            Check cloudflared logs: <code>sudo journalctl -u cloudflared -f</code>. When a request comes in, cloudflared logs the hostname matched and the service it forwarded to. This is the fastest way to confirm routing is working correctly and which ingress rule matched.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Access</b> — add authentication to any subdomain without touching your app code. Protect terminal.dustyserver.co.in with email OTP, Google SSO, or GitHub login. Configured in Cloudflare dashboard → Access → Applications. Free for up to 50 users.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare SSH tunnel</b> — add an ingress rule with <code>service: ssh://localhost:22</code>. Create <code>ssh.dustyserver.co.in</code>. SSH via browser using Cloudflare's web terminal, or via SSH client with a ProxyCommand. Requires cloudflared on client machines.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Pages / Workers</b> — host static sites and serverless functions at Cloudflare's edge. Complement spserver — static content on Cloudflare, dynamic content on spserver. Ultra-fast global delivery for static assets.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple tunnels</b> — create a second tunnel as a backup. If the primary goes down, routes can be pointed to the secondary. Relevant for high-availability setups as traffic grows.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare WAF rules</b> — Web Application Firewall. Write rules in Cloudflare dashboard to block specific traffic patterns, countries, or IPs before they reach the tunnel. Protects against common web attacks.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Analytics</b> — the Cloudflare dashboard shows request counts, bandwidth, cache hit rates, top countries, and threat blocked for all tunnelled services. Free insight into who's visiting your services.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>docs.dustyserver.co.in</b> — host this knowledge base publicly. Add an Nginx location block or a separate service pointing to /var/www/docs. Add ingress rule for docs.dustyserver.co.in pointing to localhost:80. Done.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

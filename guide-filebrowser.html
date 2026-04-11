@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Filebrowser — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.feature-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.fc-icon  { font-size: 22px; margin-bottom: .4rem; }
+.fc-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: .25rem; }
+.fc-body  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+.vs-table-wrap { margin: .75rem 0; overflow-x: auto; }
+@media(max-width:768px){ .feature-grid{ grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Filebrowser</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-fb')">What is Filebrowser</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-for')">What we use it for</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-alternatives')">vs Samba vs SFTP</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install binary</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-init')">Initialise database</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-user')">Create admin user</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-service')">Create systemd service</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-ufw')">Open firewall</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-tunnel')">Expose via Cloudflare</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-service')">Service file explained</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-flags')">All flags reference</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-tunnel')">Tunnel config entry</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-fb')">Filebrowser commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 13 of 14</div>
+      <h1 class="gh-title"><span>Filebrowser</span></h1>
+      <p class="gh-sub">A self-hosted web file manager — browse, upload, download, rename and delete server files from any browser anywhere in the world. fileserver.dustyserver.co.in from your phone, no apps required.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-fb">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is Filebrowser</div>
+        <p class="section-body">
+          Filebrowser is a lightweight, self-hosted web file manager. It runs as a tiny binary on spserver, listens on port 8080, and serves a clean web interface where you can browse folders, upload and download files, rename items, create directories, and delete files — all from any browser, from anywhere.
+        </p>
+        <p class="section-body">
+          Think of it as a self-hosted Google Drive for your server — except it is just a single binary, uses about 10MB of RAM, has zero external dependencies, and stores all its configuration in a single SQLite database file. It requires no Docker, no runtime, no Node or Python — just the binary.
+        </p>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <div class="fc-icon">📁</div>
+            <div class="fc-title">Browse files</div>
+            <div class="fc-body">Navigate the server filesystem from any browser. Folder tree, file listing, file sizes, modification dates.</div>
+          </div>
+          <div class="feature-card">
+            <div class="fc-icon">⬆️</div>
+            <div class="fc-title">Upload files</div>
+            <div class="fc-body">Drag and drop files from your PC to the server. Supports multiple files, shows progress. Works from mobile too.</div>
+          </div>
+          <div class="feature-card">
+            <div class="fc-icon">⬇️</div>
+            <div class="fc-title">Download files</div>
+            <div class="fc-body">Download any file or folder (as zip). Pull logs, configs, or project files directly to your local machine.</div>
+          </div>
+          <div class="feature-card">
+            <div class="fc-icon">✏️</div>
+            <div class="fc-title">Edit text files</div>
+            <div class="fc-body">Built-in text editor for config files, scripts, HTML. Syntax highlighting for common file types. Edit without SSH.</div>
+          </div>
+          <div class="feature-card">
+            <div class="fc-icon">🔍</div>
+            <div class="fc-title">Search files</div>
+            <div class="fc-body">Search by filename across the exposed directory. Quick way to find files without SSH and grep.</div>
+          </div>
+          <div class="feature-card">
+            <div class="fc-icon">👤</div>
+            <div class="fc-title">Multiple users</div>
+            <div class="fc-body">Create multiple users with different scopes and permissions. Each user sees only their allowed directories.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Filebrowser is login-protected. All users must authenticate with a username and password before accessing anything. The admin user is created during setup.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-for">
+        <div class="section-eyebrow">02 — Use case</div>
+        <div class="section-title">What we use Filebrowser for on spserver</div>
+        <p class="section-body">
+          The root directory for Filebrowser is set to <code>/home/sipu/shared</code> — the same shared folder exposed via Samba. This means the same files are accessible two ways:
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">At home — use Samba</div>
+            <div class="ic-body">Full speed LAN access. Drag-drop from Windows File Explorer. Edit files in-place. Native drive letter. Fast — no internet roundtrip.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">Away from home — use Filebrowser</div>
+            <div class="ic-body">Works from any browser anywhere. Upload files from phone. Download a file you need. No apps, no VPN clients, no SSH. Just open fileserver.dustyserver.co.in.</div>
+          </div>
+        </div>
+        <p class="section-body">
+          Filebrowser is also useful for quick file edits via the built-in editor — fixing a config file, editing an HTML guide page, tweaking a script — without needing to SSH in and use nano.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-alternatives">
+        <div class="section-eyebrow">03 — Alternatives</div>
+        <div class="section-title">Filebrowser vs other file access methods</div>
+        <table class="kv-table">
+          <thead><tr><th>Method</th><th>Remote?</th><th>Browser?</th><th>Edit in-place?</th><th>Upload/Download</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Filebrowser <span class="tag tag-g">this guide</span></td>
+              <td class="val green">Yes</td>
+              <td class="val green">Yes</td>
+              <td class="desc">Text files only</td>
+              <td class="val green">Yes</td>
+              <td class="desc">Remote access from any device, no client needed</td>
+            </tr>
+            <tr>
+              <td class="key">Samba</td>
+              <td class="val">Local only</td>
+              <td class="val">No</td>
+              <td class="val green">Yes — full</td>
+              <td class="val green">Yes — fast</td>
+              <td class="desc">Daily local file access at LAN speed</td>
+            </tr>
+            <tr>
+              <td class="key">SFTP / SCP</td>
+              <td class="val green">Yes (Tailscale)</td>
+              <td class="val">No — needs client</td>
+              <td class="desc">App-dependent</td>
+              <td class="val green">Yes</td>
+              <td class="desc">Command line or power users, scripted transfers</td>
+            </tr>
+            <tr>
+              <td class="key">Nextcloud</td>
+              <td class="val green">Yes</td>
+              <td class="val green">Yes</td>
+              <td class="val green">Yes — full suite</td>
+              <td class="val green">Yes + sync</td>
+              <td class="desc">Full Google Drive replacement — much heavier</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>Filebrowser and Samba are complementary — not competing. Samba for local speed, Filebrowser for remote access. Both point to the same <code>/home/sipu/shared</code> directory.</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Step 1 — Download and install the binary</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install Filebrowser binary</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Filebrowser is distributed as a single self-contained binary — no package manager, no runtime, no dependencies. The official install script detects your architecture (amd64 in our case) and installs the binary to <code>/usr/local/bin/filebrowser</code>.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Official install script — detects architecture automatically</span>
+<span class="nm">curl -fsSL https://raw.githubusercontent.com/filebrowser/get/master/get.sh | bash</span>
+
+<span class="cm"># Confirm binary installed correctly</span>
+<span class="nm">filebrowser version</span>
+<span class="cm"># Should print: Filebrowser v2.x.x</span>
+
+<span class="cm"># Confirm binary location</span>
+<span class="nm">which filebrowser</span>
+<span class="cm"># Should print: /usr/local/bin/filebrowser</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-init">
+        <div class="section-eyebrow">02 — Initialise</div>
+        <div class="section-title">Step 2 — Create database and configure root directory</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Initialise the SQLite database</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Filebrowser stores all its configuration — users, settings, permissions — in a single SQLite database file. We keep this in <code>/home/sipu/filebrowser/</code> to keep it separate from the shared files it manages.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create directory for the database</span>
+<span class="nm">mkdir -p</span> /home/sipu/filebrowser
+
+<span class="cm"># Initialise a new Filebrowser database</span>
+<span class="nm">filebrowser config init</span> \
+  --database /home/sipu/filebrowser/filebrowser.db
+
+<span class="cm"># Set the root directory — what files Filebrowser exposes</span>
+<span class="nm">filebrowser config set</span> \
+  --root /home/sipu/shared \
+  --database /home/sipu/filebrowser/filebrowser.db
+
+<span class="cm"># Verify the config was saved</span>
+<span class="nm">filebrowser config cat</span> \
+  --database /home/sipu/filebrowser/filebrowser.db</pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>The <code>--root</code> path is the top-level directory Filebrowser can access. Users cannot browse above this directory — it acts as a filesystem jail. We set it to <code>/home/sipu/shared</code> so only that folder is exposed, not the entire home directory.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-user">
+        <div class="section-eyebrow">03 — User</div>
+        <div class="section-title">Step 3 — Create the admin user</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Add admin user to the database</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Filebrowser requires at least one user to login. The <code>--perm.admin</code> flag grants full admin rights — can create other users, change settings, access all files. This is your main login for the web interface.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create admin user</span>
+<span class="cm"># Replace 'yourpassword' with a strong password</span>
+<span class="nm">filebrowser users add</span> sipu yourpassword \
+  --perm.admin \
+  --database /home/sipu/filebrowser/filebrowser.db
+
+<span class="cm"># Verify user was created</span>
+<span class="nm">filebrowser users ls</span> \
+  --database /home/sipu/filebrowser/filebrowser.db
+<span class="cm"># Should list: ID | Username | Scope | Admin</span>
+<span class="cm">#              1  | sipu     | .     | true</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>The default Filebrowser username/password is admin/admin — <b>change it immediately</b> or create your own user as shown above. The web interface is publicly accessible via Cloudflare Tunnel and brute force bots will find it.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-service">
+        <div class="section-eyebrow">04 — Service</div>
+        <div class="section-title">Step 4 — Create the systemd service</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Write and enable the service file</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">A systemd service ensures Filebrowser starts automatically on boot and restarts on crash. The <b>critical flag</b> here is <code>--address 0.0.0.0</code> — without it, Filebrowser binds to <code>127.0.0.1</code> (localhost only) and becomes completely unreachable from the network. This was the main blocker during setup.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo nano</span> /etc/systemd/system/filebrowser.service</pre>
+            </div>
+            <p class="step-why">Paste this content:</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/systemd/system/filebrowser.service</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>[<span class="kw">Unit</span>]
+<span class="nm">Description</span>=Filebrowser web file manager
+<span class="nm">After</span>=network.target
+
+[<span class="kw">Service</span>]
+<span class="nm">ExecStart</span>=/usr/local/bin/filebrowser \
+  --database /home/sipu/filebrowser/filebrowser.db \
+  --port 8080 \
+  --address 0.0.0.0
+<span class="nm">Restart</span>=always
+<span class="nm">RestartSec</span>=5
+<span class="nm">User</span>=sipu
+
+[<span class="kw">Install</span>]
+<span class="nm">WantedBy</span>=multi-user.target</pre>
+            </div>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — enable and start</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo systemctl daemon-reload</span>
+<span class="nm">sudo systemctl enable filebrowser</span>
+<span class="nm">sudo systemctl start filebrowser</span>
+<span class="nm">sudo systemctl status filebrowser</span>
+<span class="cm"># Look for: Active: active (running)</span>
+
+<span class="cm"># Confirm it is listening on 0.0.0.0:8080</span>
+<span class="nm">sudo ss -tlnp | grep 8080</span>
+<span class="cm"># Should show: 0.0.0.0:8080 ← critical, not 127.0.0.1:8080</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-ufw">
+        <div class="section-eyebrow">05 — Firewall</div>
+        <div class="section-title">Step 5 — Open port 8080 in UFW</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Allow port 8080</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">UFW blocks all incoming by default. Without this rule, Filebrowser is running and bound to 0.0.0.0:8080 — but UFW drops all packets before they reach it. Opening the port allows local network access on port 8080 and also allows cloudflared to forward traffic from the tunnel to localhost:8080.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo ufw allow 8080/tcp</span>
+<span class="nm">sudo ufw status</span>
+<span class="cm"># Should show: 8080/tcp   ALLOW   Anywhere</span>
+
+<span class="cm"># Quick local test — from Windows PC browser</span>
+<span class="cm"># Open: http://192.168.31.150:8080</span>
+<span class="cm"># Should see the Filebrowser login page</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-tunnel">
+        <div class="section-eyebrow">06 — Public access</div>
+        <div class="section-title">Step 6 — Expose via Cloudflare Tunnel</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">Add ingress rule and DNS record</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Without this step, Filebrowser is only reachable on the local network. Adding it to the Cloudflare Tunnel makes it accessible at fileserver.dustyserver.co.in from anywhere in the world with HTTPS and DDoS protection.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Step 1: Add ingress rule to Cloudflare Tunnel config</span>
+<span class="nm">sudo nano</span> /etc/cloudflared/config.yml
+<span class="cm"># Add this block BEFORE the catch-all line:</span>
+<span class="cm">#   - hostname: fileserver.dustyserver.co.in</span>
+<span class="cm">#     service: http://localhost:8080</span>
+
+<span class="cm"># Step 2: Create the DNS CNAME record</span>
+<span class="nm">cloudflared tunnel route dns spserver</span> fileserver.dustyserver.co.in
+
+<span class="cm"># Step 3: Restart cloudflared</span>
+<span class="nm">sudo systemctl restart cloudflared</span>
+
+<span class="cm"># Step 4: Wait 1-2 minutes for DNS propagation</span>
+<span class="cm"># Step 5: Open https://fileserver.dustyserver.co.in</span>
+<span class="cm"># Login with sipu / yourpassword</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>Once live, fileserver.dustyserver.co.in works from your phone on mobile data, your work PC, a friend's laptop — any browser anywhere. Login with your Filebrowser credentials (set in step 3).</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-service">
+        <div class="section-eyebrow">01 — Service file</div>
+        <div class="section-title">systemd service file — every line explained</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/systemd/system/filebrowser.service</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>[<span class="kw">Unit</span>]
+<span class="nm">Description</span>=Filebrowser web file manager
+<span class="nm">After</span>=network.target
+
+[<span class="kw">Service</span>]
+<span class="nm">ExecStart</span>=/usr/local/bin/filebrowser \
+  --database /home/sipu/filebrowser/filebrowser.db \
+  --port 8080 \
+  --address 0.0.0.0
+<span class="nm">Restart</span>=always
+<span class="nm">RestartSec</span>=5
+<span class="nm">User</span>=sipu
+
+[<span class="kw">Install</span>]
+<span class="nm">WantedBy</span>=multi-user.target</pre>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:38%">Line</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">After=network.target</td><td class="le-desc">Wait for networking to be available before starting — ensures Filebrowser can bind to port 8080 on startup.</td></tr>
+            <tr><td class="le-code">ExecStart=...</td><td class="le-desc">Full path to binary — required for systemd services. The service won't find binaries in PATH the same way your shell does.</td></tr>
+            <tr><td class="le-code">--database /home/sipu/filebrowser/filebrowser.db</td><td class="le-desc">Points to the SQLite database containing all users, settings, and permissions. Must exist before starting.</td></tr>
+            <tr><td class="le-code">--port 8080</td><td class="le-desc">Port to listen on. Port 8080 was chosen to avoid conflict with Nginx on port 80. Must match the UFW rule and Cloudflare Tunnel ingress config.</td></tr>
+            <tr><td class="le-code">--address 0.0.0.0</td><td class="le-desc"><b>Critical.</b> Bind to all network interfaces. Without this, Filebrowser binds to 127.0.0.1 (localhost) and is only reachable from the server itself — not from the network or Cloudflare Tunnel.</td></tr>
+            <tr><td class="le-code">Restart=always</td><td class="le-desc">If Filebrowser crashes or is killed, systemd automatically restarts it.</td></tr>
+            <tr><td class="le-code">RestartSec=5</td><td class="le-desc">Wait 5 seconds before restarting — prevents rapid crash loops.</td></tr>
+            <tr><td class="le-code">User=sipu</td><td class="le-desc">Run as sipu (not root). Filebrowser only needs access to /home/sipu/shared — no root privileges required. Principle of least privilege.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-flags">
+        <div class="section-eyebrow">02 — CLI flags</div>
+        <div class="section-title">All useful Filebrowser flags</div>
+        <table class="kv-table">
+          <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td class="key">--database PATH</td><td class="desc">Path to the SQLite database file. Required — all config and users live here.</td></tr>
+            <tr><td class="key">--port PORT</td><td class="desc">TCP port to listen on. Default is 8080.</td></tr>
+            <tr><td class="key">--address ADDRESS</td><td class="desc"><b>Critical.</b> IP address to bind to. Use <code>0.0.0.0</code> to accept connections from any interface. Default is <code>127.0.0.1</code> (localhost only).</td></tr>
+            <tr><td class="key">--root PATH</td><td class="desc">Root directory to expose. Users cannot browse above this path. Set during init with <code>filebrowser config set --root</code>.</td></tr>
+            <tr><td class="key">--log PATH</td><td class="desc">Write logs to a file instead of stdout. Useful for debugging — <code>--log /var/log/filebrowser.log</code>.</td></tr>
+            <tr><td class="key">--baseurl PATH</td><td class="desc">Serve Filebrowser at a sub-path — e.g. <code>--baseurl /files</code> makes it available at <code>http://host:8080/files</code>. Useful if behind a reverse proxy serving multiple apps on one domain.</td></tr>
+            <tr><td class="key">--cert PATH --key PATH</td><td class="desc">Serve directly over HTTPS using your own certificate. Not needed since Cloudflare handles TLS — use with Flexible or Full Strict SSL modes if needed.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-tunnel">
+        <div class="section-eyebrow">03 — Tunnel entry</div>
+        <div class="section-title">Cloudflare Tunnel config entry for Filebrowser</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/cloudflared/config.yml</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">tunnel</span>: <span class="str">b72cf76b-0820-44cb-90df-f4c58ed87184</span>
+<span class="nm">credentials-file</span>: <span class="str">/etc/cloudflared/b72cf76b-0820-44cb-90df-f4c58ed87184.json</span>
+
+<span class="kw">ingress</span>:
+  - <span class="nm">hostname</span>: <span class="str">terminal.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:7681</span>
+  - <span class="nm">hostname</span>: <span class="str">fileserver.dustyserver.co.in</span>   <span class="cm"># ← Filebrowser rule</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:8080</span>
+  - <span class="nm">hostname</span>: <span class="str">flask.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:5000</span>
+  - <span class="nm">hostname</span>: <span class="str">dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">hostname</span>: <span class="str">www.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">service</span>: <span class="str">http_status:404</span></pre>
+        </div>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-fb">
+        <div class="section-eyebrow">01 — Commands</div>
+        <div class="section-title">Filebrowser management commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status filebrowser</div><div class="cmd-desc">Check if Filebrowser is running — green active means it's listening on port 8080</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart filebrowser</div><div class="cmd-desc">Restart Filebrowser — use after editing the service file</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable filebrowser</div><div class="cmd-desc">Auto-start on every boot</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u filebrowser -f</div><div class="cmd-desc">Follow Filebrowser logs live — shows logins, file operations, errors</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ss -tlnp | grep 8080</div><div class="cmd-desc">Verify Filebrowser is listening — should show 0.0.0.0:8080 not 127.0.0.1:8080</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl http://localhost:8080</div><div class="cmd-desc">Test Filebrowser is responding locally — should return HTML login page</div></div>
+          <div class="cmd-row"><div class="cmd-code">filebrowser users ls --database /home/sipu/filebrowser/filebrowser.db</div><div class="cmd-desc">List all Filebrowser users</div></div>
+          <div class="cmd-row"><div class="cmd-code">filebrowser users add NAME PASS --perm.admin --database PATH</div><div class="cmd-desc">Add a new admin user to Filebrowser</div></div>
+          <div class="cmd-row"><div class="cmd-code">filebrowser users rm NAME --database PATH</div><div class="cmd-desc">Remove a Filebrowser user</div></div>
+          <div class="cmd-row"><div class="cmd-code">filebrowser config cat --database PATH</div><div class="cmd-desc">Show the current Filebrowser configuration</div></div>
+          <div class="cmd-row"><div class="cmd-code">filebrowser config set --root /path --database PATH</div><div class="cmd-desc">Change the root directory that Filebrowser exposes</div></div>
+          <div class="cmd-row"><div class="cmd-code">filebrowser version</div><div class="cmd-desc">Show installed Filebrowser version</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during Filebrowser setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1 — The big one</div>
+          <div class="bb-title">Filebrowser running but completely unreachable — browser shows nothing</div>
+          <div class="bb-body">
+            After installing and starting Filebrowser, <code>sudo systemctl status filebrowser</code> showed it was running. But opening <code>http://192.168.31.150:8080</code> in the Windows PC browser showed "This site can't be reached" — ERR_CONNECTION_REFUSED. The service was running but accepting no connections from the network.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Root cause and fix</div>
+          <div class="fb-title">Missing --address 0.0.0.0 — Filebrowser was binding to 127.0.0.1</div>
+          <div class="fb-body">
+            The default Filebrowser bind address is <code>127.0.0.1</code> (localhost only). Without explicitly setting <code>--address 0.0.0.0</code>, Filebrowser only accepts connections from the server itself — not from the network or Cloudflare Tunnel. Running <code>sudo ss -tlnp | grep 8080</code> confirmed it: <code>127.0.0.1:8080</code> — not <code>0.0.0.0:8080</code>. Fix: add <code>--address 0.0.0.0</code> to ExecStart in the service file, reload daemon, restart service. Browser immediately connected.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Port 8080 accessible locally but not from internet (Cloudflare 502)</div>
+          <div class="bb-body">
+            After fixing the address issue, Filebrowser was accessible on the local network at <code>http://192.168.31.150:8080</code>. But opening <code>https://fileserver.dustyserver.co.in</code> showed 502 Bad Gateway. Cloudflare Tunnel was running and cloudflared logs showed connection attempts.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">UFW was blocking port 8080</div>
+          <div class="fb-body">
+            Even though Cloudflare Tunnel connects internally on <code>localhost:8080</code> (so technically doesn't go through UFW's external rules), the UFW rule was still needed to allow cloudflared's connection. Running <code>sudo ufw allow 8080/tcp</code> immediately resolved the 502 error. Local network access worked because connections from 192.168.31.x are treated as local, but cloudflared's connection was being blocked. Lesson: always open the UFW port for every service, even if it's behind a tunnel.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Login works but files are not visible — empty directory listing</div>
+          <div class="bb-body">
+            After login, the file browser showed an empty directory even though <code>/home/sipu/shared</code> had files in it. The root directory was showing as correctly set to <code>/home/sipu/shared</code> in the Filebrowser settings.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Service running as wrong user — permission denied reading shared folder</div>
+          <div class="fb-body">
+            The service file initially had <code>User=root</code>. The <code>/home/sipu/shared</code> directory is owned by sipu with permissions 755 — root can read it, but the files inside had permissions that sipu created (644). The issue was actually subtler: the database was initialised with the root user's context, but the files were owned by sipu. Fix: change service to <code>User=sipu</code>, re-initialise the database as sipu (not sudo), reload and restart. Files appeared correctly.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Filebrowser problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Cannot reach Filebrowser — connection refused or timeout</div>
+          <div class="ts-body">Check in order: (1) Is service running? <code>sudo systemctl status filebrowser</code>. (2) What address is it binding to? <code>sudo ss -tlnp | grep 8080</code> — must show <code>0.0.0.0:8080</code> not <code>127.0.0.1:8080</code>. If 127.0.0.1 — add <code>--address 0.0.0.0</code> to ExecStart. (3) Is UFW allowing port 8080? <code>sudo ufw status</code>. (4) Test locally first: <code>curl http://localhost:8080</code>.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">fileserver.dustyserver.co.in shows 502 Bad Gateway</div>
+          <div class="ts-body">Cloudflare Tunnel can't reach Filebrowser. Check: (1) Is Filebrowser running? (2) Is it on port 8080 and bound to 0.0.0.0? (3) Is UFW allowing 8080? (4) Check cloudflared config.yml — is the ingress rule for fileserver.dustyserver.co.in pointing to <code>http://localhost:8080</code>? (5) Check for typos — "localhost" not "locakhost". Restart cloudflared after fixing.</td></div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Login fails — "wrong credentials"</div>
+          <div class="ts-body">The default credentials (admin/admin) may not work if you initialised the database with a different user. Check which users exist: <code>filebrowser users ls --database /home/sipu/filebrowser/filebrowser.db</code>. If the user doesn't exist — add it: <code>filebrowser users add sipu password --perm.admin --database PATH</code>. If you've forgotten the password — delete the user and re-add: <code>filebrowser users rm sipu --database PATH</code>.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Files show up but can't upload — permission denied</div>
+          <div class="ts-body">Filebrowser is running as a user that doesn't have write permission to the root directory. Check: <code>ls -la /home/sipu/shared</code> — confirm sipu owns it. Check service file User= setting — should be <code>User=sipu</code>. Also check directory permissions: <code>chmod 755 /home/sipu/shared</code> and <code>chown sipu:sipu /home/sipu/shared</code>.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Filebrowser starts then immediately stops</div>
+          <div class="ts-body">Database file is missing or corrupted. Check: <code>sudo journalctl -u filebrowser --since "5 minutes ago"</code> — look for error messages. Common cause: database path in ExecStart doesn't match where you created it. Verify: <code>ls -la /home/sipu/filebrowser/</code> — filebrowser.db should exist and be owned by sipu.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to change the root directory after setup</div>
+          <div class="ts-body">Stop the service, run: <code>filebrowser config set --root /new/path --database /home/sipu/filebrowser/filebrowser.db</code>, then restart the service. The change takes effect immediately. Note that existing user scopes (if any) may need updating too — in the Filebrowser web UI under Settings → Users.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple users with scoped access</b> — create separate users for different people or use cases. Each user can have a different root scope — e.g. a "guest" user that only sees /home/sipu/shared/public. Set in the Filebrowser web UI under Settings → Users → Add User → Scope.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Access in front of Filebrowser</b> — add email OTP or Google SSO before the Filebrowser login page. Anyone trying to access fileserver.dustyserver.co.in would need to verify their email first — adds a layer before even seeing the login form. Zero Trust → Access → Applications in Cloudflare dashboard.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Expand root directory</b> — change root from <code>/home/sipu/shared</code> to <code>/home/sipu</code> to expose more folders. Or add symlinks inside shared/ that point to other directories — Filebrowser follows symlinks, giving access to other parts of the filesystem through a controlled path.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nextcloud as upgrade path</b> — Nextcloud is a full Google Drive replacement with sync clients, mobile apps, calendar, contacts, and more. It is much heavier (~500MB RAM) but the natural evolution if file management needs grow. Can run alongside Filebrowser in Docker.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Filebrowser in Docker</b> — run Filebrowser as a Docker container instead of a bare binary. Easier to update (pull new image tag), easier to configure (docker-compose.yml), and fits into the Phase 2 containerisation approach. Official image: <code>filebrowser/filebrowser</code>.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Immich for photos</b> — if storing and managing photos on spserver, Immich is a self-hosted Google Photos alternative. Runs in Docker, has mobile apps for automatic upload, face recognition, album organisation. Good companion service alongside Filebrowser.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Samba File Sharing — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific styles ── */
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.share-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.share-card.rw  { border-top: 2px solid var(--green); }
+.share-card.ro  { border-top: 2px solid var(--amber); }
+.share-name { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--green); margin-bottom: .25rem; }
+.share-card.ro .share-name { color: var(--amber); }
+.share-path { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-bottom: .5rem; }
+.share-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: .5rem;
+}
+.badge-rw { background: var(--green2); color: var(--green); }
+.badge-ro { background: var(--amber2); color: var(--amber); }
+.share-desc { font-size: 13px; color: var(--text2); line-height: 1.55; }
+
+.vs-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin: .75rem 0;
+}
+.vs-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.vs-title { font-size: 14px; font-weight: 600; margin-bottom: .35rem; }
+.vs-body  { font-size: 13px; color: var(--text2); line-height: 1.65; }
+
+@media(max-width:768px){
+  .vs-row { grid-template-columns: 1fr; }
+  .share-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Samba File Sharing</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-samba')">What is Samba</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-smb')">What is SMB</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-it-works')">How it works</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('shares')">Shares on spserver</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-alternatives')">Alternatives</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install Samba</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-dirs')">Create shared folders</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-config')">Write smb.conf</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-user')">Set Samba password</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-ufw')">Open firewall</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-connect')">Connect from Windows</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-full')">Full smb.conf</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-explained')">Every line explained</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-options')">Useful options</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-samba')">Samba commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 14 of 14</div>
+      <h1 class="gh-title">Samba <span>File Sharing</span></h1>
+      <p class="gh-sub">Access spserver files from Windows PC like a network drive — drag, drop, edit directly over the local network at full LAN speed. No internet required, no Cloudflare needed.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config file</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-samba">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is Samba</div>
+        <p class="section-body">
+          Samba is a free, open-source implementation of the <b>SMB (Server Message Block) protocol</b> for Linux. SMB is the native file sharing protocol that Windows uses — it is what powers network drives, shared folders, and printer sharing in Windows environments. By running Samba on spserver, the server speaks Windows's own language — it shows up in File Explorer just like any other Windows machine on the network.
+        </p>
+        <p class="section-body">
+          The result: you can browse spserver's folders, drag files in and out, open documents directly, and edit them — all at full local network speed without going through the internet. A 1GB file transfers in about 8-10 seconds over ethernet, versus minutes over Cloudflare.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Samba is local network only. SMB ports (139, 445) are blocked by most ISPs and corporate firewalls — you cannot reach Samba from outside your home network. For remote file access, use Filebrowser (fileserver.dustyserver.co.in) instead.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-smb">
+        <div class="section-eyebrow">02 — Protocol</div>
+        <div class="section-title">What is SMB and why Linux needs Samba to speak it</div>
+        <p class="section-body">
+          SMB (Server Message Block) was developed by IBM in the 1980s, later refined by Microsoft, and became the standard for Windows file sharing. Windows understands SMB natively. Linux does not — SMB is not built into the Linux kernel. Samba is the software that bridges this gap, implementing the SMB protocol from scratch on Linux so that Windows machines can talk to it seamlessly.
+        </p>
+        <div class="diagram">
+<span class="db">Windows PC</span>  <span class="dm">──── SMB protocol ──── local network ────</span>  <span class="dg">spserver running Samba</span>
+<span class="dm">File Explorer sees:</span>  <span class="db">\\192.168.31.150\shared</span>
+<span class="dm">Samba presents it as:</span>  <span class="dg">a Windows-compatible network share</span>
+<span class="dm">Actual files live at:</span>  <span class="dg">/home/sipu/shared/ on Linux filesystem</span>
+        </div>
+        <p class="section-body">
+          Samba handles two ports: <b>139</b> (NetBIOS session service, older) and <b>445</b> (SMB directly over TCP, modern). Windows uses port 445 when connecting to a modern Samba server.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-it-works">
+        <div class="section-eyebrow">03 — Architecture</div>
+        <div class="section-title">How Samba works on spserver</div>
+        <div class="diagram">
+<span class="dm">spserver runs two Samba daemons:</span>
+
+<span class="dg">smbd</span>  <span class="dm">← handles file sharing — ports 139 and 445</span>
+<span class="dm">       reads /etc/samba/smb.conf for share definitions</span>
+<span class="dm">       authenticates users against Samba's own password database</span>
+<span class="dm">       manages file locks, permissions, sessions</span>
+
+<span class="dg">nmbd</span>  <span class="dm">← NetBIOS name service — port 137/138</span>
+<span class="dm">       advertises spserver name on the local network</span>
+<span class="dm">       enables Windows to find the server by name (\\spserver)</span>
+<span class="dm">       less important on modern networks — direct IP works fine</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Samba has its <b>own password database</b> separate from Linux system passwords. A user must exist as a Linux user AND have a Samba password set. Same username, but the passwords can be different. Set with <code>sudo smbpasswd -a USERNAME</code>.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="shares">
+        <div class="section-eyebrow">04 — Current setup</div>
+        <div class="section-title">Shares configured on spserver</div>
+        <div class="share-grid">
+          <div class="share-card rw">
+            <div class="share-name">[shared]</div>
+            <div class="share-path">/home/sipu/shared</div>
+            <div class="share-badge badge-rw">read-write</div>
+            <div class="share-desc">General purpose file drop zone. Move files between Windows PC and server. Store anything you want accessible from both.</div>
+          </div>
+          <div class="share-card ro">
+            <div class="share-name">[certs]</div>
+            <div class="share-path">/home/sipu/certs</div>
+            <div class="share-badge badge-ro">read-only</div>
+            <div class="share-desc">SSL certificates and sensitive key files. Read-only so you can view but not accidentally modify or delete certificates.</div>
+          </div>
+          <div class="share-card rw">
+            <div class="share-name">[projects]</div>
+            <div class="share-path">/home/sipu/projects</div>
+            <div class="share-badge badge-rw">read-write</div>
+            <div class="share-desc">All server projects — Flask app, nginx-proxy, etc. Edit project files directly from Windows using VS Code or any editor.</div>
+          </div>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Editing Docker project files via Samba while containers are running can cause issues — the container may have the old version cached. After editing via Samba, rebuild with <code>docker compose up -d --build</code>.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-alternatives">
+        <div class="section-eyebrow">05 — Alternatives</div>
+        <div class="section-title">Samba vs other file access methods</div>
+        <div class="vs-row">
+          <div class="vs-card">
+            <div class="vs-title" style="color:var(--green)">Samba <span class="tag tag-g">local</span></div>
+            <div class="vs-body">Full network drive. Drag-drop, edit-in-place. LAN speed (~100Mbps). Works offline. Windows native. Local network only.</div>
+          </div>
+          <div class="vs-card">
+            <div class="vs-title" style="color:var(--blue)">Filebrowser <span class="tag tag-b">remote</span></div>
+            <div class="vs-body">Browser-based file manager. Upload/download only — no edit-in-place. Works from anywhere via Cloudflare Tunnel. Slower than Samba.</div>
+          </div>
+          <div class="vs-card">
+            <div class="vs-title" style="color:var(--amber)">SFTP/SCP <span class="tag tag-a">remote</span></div>
+            <div class="vs-body">SSH-based file transfer. Works via Tailscale from anywhere. Command-line or apps like WinSCP. No native Windows drive letter. Fast and secure.</div>
+          </div>
+        </div>
+        <table class="kv-table">
+          <thead><tr><th>Method</th><th>Speed</th><th>Remote?</th><th>Edit in-place?</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Samba <span class="tag tag-g">chosen</span></td>
+              <td class="val green">LAN speed</td>
+              <td class="desc">Local only (Tailscale helps)</td>
+              <td class="desc">Yes — native drive</td>
+              <td class="desc">Daily local file access, project editing</td>
+            </tr>
+            <tr>
+              <td class="key">Filebrowser</td>
+              <td class="val">Internet speed</td>
+              <td class="desc">Yes — any browser</td>
+              <td class="desc">No — upload/download</td>
+              <td class="desc">Remote access from any device</td>
+            </tr>
+            <tr>
+              <td class="key">SFTP</td>
+              <td class="val">SSH speed</td>
+              <td class="desc">Yes — via Tailscale</td>
+              <td class="desc">App-dependent</td>
+              <td class="desc">Scripted transfers, power users</td>
+            </tr>
+            <tr>
+              <td class="key">NFS</td>
+              <td class="val green">LAN speed</td>
+              <td class="desc">Local only</td>
+              <td class="desc">Yes — but Linux clients only</td>
+              <td class="desc">Linux-to-Linux sharing</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Step 1 — Install Samba</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install and verify</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The <code>samba</code> package installs both smbd (file sharing) and nmbd (name resolution) daemons. It also creates the default config file at <code>/etc/samba/smb.conf</code>.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt install samba -y</span>
+
+<span class="cm"># Verify version installed</span>
+<span class="nm">samba --version</span>
+<span class="cm"># Should print: Version 4.19.x</span>
+
+<span class="cm"># Verify smbd is running</span>
+<span class="nm">sudo systemctl status smbd</span>
+
+<span class="cm"># Enable auto-start on boot</span>
+<span class="nm">sudo systemctl enable smbd</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-dirs">
+        <div class="section-eyebrow">02 — Folders</div>
+        <div class="section-title">Step 2 — Create shared directories</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Create folders and set permissions</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The directories must exist before Samba can share them. Permissions must allow the sipu user to read and write, and Samba to access the files on their behalf.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create the three shared directories</span>
+<span class="nm">mkdir -p</span> /home/sipu/shared
+<span class="nm">mkdir -p</span> /home/sipu/certs
+<span class="nm">mkdir -p</span> /home/sipu/projects
+
+<span class="cm"># Set ownership to sipu</span>
+<span class="nm">sudo chown -R sipu:sipu</span> /home/sipu/shared
+<span class="nm">sudo chown -R sipu:sipu</span> /home/sipu/certs
+<span class="nm">sudo chown -R sipu:sipu</span> /home/sipu/projects
+
+<span class="cm"># Set permissions: owner full access, others read-only</span>
+<span class="nm">sudo chmod 755</span> /home/sipu/shared /home/sipu/certs /home/sipu/projects</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-config">
+        <div class="section-eyebrow">03 — Configure</div>
+        <div class="section-title">Step 3 — Edit smb.conf</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Add share definitions to smb.conf</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">smb.conf already exists after install. We only need to append our share definitions at the bottom — the default global settings at the top are fine. Always validate with <code>testparm</code> before restarting.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo nano</span> /etc/samba/smb.conf
+<span class="cm"># Scroll to the very bottom and add the share definitions</span>
+<span class="cm"># See the Config tab for the exact content to add</span></pre>
+            </div>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — validate and restart</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Validate config — always run before restarting Samba</span>
+<span class="nm">testparm</span>
+<span class="cm"># Should end with: Loaded services file OK. — Server role: ROLE_STANDALONE</span>
+
+<span class="cm"># Restart Samba to apply changes</span>
+<span class="nm">sudo systemctl restart smbd</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-user">
+        <div class="section-eyebrow">04 — Authentication</div>
+        <div class="section-title">Step 4 — Set Samba password for sipu</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Create Samba password</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Samba maintains its own password database — separate from the Linux system password. The Linux user <code>sipu</code> must already exist (it does), and you run <code>smbpasswd -a</code> to add them to Samba's database with a Samba-specific password. This can be the same as the Linux password or different.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Add sipu to Samba's password database</span>
+<span class="cm"># -a flag = add new user</span>
+<span class="nm">sudo smbpasswd -a sipu</span>
+<span class="cm"># Enter password: (type your chosen Samba password)</span>
+<span class="cm"># Retype password:</span>
+<span class="cm"># Added user sipu.</span>
+
+<span class="cm"># Verify sipu is in the Samba database</span>
+<span class="nm">sudo pdbedit -L</span>
+<span class="cm"># Should list: sipu:1000:Sipu</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-ufw">
+        <div class="section-eyebrow">05 — Firewall</div>
+        <div class="section-title">Step 5 — Open Samba ports in UFW</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Allow Samba through UFW</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The <code>Samba</code> UFW app profile opens all required ports at once — 137 (UDP, NetBIOS name), 138 (UDP, NetBIOS datagram), 139 (TCP, NetBIOS session), and 445 (TCP, SMB). The most important are 445 and 139 — those are what Windows uses to actually connect.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># The 'Samba' app profile opens all required ports</span>
+<span class="nm">sudo ufw allow samba</span>
+
+<span class="cm"># Verify rules were added</span>
+<span class="nm">sudo ufw status</span>
+<span class="cm"># Should show: Samba   ALLOW   Anywhere</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-connect">
+        <div class="section-eyebrow">06 — Connect</div>
+        <div class="section-title">Step 6 — Connect from Windows</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">One-time access via File Explorer</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Type the server address directly into File Explorer's address bar. Windows sends an SMB connection request to spserver — Samba responds, Windows asks for credentials, and you're in.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows File Explorer address bar</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>\\192.168.31.150</pre>
+            </div>
+            <p class="step-why">Windows will ask for a username and password — enter <b>sipu</b> and your Samba password. You'll see the three shares: shared, certs, projects.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">7</div>
+            <div class="step-title">Map as a persistent network drive</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Mapping as a persistent drive gives you a drive letter (like Z:) that appears every time you open File Explorer — no need to type the IP again. Check "Reconnect at sign-in" to make it permanent across reboots.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows — steps</div></div>
+              <pre><span class="cm"># Method 1: File Explorer GUI</span>
+<span class="cm"># Right-click "This PC" → "Map network drive"</span>
+<span class="cm"># Drive: Z:  (or any letter)</span>
+<span class="cm"># Folder: \\192.168.31.150\shared</span>
+<span class="cm"># ✓ Reconnect at sign-in</span>
+<span class="cm"># ✓ Connect using different credentials</span>
+<span class="cm"># Enter: sipu / your Samba password</span>
+
+<span class="cm"># Method 2: PowerShell (faster)</span>
+<span class="nm">net use</span> Z: \\192.168.31.150\shared /user:sipu YourSambaPassword /persistent:yes</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-full">
+        <div class="section-eyebrow">01 — Full config</div>
+        <div class="section-title">Share definitions added to /etc/samba/smb.conf</div>
+        <p class="section-body">These are appended at the <b>bottom</b> of the existing smb.conf file — do not replace the whole file, just add these blocks after the existing content.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/samba/smb.conf — append at bottom</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># ── spserver shares ──────────────────────</span>
+
+[<span class="kw">shared</span>]
+   <span class="nm">path</span> = <span class="str">/home/sipu/shared</span>
+   <span class="nm">browseable</span> = <span class="str">yes</span>
+   <span class="nm">writable</span> = <span class="str">yes</span>
+   <span class="nm">valid users</span> = <span class="str">sipu</span>
+   <span class="nm">create mask</span> = <span class="str">0644</span>
+   <span class="nm">directory mask</span> = <span class="str">0755</span>
+
+[<span class="kw">certs</span>]
+   <span class="nm">path</span> = <span class="str">/home/sipu/certs</span>
+   <span class="nm">browseable</span> = <span class="str">yes</span>
+   <span class="nm">writable</span> = <span class="str">no</span>
+   <span class="nm">valid users</span> = <span class="str">sipu</span>
+
+[<span class="kw">projects</span>]
+   <span class="nm">path</span> = <span class="str">/home/sipu/projects</span>
+   <span class="nm">browseable</span> = <span class="str">yes</span>
+   <span class="nm">writable</span> = <span class="str">yes</span>
+   <span class="nm">valid users</span> = <span class="str">sipu</span>
+   <span class="nm">create mask</span> = <span class="str">0644</span>
+   <span class="nm">directory mask</span> = <span class="str">0755</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-explained">
+        <div class="section-eyebrow">02 — Line by line</div>
+        <div class="section-title">Every directive explained</div>
+        <table class="le-table">
+          <thead><tr><th style="width:36%">Directive</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">[shared]</td><td class="le-desc">The share name in square brackets. This is what Windows sees — <code>\\192.168.31.150\shared</code>. The name can be anything but should be short and descriptive.</td></tr>
+            <tr><td class="le-code">path = /home/sipu/shared</td><td class="le-desc">The actual filesystem path this share exposes. The directory must exist and be readable by the valid users.</td></tr>
+            <tr><td class="le-code">browseable = yes</td><td class="le-desc">Shows this share in the list when you browse to <code>\\192.168.31.150</code>. Set to <code>no</code> to create a hidden share — still accessible by direct path but not shown in listings.</td></tr>
+            <tr><td class="le-code">writable = yes</td><td class="le-desc">Allow users to create, modify, and delete files. Set to <code>no</code> for a read-only share like [certs].</td></tr>
+            <tr><td class="le-code">valid users = sipu</td><td class="le-desc">Only users in this list can access the share. Must be a Samba user (added with smbpasswd). Comma-separated for multiple: <code>sipu, john</code>.</td></tr>
+            <tr><td class="le-code">create mask = 0644</td><td class="le-desc">Permissions applied to new files created through Samba. 0644 = owner read/write, group and others read-only. Prevents accidentally creating executable files.</td></tr>
+            <tr><td class="le-code">directory mask = 0755</td><td class="le-desc">Permissions applied to new directories created through Samba. 0755 = owner full access, others read and execute (can enter directory).</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-options">
+        <div class="section-eyebrow">03 — More options</div>
+        <div class="section-title">Other useful smb.conf directives</div>
+        <table class="kv-table">
+          <thead><tr><th>Directive</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td class="key">guest ok = yes</td><td class="desc">Allow access without a password. Anyone on the network can read (and write if writable=yes). Only use on a fully trusted private network.</td></tr>
+            <tr><td class="key">read only = yes</td><td class="desc">Alternative to <code>writable = no</code>. Makes the share read-only for everyone in valid users.</td></tr>
+            <tr><td class="key">write list = sipu</td><td class="desc">Only users in this list can write — others in valid users get read-only. Useful for multi-user setups with different permission levels.</td></tr>
+            <tr><td class="key">force user = sipu</td><td class="desc">All file operations happen as this Linux user regardless of who connected. Simplifies permissions on shared directories.</td></tr>
+            <tr><td class="key">comment = My share</td><td class="desc">Description shown in Windows when browsing the server — appears next to the share name in File Explorer.</td></tr>
+            <tr><td class="key">max connections = 5</td><td class="desc">Limit simultaneous connections to this share.</td></tr>
+            <tr><td class="key">hide dot files = yes</td><td class="desc">Hide Linux hidden files (starting with .) from Windows clients — cleaner view.</td></tr>
+            <tr><td class="key">vfs objects = recycle</td><td class="desc">Enable a recycle bin for this share — deleted files go to a .recycle folder instead of being permanently deleted immediately.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-samba">
+        <div class="section-eyebrow">01 — Samba commands</div>
+        <div class="section-title">Essential Samba management commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status smbd</div><div class="cmd-desc">Check if Samba file sharing daemon is running</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart smbd</div><div class="cmd-desc">Restart Samba after config changes</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable smbd</div><div class="cmd-desc">Auto-start Samba on every boot</div></div>
+          <div class="cmd-row"><div class="cmd-code">testparm</div><div class="cmd-desc">Validate smb.conf syntax — always run before restarting. Shows parsed config and any errors.</div></div>
+          <div class="cmd-row"><div class="cmd-code">testparm -s</div><div class="cmd-desc">Validate and print the full effective config without prompts</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo smbpasswd -a USERNAME</div><div class="cmd-desc">Add a Linux user to Samba's password database. User must exist as a Linux user first.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo smbpasswd -d USERNAME</div><div class="cmd-desc">Disable a Samba user (without deleting from database)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo smbpasswd -e USERNAME</div><div class="cmd-desc">Re-enable a disabled Samba user</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo smbpasswd USERNAME</div><div class="cmd-desc">Change an existing Samba user's password</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo pdbedit -L</div><div class="cmd-desc">List all Samba users in the password database</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo pdbedit -L -v</div><div class="cmd-desc">List Samba users with verbose details</div></div>
+          <div class="cmd-row"><div class="cmd-code">smbclient -L localhost -U sipu</div><div class="cmd-desc">List all shares on spserver — test from server itself using Samba client</div></div>
+          <div class="cmd-row"><div class="cmd-code">smbclient //192.168.31.150/shared -U sipu</div><div class="cmd-desc">Connect to a share from command line — useful for testing</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo smbstatus</div><div class="cmd-desc">Show active Samba connections, open files, and locked files</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u smbd -f</div><div class="cmd-desc">Follow Samba logs live — shows connections, auth attempts, errors</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during Samba setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Windows couldn't see the server — network discovery not finding \\spserver</div>
+          <div class="bb-body">
+            After setting up Samba, tried browsing to <code>\\spserver</code> in File Explorer. Windows showed "Windows cannot access \\spserver" or nothing appeared in Network. Expected the server to appear automatically.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Use IP address instead of hostname — \\192.168.31.150</div>
+          <div class="fb-body">
+            NetBIOS name resolution (what makes <code>\\spserver</code> work) depends on nmbd and network broadcast, which can be unreliable on modern networks. The fix is straightforward — use the static IP directly: <code>\\192.168.31.150</code>. Since we configured a static IP, this always works and is more reliable than hostname-based discovery. Map drives by IP, not hostname.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Access denied when trying to write files — permissions error</div>
+          <div class="bb-body">
+            Could browse and read files through the Samba share but couldn't create new files or edit existing ones. Windows showed "You don't have permission to perform this action" when trying to save or copy files into the share.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Directory ownership and Samba writable setting</div>
+          <div class="fb-body">
+            Two things needed fixing: (1) The shared directory was owned by root, not sipu — Samba was acting as sipu but couldn't write to root-owned directories. Fix: <code>sudo chown -R sipu:sipu /home/sipu/shared</code>. (2) Double-checked that <code>writable = yes</code> was set in smb.conf for the [shared] section. After both fixes and an smbd restart, file creation worked immediately.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">testparm showed errors — smb.conf syntax issue</div>
+          <div class="bb-body">
+            After editing smb.conf, running <code>testparm</code> showed warnings about unknown parameters. One of the directive names was misspelled — <code>browsable</code> instead of <code>browseable</code> (note the extra 'e'). Samba ignored the unknown directive silently.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Always run testparm — it catches misspelled directives</div>
+          <div class="fb-body">
+            Fixed the spelling to <code>browseable = yes</code> and ran <code>testparm</code> again — no warnings. The lesson: always run <code>testparm</code> before restarting smbd. Unlike many config files, Samba doesn't fail to start on unknown directives — it just silently ignores them, which makes bugs hard to find without testparm.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Samba problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Windows cannot access \\192.168.31.150 — no response</div>
+          <div class="ts-body">Samba isn't running or UFW is blocking. Check: (1) <code>sudo systemctl status smbd</code> — is it running? (2) <code>sudo ufw status</code> — is Samba allowed? (3) Test from server itself: <code>smbclient -L localhost -U sipu</code>. (4) Ping the server first: <code>ping 192.168.31.150</code> — if ping fails, it's a network issue, not Samba.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Logon failure — wrong credentials</div>
+          <div class="ts-body">The Samba password is different from the Linux password. Common mistake: setting the Samba password then forgetting it. Reset with: <code>sudo smbpasswd sipu</code>. Also check that the user is in the Samba database: <code>sudo pdbedit -L</code> — if sipu isn't listed, run <code>sudo smbpasswd -a sipu</code> to add them.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Can browse but cannot write — permission denied</div>
+          <div class="ts-body">Check three things: (1) Is <code>writable = yes</code> in smb.conf for this share? (2) Does sipu own the directory? <code>ls -la /home/sipu/</code> — all shared dirs should show <code>sipu sipu</code> as owner. (3) Do the directory permissions allow writing? <code>chmod 755</code> is the minimum — or <code>chmod 775</code> if group write is needed.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Share not visible when browsing \\192.168.31.150</div>
+          <div class="ts-body">Check: (1) <code>browseable = yes</code> in the share config. (2) Run <code>testparm</code> — is the share listed in the output? (3) Did you restart smbd after editing smb.conf? (4) Is the sipu user valid for that share? <code>valid users = sipu</code> must be set or the share won't be shown to that user.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Slow file transfer speeds</div>
+          <div class="ts-body">Expected ~100Mbps over ethernet, getting much less. Common causes: (1) WiFi instead of ethernet — WiFi introduces latency and variable speeds. Use ethernet for spserver. (2) USB ethernet adapter bottleneck — USB 2.0 max is ~40MB/s, USB 3.0 is faster. (3) SMB signing overhead — add <code>server signing = disabled</code> to the [global] section in smb.conf (slightly less secure but faster on trusted LAN).</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Access Samba remotely via Tailscale</div>
+          <div class="ts-body">SMB ports (139, 445) are blocked by the internet and most firewalls. But Tailscale creates a virtual LAN — over Tailscale, spserver is at <code>100.x.x.x</code>. Connect from any Tailscale device using the Tailscale IP: <code>\\100.x.x.x\shared</code> in File Explorer. Works from mobile, work PC, anywhere with Tailscale installed.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Tailscale + Samba remote access</b> — install Tailscale on your phone or work laptop, then access <code>\\100.x.x.x\shared</code> from anywhere. Works over mobile data. No VPN setup required beyond Tailscale. Full Samba functionality remotely.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Samba recycle bin</b> — add <code>vfs objects = recycle</code> and configure a recycle bin for the shared folder. Deleted files go to a hidden .recycle directory instead of being gone immediately. Safety net for accidental deletions.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple Samba users</b> — create additional Linux users (<code>sudo adduser john</code>) and add them to Samba (<code>sudo smbpasswd -a john</code>). Give each user access to only their own share by setting <code>valid users = john</code> on specific shares.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Time Machine over Samba</b> — macOS supports Time Machine backups to Samba shares. Add <code>vfs objects = catia fruit streams_xattr</code> and <code>fruit:time machine = yes</code> to a share config. Your Mac can then back up directly to spserver.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Samba as a domain controller</b> — Samba can act as an Active Directory domain controller for a small office network. Centralised user management, login credentials, group policies. Massive scope expansion — relevant if spserver grows beyond personal use.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>NFS as alternative</b> — NFS (Network File System) is Linux's native file sharing protocol. Faster than Samba for Linux-to-Linux transfers, no authentication overhead. Set up NFS if you ever add more Linux machines to the home network.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFW Firewall — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+
+.main{flex:1;min-width:0;}
+
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:30%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;width:20%;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.amber{color:var(--amber);}
+.kv-table .val.red{color:var(--red);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:280px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+
+.le-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+.le-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);}
+.le-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.le-table tr:last-child td{border-bottom:none;}
+.le-table tr:hover td{background:var(--bg3);}
+.le-code{font-family:var(--mono);font-size:12px;color:var(--blue);background:#080b10;white-space:nowrap;width:38%;}
+.le-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+.le-desc b{color:var(--text);font-weight:500;}
+
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+/* ports reference grid */
+.ports-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin:.75rem 0;}
+.port-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:.85rem 1rem;display:flex;align-items:center;gap:12px;}
+.port-num{font-family:var(--mono);font-size:15px;font-weight:700;color:var(--green);min-width:50px;}
+.port-info .port-name{font-size:14px;font-weight:500;color:var(--text);margin-bottom:1px;}
+.port-info .port-desc{font-size:12px;color:var(--text3);}
+.port-card.blocked .port-num{color:var(--red);}
+.port-card.blocked{border-color:rgba(240,101,101,0.15);background:rgba(240,101,101,0.04);}
+
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">UFW Firewall</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-ufw')">What is UFW</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('ufw-iptables')">UFW vs iptables</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('default-policy')">Default policies</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('ports-open')">Ports on spserver</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('traffic-flow')">Traffic flow diagram</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-order')">Critical order warning</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-enable')">Enable UFW</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-services')">Open service ports</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify rules</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-essential')">Essential commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-advanced')">Advanced rules</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 5 of 14</div>
+      <h1 class="gh-title"><span>UFW</span> Firewall</h1>
+      <p class="gh-sub">Controlling which network traffic is allowed in and out of spserver. UFW is the gatekeeper — everything goes through it before reaching your services.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-ufw">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is UFW</div>
+        <p class="section-body">
+          UFW stands for <b>Uncomplicated Firewall</b>. It is a frontend — a simplified interface — for managing Linux's packet filtering system. Without a firewall, every port on your server is potentially accessible to anyone on the network. UFW lets you define exactly which traffic is allowed and blocks everything else.
+        </p>
+        <p class="section-body">
+          UFW comes pre-installed on Ubuntu but is <b>inactive by default</b>. It sits there doing nothing until you explicitly enable it. This is by design — enabling it before you've opened port 22 would lock you out of SSH.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>A firewall is not the same as security. It controls which ports are reachable — it does not protect against vulnerabilities in the services running on those ports. But it is a fundamental and necessary first layer of defence.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ufw-iptables">
+        <div class="section-eyebrow">02 — Architecture</div>
+        <div class="section-title">UFW vs iptables vs nftables</div>
+        <p class="section-body">
+          Linux has a built-in packet filtering system in the kernel. Over the years it has had different interfaces — netfilter, iptables, nftables. UFW sits on top of these and translates your simple commands into the correct low-level rules.
+        </p>
+        <div class="diagram">
+<span class="dm">You type:</span>   <span class="dg">sudo ufw allow 22/tcp</span>
+           <span class="dm">↓</span>
+<span class="db">UFW translates into iptables / nftables rules</span>
+           <span class="dm">↓</span>
+<span class="da">Linux kernel netfilter</span>  <span class="dm">← actual packet filtering happens here</span>
+           <span class="dm">↓</span>
+<span class="dm">Incoming packet on port 22 → allowed ✓</span>
+<span class="dm">Incoming packet on port 3306 → dropped ✗</span>
+        </div>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">UFW — what we use</div>
+            <div class="ic-body">Simple human-readable commands. <code>sudo ufw allow 80/tcp</code> is all it takes to open a port. Ubuntu's recommended tool. Pre-installed. Sufficient for 95% of server firewall needs.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">iptables / nftables</div>
+            <div class="ic-body">Raw power — complex syntax, fine-grained control. Used directly when you need stateful inspection, NAT, complex routing, or custom chains. UFW generates iptables rules under the hood — you can view them with <code>sudo iptables -L</code>.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="default-policy">
+        <div class="section-eyebrow">03 — Policies</div>
+        <div class="section-title">Default UFW policies — deny in, allow out</div>
+        <p class="section-body">
+          When UFW is enabled, it applies default policies to all traffic not matched by a specific rule. The defaults on Ubuntu are sensible for a server:
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Direction</th><th>Default policy</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Incoming</td>
+              <td class="val red">DENY</td>
+              <td class="desc">All incoming connections are blocked unless you explicitly allow them. Anyone trying to reach a port you haven't opened gets dropped.</td>
+            </tr>
+            <tr>
+              <td class="key">Outgoing</td>
+              <td class="val green">ALLOW</td>
+              <td class="desc">spserver can make outgoing connections freely — apt update, curl, Tailscale, cloudflared all work. No restrictions on what the server initiates.</td>
+            </tr>
+            <tr>
+              <td class="key">Forwarding</td>
+              <td class="val red">DENY</td>
+              <td class="desc">Traffic passing through the server (not destined for it) is blocked. Relevant if spserver were acting as a router — not our use case.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          This means after enabling UFW, you must explicitly open a port for each service you want accessible. Miss one and that service becomes unreachable — which is exactly the blocker we hit several times during setup (ttyd, Filebrowser).
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ports-open">
+        <div class="section-eyebrow">04 — Current state</div>
+        <div class="section-title">Ports open on spserver</div>
+        <p class="section-body">Every service added to spserver required opening its port in UFW. Here is the current state:</p>
+        <div class="ports-grid">
+          <div class="port-card">
+            <div class="port-num">22</div>
+            <div class="port-info">
+              <div class="port-name">SSH</div>
+              <div class="port-desc">Remote terminal — TCP</div>
+            </div>
+          </div>
+          <div class="port-card">
+            <div class="port-num">80</div>
+            <div class="port-info">
+              <div class="port-name">HTTP — Nginx</div>
+              <div class="port-desc">Web server — via Nginx Full</div>
+            </div>
+          </div>
+          <div class="port-card">
+            <div class="port-num">443</div>
+            <div class="port-info">
+              <div class="port-name">HTTPS — Nginx</div>
+              <div class="port-desc">Secure web — via Nginx Full</div>
+            </div>
+          </div>
+          <div class="port-card">
+            <div class="port-num">7681</div>
+            <div class="port-info">
+              <div class="port-name">ttyd</div>
+              <div class="port-desc">Browser terminal — TCP</div>
+            </div>
+          </div>
+          <div class="port-card">
+            <div class="port-num">8080</div>
+            <div class="port-info">
+              <div class="port-name">Filebrowser</div>
+              <div class="port-desc">Web file manager — TCP</div>
+            </div>
+          </div>
+          <div class="port-card">
+            <div class="port-num">139/445</div>
+            <div class="port-info">
+              <div class="port-name">Samba</div>
+              <div class="port-desc">Local file sharing — via Samba app</div>
+            </div>
+          </div>
+          <div class="port-card blocked">
+            <div class="port-num">3306</div>
+            <div class="port-info">
+              <div class="port-name">MySQL</div>
+              <div class="port-desc">Blocked — internal only</div>
+            </div>
+          </div>
+          <div class="port-card blocked">
+            <div class="port-num">5432</div>
+            <div class="port-info">
+              <div class="port-name">PostgreSQL</div>
+              <div class="port-desc">Blocked — internal only</div>
+            </div>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>Database ports (3306, 5432) are intentionally blocked at the UFW level even though they run inside Docker containers. Docker containers talk to each other on internal networks — databases should never be publicly accessible.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="traffic-flow">
+        <div class="section-eyebrow">05 — Traffic flow</div>
+        <div class="section-title">How traffic flows through UFW</div>
+        <div class="diagram">
+<span class="dm">Incoming packet arrives on spserver:</span>
+
+<span class="db">Packet → port 22</span>
+  <span class="dm">UFW checks rules: 22/tcp ALLOW ✓</span>
+  <span class="dg">→ packet reaches sshd → SSH session opens</span>
+
+<span class="db">Packet → port 7681</span>
+  <span class="dm">UFW checks rules: 7681/tcp ALLOW ✓</span>
+  <span class="dg">→ packet reaches ttyd → browser terminal opens</span>
+
+<span class="db">Packet → port 3306</span>
+  <span class="dm">UFW checks rules: no rule found → default DENY</span>
+  <span class="dr">→ packet dropped silently — no response sent</span>
+
+<span class="db">Packet → port 9999 (random)</span>
+  <span class="dm">UFW checks rules: no rule found → default DENY</span>
+  <span class="dr">→ packet dropped — attacker gets no info</span>
+
+<span class="dm">Outgoing packet from spserver (apt update, cloudflared, tailscale):</span>
+  <span class="dm">UFW default outgoing: ALLOW ✓</span>
+  <span class="dg">→ all outgoing connections work freely</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-order">
+        <div class="section-eyebrow">01 — Critical warning</div>
+        <div class="section-title">The order of operations matters enormously</div>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span><b>Never run <code>sudo ufw enable</code> before opening port 22.</b> The moment UFW is enabled with default deny-incoming, your current SSH session continues but new SSH connections are blocked. If you disconnect — whether intentionally or due to a network blip — you cannot SSH back in. You need physical access to recover.</span>
+        </div>
+        <p class="section-body">The correct sequence every time:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — always in this order</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># 1. Open port 22 FIRST — before enabling</span>
+<span class="nm">sudo ufw allow 22/tcp</span>
+
+<span class="cm"># 2. Now enable UFW safely</span>
+<span class="nm">sudo ufw enable</span>
+
+<span class="cm"># 3. Verify SSH rule is active</span>
+<span class="nm">sudo ufw status</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-enable">
+        <div class="section-eyebrow">02 — Enable</div>
+        <div class="section-title">Enable UFW for the first time</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Check current UFW status</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Before enabling, check if UFW is already active and what rules exist. On a fresh Ubuntu Server install, UFW is installed but inactive.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo ufw status verbose</span>
+<span class="cm"># Fresh install shows: Status: inactive</span>
+<span class="cm"># Already enabled shows: Status: active + list of rules</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Open SSH port then enable</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Allow SSH first — always. Then enable. UFW will warn you that enabling may disrupt existing SSH connections — type <b>y</b> to confirm. Your current session stays alive because UFW doesn't kill existing connections, only blocks new ones.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Step 1: Open SSH port</span>
+<span class="nm">sudo ufw allow 22/tcp</span>
+
+<span class="cm"># Step 2: Enable UFW (type y when prompted)</span>
+<span class="nm">sudo ufw enable</span>
+
+<span class="cm"># Step 3: Verify</span>
+<span class="nm">sudo ufw status verbose</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-services">
+        <div class="section-eyebrow">03 — Open ports</div>
+        <div class="section-title">Opening ports for each service</div>
+        <p class="section-body">Every service added to spserver needed its port opened in UFW. Here are all the commands used — in the order services were set up:</p>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">SSH, Nginx, ttyd, Filebrowser, Samba</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — all service ports</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># SSH — first thing always</span>
+<span class="nm">sudo ufw allow 22/tcp</span>
+
+<span class="cm"># Nginx — 'Nginx Full' opens both port 80 (HTTP) and 443 (HTTPS)</span>
+<span class="cm"># UFW has pre-built app profiles for common services</span>
+<span class="nm">sudo ufw allow 'Nginx Full'</span>
+
+<span class="cm"># ttyd browser terminal</span>
+<span class="nm">sudo ufw allow 7681/tcp</span>
+
+<span class="cm"># Filebrowser</span>
+<span class="nm">sudo ufw allow 8080/tcp</span>
+
+<span class="cm"># Samba — 'samba' is a pre-built UFW app profile</span>
+<span class="cm"># Opens ports 139 (NetBIOS) and 445 (SMB)</span>
+<span class="nm">sudo ufw allow samba</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span><b>UFW app profiles</b> are pre-defined rule sets for common services. <code>Nginx Full</code>, <code>samba</code>, <code>OpenSSH</code> are examples. List all available profiles with <code>sudo ufw app list</code>.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Docker ports — what NOT to do</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why"><b>Important Docker caveat:</b> Docker bypasses UFW rules by default. When you use <code>ports:</code> in docker-compose.yml, Docker directly adds iptables rules — skipping UFW entirely. This means a Docker container with a mapped port is accessible from the network regardless of UFW rules.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — Flask Docker port</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Flask Docker container maps port 5000 to host</span>
+<span class="cm"># We still open it in UFW for clarity and documentation</span>
+<span class="nm">sudo ufw allow 5000/tcp</span>
+
+<span class="cm"># But be aware: even WITHOUT this UFW rule,</span>
+<span class="cm"># Docker's port mapping makes it reachable on the local network</span>
+<span class="cm"># UFW does NOT fully control Docker-mapped ports</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>To properly control Docker ports with UFW, edit <code>/etc/docker/daemon.json</code> and set <code>"iptables": false</code>. Then manage all routing through Nginx reverse proxy instead. This is the correct production approach — relevant when adding Flask + MySQL later.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Verify</div>
+        <div class="section-title">Check all rules are in place</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Show all active rules with status</span>
+<span class="nm">sudo ufw status verbose</span>
+
+<span class="cm"># Show rules numbered — useful for deleting specific rules</span>
+<span class="nm">sudo ufw status numbered</span>
+
+<span class="cm"># Expected output should show:</span>
+<span class="cm"># 22/tcp                     ALLOW IN    Anywhere</span>
+<span class="cm"># Nginx Full                 ALLOW IN    Anywhere</span>
+<span class="cm"># 7681/tcp                   ALLOW IN    Anywhere</span>
+<span class="cm"># 8080/tcp                   ALLOW IN    Anywhere</span>
+<span class="cm"># Samba                      ALLOW IN    Anywhere</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>UFW rules persist across reboots automatically — you do not need to re-enable or re-add rules after restarting spserver.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-essential">
+        <div class="section-eyebrow">01 — Essential</div>
+        <div class="section-title">Essential UFW commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo ufw status</div><div class="cmd-desc">Show whether UFW is active and list all current rules</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw status verbose</div><div class="cmd-desc">Detailed status including default policies and all rules</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw status numbered</div><div class="cmd-desc">Show rules with numbers — needed for deleting specific rules</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw enable</div><div class="cmd-desc">Activate the firewall — persists across reboots</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw disable</div><div class="cmd-desc">Deactivate firewall — all traffic flows freely. Use to recover from lockout.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow 22/tcp</div><div class="cmd-desc">Allow incoming TCP connections on port 22 (SSH)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow 80/tcp</div><div class="cmd-desc">Allow HTTP on port 80</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow 'Nginx Full'</div><div class="cmd-desc">Allow Nginx on ports 80 and 443 using the app profile</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow samba</div><div class="cmd-desc">Allow Samba file sharing (ports 139 and 445) using app profile</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw deny 3306/tcp</div><div class="cmd-desc">Explicitly block MySQL port — even from local network</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw delete allow 8080/tcp</div><div class="cmd-desc">Remove the rule allowing port 8080</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw delete 3</div><div class="cmd-desc">Delete rule number 3 — get number from ufw status numbered</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw reset</div><div class="cmd-desc">Reset all rules to default — disables UFW. Use with caution.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw app list</div><div class="cmd-desc">List all available pre-built app profiles (Nginx, Samba, OpenSSH etc.)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw app info 'Nginx Full'</div><div class="cmd-desc">Show details about an app profile — which ports it opens</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-advanced">
+        <div class="section-eyebrow">02 — Advanced</div>
+        <div class="section-title">Advanced UFW rules</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow from 192.168.31.0/24</div><div class="cmd-desc">Allow all traffic from the local network subnet — useful for Samba, NFS</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow from 192.168.31.7 to any port 22</div><div class="cmd-desc">Allow SSH only from your specific PC's IP — whitelist approach</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow from 100.64.0.0/10</div><div class="cmd-desc">Allow all traffic from Tailscale IP range (100.64.x.x to 100.127.x.x)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw limit 22/tcp</div><div class="cmd-desc">Rate-limit SSH — blocks IPs that attempt more than 6 connections in 30 seconds. Basic brute-force protection.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw default deny incoming</div><div class="cmd-desc">Set default policy for incoming traffic to deny (already default)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw default allow outgoing</div><div class="cmd-desc">Set default policy for outgoing traffic to allow (already default)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw logging on</div><div class="cmd-desc">Enable UFW logging — log blocked and allowed connections to syslog</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw logging medium</div><div class="cmd-desc">Set log verbosity: low / medium / high / full</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo cat /var/log/ufw.log</div><div class="cmd-desc">View UFW log — shows blocked connection attempts with IPs and ports</div></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-eyebrow" style="margin-top:1.5rem;">Viewing underlying iptables rules</div>
+        <div class="section-title" style="font-size:18px;">What UFW generates under the hood</div>
+        <p class="section-body">Curious what UFW is actually doing? View the raw iptables rules it created:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># View all iptables rules UFW created</span>
+<span class="nm">sudo iptables -L -v -n</span>
+
+<span class="cm"># View UFW-specific chains only</span>
+<span class="nm">sudo iptables -L ufw-user-input -v -n</span>
+
+<span class="cm"># View nftables rules (Ubuntu 22.04+ uses nftables backend)</span>
+<span class="nm">sudo nft list ruleset</span></pre>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit because of UFW</div>
+        <p class="section-body">UFW was the cause of several "service not reachable" issues throughout the setup. The pattern was always the same — start a service, test in browser, get nothing. Check UFW. Open the port. Works.</p>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">ttyd running but browser shows nothing — port 7681 blocked</div>
+          <div class="bb-body">
+            ttyd was installed and running — <code>sudo systemctl status ttyd</code> showed active. Port was listening — <code>sudo ss -tlnp | grep 7681</code> showed it. But opening <code>http://192.168.31.150:7681</code> in the browser showed "can't reach this page" with no response at all.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">sudo ufw allow 7681/tcp</div>
+          <div class="fb-body">
+            UFW was blocking port 7681. The service was running fine — the firewall was dropping the packets before they reached ttyd. After opening the port, the browser terminal was immediately accessible. Lesson: whenever a service is running but unreachable from the browser, check UFW first.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Filebrowser not reachable — port 8080 blocked</div>
+          <div class="bb-body">
+            Same pattern as ttyd. Filebrowser was running and bound to <code>0.0.0.0:8080</code> — confirmed with <code>curl http://localhost:8080</code> returning HTML. But opening the URL from the browser on the Windows PC showed nothing.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">sudo ufw allow 8080/tcp</div>
+          <div class="fb-body">
+            Same cause — UFW blocking port 8080. After allowing the port, Filebrowser was immediately accessible from the browser. The key diagnostic here was using <code>curl http://localhost:8080</code> from the server itself — if that works but the browser doesn't, UFW is almost certainly the issue.
+          </div>
+        </div>
+
+        <div class="alert info" style="margin-top:1.5rem;">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Diagnostic pattern for "service running but not reachable":</b> (1) Check service status — <code>sudo systemctl status SERVICE</code>. (2) Check what port it's on — <code>sudo ss -tlnp</code>. (3) Test from server itself — <code>curl http://localhost:PORT</code>. (4) If server curl works but browser doesn't — it's UFW. Open the port.</span>
+        </div>
+      </div>
+
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common UFW problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Locked out of SSH after enabling UFW</div>
+          <div class="ts-body">You enabled UFW before allowing port 22. Your current session may still be alive but reconnecting is impossible. Immediate options: (1) If Tailscale was already set up — SSH in via Tailscale IP (<code>ssh sipu@100.x.x.x</code>) — Tailscale operates at a different layer and UFW doesn't block it. Once in, run <code>sudo ufw allow 22/tcp</code>. (2) Physical access — connect keyboard and monitor, login locally, run <code>sudo ufw disable</code> or <code>sudo ufw allow 22/tcp</code>. Prevention: always open port 22 before enabling.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Service is running but completely unreachable from network</div>
+          <div class="ts-body">UFW is blocking the port. Diagnostic steps in order: (1) <code>sudo systemctl status SERVICE</code> — confirm service is running. (2) <code>sudo ss -tlnp</code> — confirm which port it's listening on. (3) <code>curl http://localhost:PORT</code> — test from server itself. If this works, UFW is the issue. (4) <code>sudo ufw status</code> — check if the port has a rule. (5) <code>sudo ufw allow PORT/tcp</code> — open the port and retest.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">UFW shows rule exists but port is still blocked</div>
+          <div class="ts-body">Possible causes: (1) Wrong protocol — tried <code>allow 80</code> (both TCP+UDP) but service only uses TCP. (2) Conflicting DENY rule takes precedence — <code>sudo ufw status numbered</code> and check rule order. (3) Docker bypassed UFW — Docker container port mappings use iptables directly. (4) Service is binding to <code>127.0.0.1</code> not <code>0.0.0.0</code> — UFW can't help if the service refuses external connections. Check with <code>sudo ss -tlnp</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Accidentally deleted the wrong UFW rule</div>
+          <div class="ts-body">Re-add it immediately: <code>sudo ufw allow PORT/tcp</code>. If you deleted the SSH rule and are still connected — add it back before disconnecting. If you've lost SSH and have Tailscale — connect via Tailscale and re-add the rule. UFW persists all changes immediately — no restart needed after adding rules.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">ufw status shows "inactive" after reboot</div>
+          <div class="ts-body">This should not happen — UFW persists its enabled state across reboots. If it does: run <code>sudo ufw enable</code>. If it keeps happening, check if another firewall tool (iptables-persistent, firewalld) is interfering. Also verify: <code>sudo systemctl status ufw</code> — if the UFW service itself is disabled, enable it: <code>sudo systemctl enable ufw</code>.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Port accessible on local network but not from outside</div>
+          <div class="ts-body">This is expected and correct — UFW allows local network connections but Airtel CG-NAT blocks all incoming from the internet. This is not a UFW problem. External access to services goes through Cloudflare Tunnel (for public services) or Tailscale (for private SSH). UFW only controls what arrives at the server — CG-NAT controls what reaches the server from the internet.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>UFW rate limiting for SSH</b> — <code>sudo ufw limit 22/tcp</code> instead of <code>allow</code>. Automatically blocks IPs attempting more than 6 connections in 30 seconds. Simple but effective brute-force protection. Change the current SSH rule to use limit.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>IP whitelisting for SSH</b> — restrict SSH to specific IPs only: <code>sudo ufw allow from 192.168.31.7 to any port 22</code>. Then delete the general 22/tcp rule. Strongest local SSH protection — only your PC can SSH in on the local network.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker + UFW integration</b> — Docker bypasses UFW by default. For proper control, set <code>"iptables": false</code> in <code>/etc/docker/daemon.json</code> and route all container traffic through Nginx reverse proxy. Required when running databases in Docker that should not be externally accessible.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>UFW logging and monitoring</b> — enable <code>sudo ufw logging medium</code> and pipe logs to a monitoring tool. Visualise blocked connection attempts over time using Prometheus + Grafana. See how many bots are scanning your server.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>fail2ban with UFW</b> — fail2ban watches log files and dynamically adds UFW deny rules for IPs that fail authentication too many times. Combine with UFW rate limiting for layered SSH protection.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>nftables directly</b> — UFW's backend on Ubuntu 22.04+ is nftables. Learning nftables directly gives you more power — stateful rules, sets, maps, verdict chains. Relevant for complex scenarios like running a VPN gateway or multi-homed server.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>

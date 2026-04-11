@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ttyd Browser Terminal — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+.main{flex:1;min-width:0;}
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:30%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.red{color:var(--red);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+.le-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+.le-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);}
+.le-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.le-table tr:last-child td{border-bottom:none;}
+.le-table tr:hover td{background:var(--bg3);}
+.le-code{font-family:var(--mono);font-size:12px;color:var(--blue);background:#080b10;white-space:nowrap;width:38%;}
+.le-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+.le-desc b{color:var(--text);font-weight:500;}
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:280px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+/* access comparison */
+.access-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:.75rem 0;}
+.ac-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;}
+.ac-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;}
+.ac-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:.3rem;}
+.ac-body{font-size:13px;color:var(--text2);line-height:1.6;}
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .access-compare{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+}
+</style>
+</head>
+<body>
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">ttyd Browser Terminal</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-ttyd')">What is ttyd</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-it-works')">How it works</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('bash-vs-login')">bash vs login mode</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('access-compare')">vs SSH vs browser</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('security')">Security considerations</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install ttyd</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-test')">Test manually</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-service')">Create systemd service</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-ufw')">Open firewall port</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-tunnel')">Expose via Cloudflare</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-service')">Service file explained</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-flags')">All ttyd flags</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-tunnel')">Tunnel config entry</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-ttyd')">ttyd commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 12 of 14</div>
+      <h1 class="gh-title"><span>ttyd</span> Browser Terminal</h1>
+      <p class="gh-sub">A full interactive Linux terminal running inside any browser — no SSH client, no Tailscale app, no setup on the client device. Open terminal.dustyserver.co.in from your phone and you're in.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-ttyd">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is ttyd</div>
+        <p class="section-body">
+          ttyd is a small, open-source tool that runs a <b>terminal emulator inside a web browser</b>. It starts a WebSocket server on a port (7681 in our case), and when you open that URL in a browser, you get a fully functional terminal — exactly like opening a terminal on the server itself. You can run any command, edit files, manage services, tail logs — everything.
+        </p>
+        <p class="section-body">
+          The name ttyd stands for <b>tty daemon</b>. A tty (teletype) is the Linux abstraction for a terminal — every terminal session in Linux is a tty. ttyd creates a tty and streams it over WebSocket to the browser using the xterm.js terminal emulator library.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>ttyd has zero dependencies after installation — it is a single binary compiled in C. It uses about 1-2MB of RAM when idle. Even with multiple browser sessions connected, resource usage stays negligible.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-it-works">
+        <div class="section-eyebrow">02 — Architecture</div>
+        <div class="section-title">How ttyd works under the hood</div>
+        <div class="diagram">
+<span class="dm">Browser opens: https://terminal.dustyserver.co.in</span>
+    <span class="dm">↓</span>
+<span class="db">Cloudflare Tunnel</span> <span class="dm">→ routes to →</span> <span class="dg">localhost:7681 (ttyd)</span>
+    <span class="dm">↓</span>
+<span class="dg">ttyd serves xterm.js</span> <span class="dm">← JavaScript terminal emulator in browser</span>
+    <span class="dm">↓</span>
+<span class="dm">WebSocket connection established between browser and ttyd</span>
+    <span class="dm">↓</span>
+<span class="dg">ttyd spawns: /bin/login</span> <span class="dm">(a real Linux login process)</span>
+    <span class="dm">↓</span>
+<span class="dm">Login prompt appears in browser</span>
+<span class="dm">You type: sipu / your password</span>
+    <span class="dm">↓</span>
+<span class="dg">Full bash session — authenticated Linux terminal in browser</span>
+<span class="dm">Every keypress → WebSocket → ttyd → tty → shell → output back</span>
+        </div>
+        <p class="section-body">
+          The WebSocket connection is bidirectional — keystrokes go in, terminal output comes back. Because ttyd uses xterm.js, you get proper ANSI color codes, cursor movement, and even programs like <code>htop</code> or <code>vim</code> that rely on terminal capabilities.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="bash-vs-login">
+        <div class="section-eyebrow">03 — Critical choice</div>
+        <div class="section-title">bash mode vs login mode — never use bash mode publicly</div>
+        <p class="section-body">
+          ttyd can be started with either <code>bash</code> or <code>login</code> as the command it runs. This is the most important configuration decision — the security implications are completely different.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">ttyd bash — NEVER use publicly</div>
+            <div class="ic-body">Opens a bash shell directly as whatever user ran ttyd (root if started via sudo). <b>No password is asked.</b> Anyone who opens the URL gets instant root access. Only use for local testing where nobody else can reach the port.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">ttyd login — what we use</div>
+            <div class="ic-body">Spawns <code>/bin/login</code> — a proper Linux login process. Shows a username + password prompt. Uses PAM (Linux auth system). Only authenticated users get a session. The correct choice for any public-facing terminal.</div>
+          </div>
+        </div>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span>Many online tutorials show <code>ttyd bash</code> — this is fine for local testing on a private port, but catastrophic if exposed publicly. Since our ttyd is accessible at terminal.dustyserver.co.in worldwide, we always use <code>ttyd login</code>.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="access-compare">
+        <div class="section-eyebrow">04 — Comparison</div>
+        <div class="section-title">Three ways to access spserver — when to use each</div>
+        <div class="access-compare">
+          <div class="ac-card">
+            <div class="ac-label" style="color:var(--green)">SSH — primary</div>
+            <div class="ac-name">ssh sipu@192.168.31.150</div>
+            <div class="ac-body">Best performance. Copy-paste works perfectly. Key auth possible. Needs SSH client. Local network or Tailscale for remote.</div>
+          </div>
+          <div class="ac-card">
+            <div class="ac-label" style="color:var(--blue)">ttyd — anywhere, any device</div>
+            <div class="ac-name">terminal.dustyserver.co.in</div>
+            <div class="ac-body">Works in any browser — phone, tablet, work PC, library kiosk. No install needed. Slightly higher latency than SSH. Best for quick access from unexpected devices.</div>
+          </div>
+          <div class="ac-card">
+            <div class="ac-label" style="color:var(--amber)">Tailscale SSH — remote backup</div>
+            <div class="ac-name">ssh sipu@100.x.x.x</div>
+            <div class="ac-body">Works from any network. Bypasses CG-NAT. Emergency access if Cloudflare Tunnel goes down. Requires Tailscale app on client device.</div>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>The practical use for ttyd: you're on a different device — a friend's laptop, your tablet, a work machine where you can't install apps — and need to quickly SSH into spserver. Open the browser, go to terminal.dustyserver.co.in, login, done.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="security">
+        <div class="section-eyebrow">05 — Security</div>
+        <div class="section-title">Security considerations for a public browser terminal</div>
+        <p class="section-body">
+          A browser terminal exposed to the internet requires careful thought. Here is what protects our setup and what could be improved:
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Layer</th><th>Status</th><th>What it provides</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Linux login auth</td>
+              <td class="val green">✓ Active</td>
+              <td class="desc">Username + password required via PAM. Failed attempts are logged in /var/log/auth.log.</td>
+            </tr>
+            <tr>
+              <td class="key">HTTPS via Cloudflare</td>
+              <td class="val green">✓ Active</td>
+              <td class="desc">All traffic encrypted between browser and Cloudflare edge. No plaintext credentials on the wire.</td>
+            </tr>
+            <tr>
+              <td class="key">Cloudflare DDoS protection</td>
+              <td class="val green">✓ Active</td>
+              <td class="desc">Volumetric attacks absorbed by Cloudflare. Rate limiting available in Cloudflare WAF.</td>
+            </tr>
+            <tr>
+              <td class="key">Real home IP hidden</td>
+              <td class="val green">✓ Active</td>
+              <td class="desc">Visitors see Cloudflare's IP, not spserver's. No direct attack surface exposed.</td>
+            </tr>
+            <tr>
+              <td class="key">Cloudflare Access</td>
+              <td class="val red">Not yet set up</td>
+              <td class="desc">Would add email/SSO authentication before the login prompt. Anyone can currently attempt to login.</td>
+            </tr>
+            <tr>
+              <td class="key">fail2ban</td>
+              <td class="val red">Not yet set up</td>
+              <td class="desc">Would auto-ban IPs that fail login too many times. Recommended addition.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Step 1 — Install ttyd</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install from Ubuntu package repository</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">ttyd is available in Ubuntu's official package repository — the simplest and most reliable installation method. It installs the binary and all required libraries.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt install ttyd -y</span>
+
+<span class="cm"># Verify installation and check version</span>
+<span class="nm">ttyd --version</span>
+<span class="cm"># Should print: ttyd/x.x.x (libwebsockets/x.x)</span>
+
+<span class="cm"># Confirm binary location</span>
+<span class="nm">which ttyd</span>
+<span class="cm"># Should print: /usr/bin/ttyd</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-test">
+        <div class="section-eyebrow">02 — Test</div>
+        <div class="section-title">Step 2 — Test manually before creating service</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Run ttyd manually and test in browser</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Always test a service manually first before turning it into a systemd service. This confirms the binary works, the port is available, and you can see any errors directly in the terminal output. Use Ctrl+C to stop the manual run.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Run ttyd manually in the foreground</span>
+<span class="cm"># --writable: allow keyboard input (not just read-only)</span>
+<span class="cm"># -p 7681: listen on port 7681</span>
+<span class="cm"># login: run /bin/login (requires username+password)</span>
+<span class="nm">sudo ttyd --writable -p 7681 login</span>
+
+<span class="cm"># Open in browser (from your Windows PC on same network):</span>
+<span class="cm"># http://192.168.31.150:7681</span>
+<span class="cm"># You should see a login prompt — type "sipu" then your password</span>
+
+<span class="cm"># Press Ctrl+C to stop after confirming it works</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>If the browser shows nothing when visiting port 7681, UFW is likely blocking it. Open it first: <code>sudo ufw allow 7681/tcp</code>. Then test again.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-service">
+        <div class="section-eyebrow">03 — Service</div>
+        <div class="section-title">Step 3 — Create systemd service</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Write the systemd unit file</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">A systemd service makes ttyd start automatically on every boot and restart if it crashes. We run ttyd as root because <code>/bin/login</code> requires root privileges to authenticate users via PAM and switch to the correct user after login.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo nano</span> /etc/systemd/system/ttyd.service</pre>
+            </div>
+            <p class="step-why">Paste this content:</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/systemd/system/ttyd.service</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>[<span class="kw">Unit</span>]
+<span class="nm">Description</span>=ttyd browser terminal
+<span class="nm">After</span>=network.target
+
+[<span class="kw">Service</span>]
+<span class="nm">ExecStart</span>=/usr/bin/ttyd --writable -p 7681 login
+<span class="nm">Restart</span>=always
+<span class="nm">RestartSec</span>=5
+<span class="nm">User</span>=root
+
+[<span class="kw">Install</span>]
+<span class="nm">WantedBy</span>=multi-user.target</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Enable, start, and verify</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Tell systemd about the new service file</span>
+<span class="nm">sudo systemctl daemon-reload</span>
+
+<span class="cm"># Enable — auto-start on every boot</span>
+<span class="nm">sudo systemctl enable ttyd</span>
+
+<span class="cm"># Start — run it right now</span>
+<span class="nm">sudo systemctl start ttyd</span>
+
+<span class="cm"># Verify it is running</span>
+<span class="nm">sudo systemctl status ttyd</span>
+<span class="cm"># Look for: Active: active (running)</span>
+
+<span class="cm"># Confirm it is listening on port 7681</span>
+<span class="nm">sudo ss -tlnp | grep 7681</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-ufw">
+        <div class="section-eyebrow">04 — Firewall</div>
+        <div class="section-title">Step 4 — Open port 7681 in UFW</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Allow port 7681 through UFW</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">UFW blocks all incoming by default. Without opening port 7681, ttyd is running but completely unreachable from the network — this was one of the first blockers we hit. The browser shows nothing and gives a "connection refused" or timeout error.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo ufw allow 7681/tcp</span>
+
+<span class="cm"># Verify the rule is active</span>
+<span class="nm">sudo ufw status</span>
+<span class="cm"># Should show: 7681/tcp   ALLOW   Anywhere</span>
+
+<span class="cm"># Test from local network browser</span>
+<span class="cm"># Open: http://192.168.31.150:7681</span>
+<span class="cm"># Login prompt should appear</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-tunnel">
+        <div class="section-eyebrow">05 — Public access</div>
+        <div class="section-title">Step 5 — Expose via Cloudflare Tunnel</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">Add ingress rule and create DNS record</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Without this step, ttyd is only accessible on the local network. Adding it to the Cloudflare Tunnel makes it publicly accessible at terminal.dustyserver.co.in from anywhere in the world.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Step 1: Add ingress rule to Cloudflare Tunnel config</span>
+<span class="nm">sudo nano</span> /etc/cloudflared/config.yml
+
+<span class="cm"># Add this block BEFORE the catch-all line:</span>
+<span class="cm">#   - hostname: terminal.dustyserver.co.in</span>
+<span class="cm">#     service: http://localhost:7681</span>
+
+<span class="cm"># Step 2: Create the DNS CNAME record</span>
+<span class="nm">cloudflared tunnel route dns spserver</span> terminal.dustyserver.co.in
+
+<span class="cm"># Step 3: Restart cloudflared to pick up config changes</span>
+<span class="nm">sudo systemctl restart cloudflared</span>
+
+<span class="cm"># Step 4: Wait 1-2 minutes for DNS to propagate</span>
+<span class="cm"># Step 5: Open in browser from anywhere:</span>
+<span class="cm"># https://terminal.dustyserver.co.in</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>Once live, terminal.dustyserver.co.in works from your phone on mobile data, your work PC, a friend's laptop — any browser anywhere. Login with your sipu username and password.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-service">
+        <div class="section-eyebrow">01 — Service file</div>
+        <div class="section-title">systemd service file — every line explained</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/systemd/system/ttyd.service</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>[<span class="kw">Unit</span>]
+<span class="nm">Description</span>=ttyd browser terminal
+<span class="nm">After</span>=network.target
+
+[<span class="kw">Service</span>]
+<span class="nm">ExecStart</span>=/usr/bin/ttyd --writable -p 7681 login
+<span class="nm">Restart</span>=always
+<span class="nm">RestartSec</span>=5
+<span class="nm">User</span>=root
+
+[<span class="kw">Install</span>]
+<span class="nm">WantedBy</span>=multi-user.target</pre>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:38%">Line</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">[Unit]</td><td class="le-desc">Metadata section — describes the service and its dependencies.</td></tr>
+            <tr><td class="le-code">Description=ttyd browser terminal</td><td class="le-desc">Human-readable name shown in <code>systemctl status</code> output.</td></tr>
+            <tr><td class="le-code">After=network.target</td><td class="le-desc">Wait for networking to be ready before starting. Without this, ttyd might start before the network interface is up and fail to bind to port 7681.</td></tr>
+            <tr><td class="le-code">[Service]</td><td class="le-desc">Service behavior section.</td></tr>
+            <tr><td class="le-code">ExecStart=/usr/bin/ttyd --writable -p 7681 login</td><td class="le-desc">The exact command to run. Full path to binary required. <code>--writable</code> enables keyboard input. <code>-p 7681</code> sets the port. <code>login</code> runs /bin/login — the authenticated login shell.</td></tr>
+            <tr><td class="le-code">Restart=always</td><td class="le-desc">If ttyd crashes for any reason, systemd automatically restarts it.</td></tr>
+            <tr><td class="le-code">RestartSec=5</td><td class="le-desc">Wait 5 seconds before restarting after a crash — prevents rapid restart loops.</td></tr>
+            <tr><td class="le-code">User=root</td><td class="le-desc"><b>Required for login mode.</b> /bin/login needs root to authenticate users via PAM and switch user identity after login. Running as non-root causes PAM authentication failures.</td></tr>
+            <tr><td class="le-code">[Install]</td><td class="le-desc">Defines how systemctl enable wires the service into the boot process.</td></tr>
+            <tr><td class="le-code">WantedBy=multi-user.target</td><td class="le-desc">Start this service in normal multi-user mode (standard server boot). This is the correct target for network services.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-flags">
+        <div class="section-eyebrow">02 — ttyd flags</div>
+        <div class="section-title">All useful ttyd flags and options</div>
+        <table class="kv-table">
+          <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td class="key">--writable</td><td class="desc">Allow keyboard input. Without this, the terminal is read-only — you can see output but can't type. Always include this flag.</td></tr>
+            <tr><td class="key">-p PORT</td><td class="desc">Listen on a specific port. Default is 7681. Change if that port is in use.</td></tr>
+            <tr><td class="key">-i INTERFACE</td><td class="desc">Bind to a specific network interface. Default binds to all (0.0.0.0). Use <code>-i 127.0.0.1</code> to restrict to localhost only — useful if proxying through Nginx.</td></tr>
+            <tr><td class="key">-c user:password</td><td class="desc">Add HTTP Basic Auth in front of the terminal. Simple username/password gate before the login prompt even appears. Weak but adds a layer.</td></tr>
+            <tr><td class="key">-t fontSize=16</td><td class="desc">Set the terminal font size. Can also set <code>fontFamily</code>, <code>theme</code> etc. Multiple -t flags allowed.</td></tr>
+            <tr><td class="key">-t disableLeaveAlert=true</td><td class="desc">Disable the browser "are you sure you want to leave?" alert when closing the tab.</td></tr>
+            <tr><td class="key">-m MAX_CLIENTS</td><td class="desc">Limit simultaneous connections. Default is unlimited. <code>-m 1</code> allows only one session at a time.</td></tr>
+            <tr><td class="key">-o</td><td class="desc">Once mode — exit ttyd after the first client disconnects. Useful for one-shot scripts.</td></tr>
+            <tr><td class="key">login</td><td class="desc">The command to run. This runs /bin/login — requires auth. Can be replaced with any command: <code>bash</code>, <code>htop</code>, <code>python3</code>.</td></tr>
+          </tbody>
+        </table>
+        <p class="section-body">Example — ttyd with basic auth and font size set:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">ExecStart example with extra flags</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">ExecStart</span>=/usr/bin/ttyd --writable -p <span class="str">7681</span> \
+  -c <span class="str">admin:secretpassword</span> \
+  -t <span class="str">fontSize=16</span> \
+  -t <span class="str">disableLeaveAlert=true</span> \
+  login</pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>The <code>-c</code> HTTP Basic Auth flag adds a weak layer of protection — credentials are base64 encoded, not encrypted. Only useful over HTTPS (which we have via Cloudflare). The real security comes from the Linux login prompt that appears after.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-tunnel">
+        <div class="section-eyebrow">03 — Tunnel entry</div>
+        <div class="section-title">Cloudflare Tunnel config entry for ttyd</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/cloudflared/config.yml — ttyd ingress rule</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">tunnel</span>: <span class="str">b72cf76b-0820-44cb-90df-f4c58ed87184</span>
+<span class="nm">credentials-file</span>: <span class="str">/etc/cloudflared/b72cf76b-0820-44cb-90df-f4c58ed87184.json</span>
+
+<span class="kw">ingress</span>:
+  - <span class="nm">hostname</span>: <span class="str">terminal.dustyserver.co.in</span>   <span class="cm"># ← ttyd rule</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:7681</span>
+  - <span class="nm">hostname</span>: <span class="str">fileserver.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:8080</span>
+  - <span class="nm">hostname</span>: <span class="str">flask.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:5000</span>
+  - <span class="nm">hostname</span>: <span class="str">dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">hostname</span>: <span class="str">www.dustyserver.co.in</span>
+    <span class="nm">service</span>: <span class="str">http://localhost:80</span>
+  - <span class="nm">service</span>: <span class="str">http_status:404</span></pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>ttyd uses WebSocket connections. Cloudflare Tunnel supports WebSocket natively — no extra configuration needed. The <code>http://localhost:7681</code> service URL works correctly for WebSocket upgrades.</span>
+        </div>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-ttyd">
+        <div class="section-eyebrow">01 — ttyd management</div>
+        <div class="section-title">Commands for managing ttyd</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status ttyd</div><div class="cmd-desc">Check if ttyd is running — green active means it is listening on port 7681.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl start ttyd</div><div class="cmd-desc">Start the ttyd service.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl stop ttyd</div><div class="cmd-desc">Stop ttyd — closes all active browser terminal sessions.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart ttyd</div><div class="cmd-desc">Restart ttyd — use after editing the service file.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable ttyd</div><div class="cmd-desc">Enable auto-start on boot.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl daemon-reload</div><div class="cmd-desc">Reload systemd after editing /etc/systemd/system/ttyd.service — always run before restart.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ss -tlnp | grep 7681</div><div class="cmd-desc">Verify ttyd is listening on port 7681. No output = ttyd not running.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo pkill ttyd</div><div class="cmd-desc">Kill all ttyd processes — useful if port 7681 is stuck occupied by an old run.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u ttyd -f</div><div class="cmd-desc">Follow ttyd logs live — shows connections, disconnections, errors.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u ttyd --since "10 minutes ago"</div><div class="cmd-desc">Show ttyd logs from the last 10 minutes.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl http://localhost:7681</div><div class="cmd-desc">Test ttyd is responding locally — should return the xterm.js HTML page.</div></div>
+          <div class="cmd-row"><div class="cmd-code">ttyd --version</div><div class="cmd-desc">Show installed ttyd version.</div></div>
+          <div class="cmd-row"><div class="cmd-code">ttyd --help</div><div class="cmd-desc">Show all available flags and options with descriptions.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo cat /var/log/auth.log | grep ttyd</div><div class="cmd-desc">Check auth log for login attempts through ttyd — shows failed and successful logins.</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Every blocker hit during ttyd setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Port 7681 already in use — ttyd won't start</div>
+          <div class="bb-body">
+            After running <code>sudo ttyd --writable -p 7681 login</code> during testing, pressed Ctrl+C to stop it. Then tried to start the systemd service and it failed — "address already in use". A previous ttyd test was still running in the background.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">sudo pkill ttyd — kill leftover processes</div>
+          <div class="fb-body">
+            Ctrl+C only sends SIGINT to the foreground process. If ttyd was run with <code>&</code> or in another session, it keeps running. Fix: <code>sudo pkill ttyd</code> kills all ttyd processes. Then <code>sudo ss -tlnp | grep 7681</code> to confirm the port is free, then start the service normally.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Browser shows nothing — port 7681 blocked by UFW</div>
+          <div class="bb-body">
+            ttyd was running and confirmed listening on port 7681. Opening <code>http://192.168.31.150:7681</code> in the browser on the Windows PC showed "This site can't be reached" with ERR_CONNECTION_REFUSED or a timeout. Everything on the server looked fine.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">sudo ufw allow 7681/tcp</div>
+          <div class="fb-body">
+            UFW was blocking port 7681 — the standard pattern for any new service. Fix: <code>sudo ufw allow 7681/tcp</code>. Immediately after, the browser loaded the terminal. This was the moment the diagnostic pattern was established: service running → curl localhost:PORT works → browser doesn't work → UFW is the culprit.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Terminal appeared but was read-only — couldn't type anything</div>
+          <div class="bb-body">
+            The ttyd interface loaded in the browser, the login prompt appeared, but typing had no effect — keystrokes were not reaching the terminal. Clicking in the terminal window did nothing.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Add --writable flag to ExecStart</div>
+          <div class="fb-body">
+            ttyd defaults to read-only mode without the <code>--writable</code> flag. The service file was written without it initially: <code>ExecStart=/usr/bin/ttyd -p 7681 login</code>. Fix: add <code>--writable</code> to the ExecStart line, run <code>sudo systemctl daemon-reload</code> then <code>sudo systemctl restart ttyd</code>. Keyboard input then worked immediately.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 4</div>
+          <div class="bb-title">Cloudflare Tunnel 502 — typo in config.yml service URL</div>
+          <div class="bb-body">
+            After adding the terminal ingress rule to config.yml and restarting cloudflared, opening terminal.dustyserver.co.in showed 502 Bad Gateway. ttyd was running and responding to local curl requests. The tunnel config looked correct at first glance.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Typo: "locakhost:7681" instead of "localhost:7681"</div>
+          <div class="fb-body">
+            Careful re-reading of config.yml found <code>service: http://locakhost:7681</code> — the letters 'a' and 'k' were transposed. cloudflared was trying to connect to a non-existent hostname. Fix: correct the typo to <code>localhost</code>, restart cloudflared, and the terminal immediately became accessible at terminal.dustyserver.co.in.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common ttyd problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">ttyd service fails to start — "address already in use"</div>
+          <div class="ts-body">Port 7681 is occupied by an old ttyd process or another service. Fix: (1) Kill old ttyd: <code>sudo pkill ttyd</code>. (2) Check what's using the port: <code>sudo ss -tlnp | grep 7681</code>. (3) If another service is using 7681, change ttyd's port in the service file to something else (e.g. 7682). (4) Run <code>sudo systemctl daemon-reload</code> and restart ttyd.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Login fails — "Login incorrect" even with correct password</div>
+          <div class="ts-body">PAM authentication issue. Possible causes: (1) ttyd is not running as root — <code>User=root</code> must be in the service file. Check: <code>sudo systemctl status ttyd</code> — look for which user it runs as. (2) The user does not have a Linux password set — set one: <code>sudo passwd sipu</code>. (3) Caps lock is on in the browser — browser terminals don't always show this visually.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">terminal.dustyserver.co.in shows 502 Bad Gateway</div>
+          <div class="ts-body">Cloudflare Tunnel can't reach ttyd. Check in order: (1) Is ttyd running? <code>sudo systemctl status ttyd</code>. (2) Is it on port 7681? <code>sudo ss -tlnp | grep 7681</code>. (3) Test locally: <code>curl http://localhost:7681</code> — should return HTML. (4) Check config.yml for typos — specifically "localhost" vs "locakhost". (5) Restart cloudflared after fixing: <code>sudo systemctl restart cloudflared</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Terminal renders but keyboard input doesn't work</div>
+          <div class="ts-body">The <code>--writable</code> flag is missing from ExecStart. Check: <code>sudo systemctl status ttyd</code> — look at the ExecStart line in the output. Fix: edit <code>/etc/systemd/system/ttyd.service</code>, add <code>--writable</code> to ExecStart, run <code>sudo systemctl daemon-reload && sudo systemctl restart ttyd</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Terminal session disconnects after a few minutes of inactivity</div>
+          <div class="ts-body">WebSocket connection timing out due to inactivity. The Cloudflare Tunnel has a default timeout for idle connections. Fix options: (1) Set <code>ClientAliveInterval 60</code> in <code>/etc/ssh/sshd_config</code> (this applies to SSH sessions in the terminal). (2) Configure Cloudflare Tunnel keepalives. (3) Run a keepalive command in the terminal like <code>while true; do sleep 30; done &</code> before going idle.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">htop / vim / ncurses apps look garbled</div>
+          <div class="ts-body">Terminal size (rows/columns) isn't being communicated correctly. Try: (1) Resize the browser window. (2) Run <code>resize</code> command in the terminal. (3) Set TERM environment: <code>export TERM=xterm-256color</code>. Most apps should work correctly in ttyd's xterm.js terminal — if still garbled, it may be a specific app compatibility issue.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to check who is currently connected to ttyd</div>
+          <div class="ts-body">Check active terminal sessions: <code>who</code> or <code>w</code> commands show all logged-in users including their connection source. <code>sudo journalctl -u ttyd -f</code> shows WebSocket connections in real time. <code>sudo cat /var/log/auth.log | grep login</code> shows all login attempts and successes.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Access</b> — add email OTP or Google SSO authentication in front of the terminal before the login prompt appears. Configured in Cloudflare dashboard → Zero Trust → Access → Applications. Anyone trying to open terminal.dustyserver.co.in would need to verify their email first.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>HTTP Basic Auth</b> — add the <code>-c username:password</code> flag to ttyd's ExecStart as an additional quick security layer before the Linux login prompt. Simple but adds friction for bots scanning the URL.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>fail2ban integration</b> — install fail2ban and configure it to watch <code>/var/log/auth.log</code> for failed ttyd login attempts. After N failures from the same IP, automatically add a UFW deny rule for that IP. Protects against brute force attacks on the login prompt.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Wetty as alternative</b> — Wetty is another browser terminal tool, Node.js-based, with a cleaner UI. Can be run inside Docker. Worth evaluating as an alternative to ttyd for a more polished interface.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple users</b> — create additional Linux users on spserver (e.g. for collaborators). Each user gets their own credentials and home directory. ttyd's login mode handles multiple users correctly — each gets their own isolated session.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Read-only terminal for monitoring</b> — run a second ttyd instance on a different port in read-only mode (without --writable) showing live system stats: <code>ttyd -p 7682 watch -n1 "df -h && free -h && uptime"</code>. Expose it as a public dashboard — can't be typed into, just displays data.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Audit logging</b> — use <code>script</code> command or <code>auditd</code> to record everything typed and output in terminal sessions. Compliance-grade session logging for all ttyd connections.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

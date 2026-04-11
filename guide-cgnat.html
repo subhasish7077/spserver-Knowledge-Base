@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CG-NAT Explained — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+.solution-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.sol-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.sol-card.chosen { border-color: rgba(61,220,132,0.3); background: rgba(61,220,132,0.03); }
+.sol-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: .3rem; }
+.sol-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+.nat-layer {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nat-num { font-family: var(--mono); font-size: 11px; font-weight: 700; width: 22px; flex-shrink: 0; }
+.nat-info .nat-title { font-size: 14px; font-weight: 500; color: var(--text); }
+.nat-info .nat-sub   { font-family: var(--mono); font-size: 12px; color: var(--text3); }
+.nat-badge {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.nb-bad  { background: var(--red2);   color: var(--red); }
+.nb-warn { background: var(--amber2); color: var(--amber); }
+.nb-ok   { background: var(--green2); color: var(--green); }
+
+.link-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--bg2);
+  border: 1px solid rgba(61,220,132,0.2);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  text-decoration: none;
+  transition: all .2s;
+  margin: .75rem 0;
+}
+.link-card:hover { border-color: rgba(61,220,132,0.4); background: rgba(61,220,132,0.04); }
+.lc-icon  { font-size: 28px; flex-shrink: 0; }
+.lc-title { font-size: 15px; font-weight: 600; color: var(--green); margin-bottom: 2px; }
+.lc-sub   { font-size: 13px; color: var(--text2); }
+.lc-arrow { font-family: var(--mono); color: var(--green); font-size: 18px; margin-left: auto; }
+
+@media(max-width:768px){ .solution-grid{ grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">CG-NAT Explained</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Concepts</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-nat')">What is NAT</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-cgnat')">What is CG-NAT</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-broken')">Why port forwarding fails</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('double-nat')">Our double NAT setup</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Investigation</div>
+      <div class="sidebar-link" onclick="switchTab('investigation');scrollToId('i-confirm')">Confirming CG-NAT</div>
+      <div class="sidebar-link" onclick="switchTab('investigation');scrollToId('i-story')">Full investigation story</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Solutions</div>
+      <div class="sidebar-link" onclick="switchTab('solutions');scrollToId('s-all')">All solutions</div>
+      <div class="sidebar-link" onclick="switchTab('solutions');scrollToId('s-chosen')">What we chose</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-diagnose')">Diagnostic commands</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 7 of 14</div>
+      <h1 class="gh-title">CG-NAT <span>Explained</span></h1>
+      <p class="gh-sub">Why Airtel makes it physically impossible to host services using port forwarding — and the two tools that bypass it entirely: Tailscale for private access and Cloudflare Tunnel for public services.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('investigation')">Investigation</button>
+      <button class="tab-btn" onclick="switchTab('solutions')">Solutions</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-nat">
+        <div class="section-eyebrow">01 — Foundation</div>
+        <div class="section-title">What is NAT</div>
+        <p class="section-body">
+          NAT stands for <b>Network Address Translation</b>. IPv4 only has about 4 billion addresses, but the world has far more internet-connected devices. NAT allows multiple devices to share a single public IP address.
+        </p>
+        <p class="section-body">
+          Your home router performs NAT. Every device (PC, phone, spserver) has a private IP (192.168.31.x). When a device makes an outgoing request, the router translates the private IP to its public IP, sends the request, and routes the response back to the right device.
+        </p>
+        <div class="diagram">
+<span class="db">Your PC (192.168.31.7)</span>  <span class="dm">──► visits google.com</span>
+<span class="da">Router (192.168.31.1)</span>   <span class="dm">translates: 192.168.31.7 → 106.215.x.x (public IP)</span>
+<span class="dg">Google responds</span>         <span class="dm">to: 106.215.x.x</span>
+<span class="da">Router delivers</span>         <span class="dm">back to: 192.168.31.7</span>
+
+<span class="dm">Multiple devices share one public IP — outgoing works fine</span>
+<span class="dm">Problem: unsolicited INCOMING connections have no NAT table entry → dropped</span>
+        </div>
+        <p class="section-body">
+          <b>Port forwarding</b> solves the incoming problem by telling the router "forward any packet arriving on port 22 to 192.168.31.150". This works — but only if you control the router that holds the real public IP. With CG-NAT, you don't.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-cgnat">
+        <div class="section-eyebrow">02 — The problem</div>
+        <div class="section-title">What is CG-NAT</div>
+        <p class="section-body">
+          CG-NAT stands for <b>Carrier Grade NAT</b>. It is NAT performed by Airtel's own infrastructure — before traffic even reaches your router. Airtel shares a single real public IP among hundreds of customers. Your router's WAN IP is in the <b>100.64.0.0/10 range</b> — IANA-reserved for CG-NAT. Our router shows <code>100.220.x.x</code>.
+        </p>
+        <div class="diagram">
+<span class="dm">Normal NAT:</span>
+<span class="db">Internet</span> <span class="dm">──►</span> <span class="dg">106.215.x.x (YOUR router)</span> <span class="dm">──►</span> <span class="dg">192.168.31.150</span>
+<span class="dm">          You control this ↑       Port forwarding works here</span>
+
+<span class="dm">CG-NAT (what Airtel gives):</span>
+<span class="db">Internet</span> <span class="dm">──►</span> <span class="dr">106.215.x.x (AIRTEL servers)</span> <span class="dm">──►</span> <span class="da">100.220.x.x (your router WAN)</span> <span class="dm">──►</span> <span class="dg">spserver</span>
+<span class="dm">          Airtel controls this ↑</span>
+<span class="dr">          Traffic dropped here ↑    Port forwarding here is useless</span>
+        </div>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span>When your router WAN IP starts with <b>100.x.x.x</b> (range 100.64.0.0–100.127.255.255) — you have CG-NAT. No router configuration changes this. The first NAT layer is Airtel's infrastructure, which you cannot touch.</span>
+        </div>
+        <p class="section-body">
+          Why? IPv4 addresses ran out. ISPs use CG-NAT to share their limited IPv4 pool across many customers — it reduces Airtel's costs significantly. The downside: customers cannot accept incoming connections from the internet.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="why-broken">
+        <div class="section-eyebrow">03 — Why it fails</div>
+        <div class="section-title">Why port forwarding cannot work</div>
+        <div class="diagram">
+<span class="db">External device</span>  <span class="dm">──► sends packet to 106.215.x.x:22</span>
+                      <span class="dm">↓</span>
+                <span class="dr">Arrives at Airtel CG-NAT — no mapping for this</span>
+                <span class="dr">Packet dropped ✗</span>
+                      <span class="dm">↓</span>
+<span class="da">Your router</span>   <span class="dm">← never reached (port 22 → 192.168.31.150 rule exists but useless)</span>
+<span class="dg">spserver</span>      <span class="dm">← never reached (sshd running and ready — but unreachable)</span>
+        </div>
+        <p class="section-body">
+          The packet never gets past Airtel's layer. Your router's port forwarding rules, your UFW rules, sshd being perfectly configured — none of it matters. The packet is dropped before your hardware sees it.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="double-nat">
+        <div class="section-eyebrow">04 — Our specific setup</div>
+        <div class="section-title">Our three NAT layers</div>
+        <p class="section-body">Our home network has two physical routers stacked, plus the Airtel CG-NAT layer — three total. Discovered during investigation when port forwarding on one router had no effect.</p>
+
+        <div class="nat-layer" style="border-color:rgba(240,101,101,0.2);background:rgba(240,101,101,0.04);">
+          <div class="nat-num" style="color:var(--red)">1</div>
+          <div class="nat-info">
+            <div class="nat-title">Airtel CG-NAT</div>
+            <div class="nat-sub">106.215.x.x (real public IP) — shared by hundreds of customers</div>
+          </div>
+          <div class="nat-badge nb-bad">not yours</div>
+        </div>
+        <div class="nat-layer" style="border-color:rgba(240,165,0,0.2);background:rgba(240,165,0,0.04);">
+          <div class="nat-num" style="color:var(--amber)">2</div>
+          <div class="nat-info">
+            <div class="nat-title">Airtel Modem (192.168.1.1)</div>
+            <div class="nat-sub">WAN: 100.220.x.x → LAN: 192.168.1.x</div>
+          </div>
+          <div class="nat-badge nb-warn">yours — useless</div>
+        </div>
+        <div class="nat-layer" style="border-color:rgba(240,165,0,0.2);background:rgba(240,165,0,0.04);">
+          <div class="nat-num" style="color:var(--amber)">3</div>
+          <div class="nat-info">
+            <div class="nat-title">Backup Router (192.168.31.1)</div>
+            <div class="nat-sub">WAN: 192.168.1.x → LAN: 192.168.31.x</div>
+          </div>
+          <div class="nat-badge nb-warn">yours — useless</div>
+        </div>
+        <div class="nat-layer" style="border-color:rgba(61,220,132,0.2);background:rgba(61,220,132,0.04);">
+          <div class="nat-num" style="color:var(--green)">→</div>
+          <div class="nat-info">
+            <div class="nat-title">spserver (192.168.31.150)</div>
+            <div class="nat-sub">Static IP — your server</div>
+          </div>
+          <div class="nat-badge nb-ok">yours</div>
+        </div>
+
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ INVESTIGATION ══ -->
+    <div class="tab-pane" id="pane-investigation">
+
+      <div class="section" id="i-confirm">
+        <div class="section-eyebrow">01 — Confirmation</div>
+        <div class="section-title">How we confirmed CG-NAT</div>
+        <p class="section-body">Two checks confirmed CG-NAT definitively — no special tools needed.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — Check 1: public IP from internet's view</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">curl ifconfig.me</span>
+<span class="cm"># Returned: 106.215.x.x  ← Airtel's shared public IP</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Router admin panel — Check 2: WAN IP</div></div>
+          <pre><span class="cm"># Login to router admin → check WAN / Internet Status</span>
+<span class="cm"># WAN IP: 100.220.x.x</span>
+<span class="cm"># 100.64.0.0 – 100.127.255.255 = IANA CG-NAT range → confirmed</span></pre>
+        </div>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span><b>Key signal:</b> <code>curl ifconfig.me</code> returned <code>106.215.x.x</code> but router WAN showed <code>100.220.x.x</code>. Two different IPs = a NAT layer between them that you don't control = CG-NAT.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="i-story">
+        <div class="section-eyebrow">02 — Full story</div>
+        <div class="section-title">The investigation — step by step</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Attempt 1</div>
+          <div class="bb-title">SSH timed out from mobile hotspot despite port forwarding on backup router</div>
+          <div class="bb-body">SSH worked on local network. Tried from mobile hotspot using the public IP from <code>curl ifconfig.me</code>. Got "Connection timed out". Port 22 forwarding was configured on the backup router (192.168.31.1).</div>
+        </div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Attempt 2</div>
+          <div class="bb-title">Added port forwarding on Airtel modem too — still timed out</div>
+          <div class="bb-body">Realised the network has two routers (double NAT). Added port forwarding on Airtel modem (192.168.1.1) as well. Still timed out. Checked modem WAN IP: 100.220.x.x. Searched the range — IANA CG-NAT reserved space.</div>
+        </div>
+
+        <div class="fix-banner">
+          <div class="fb-label">✓ Root cause found</div>
+          <div class="fb-title">CG-NAT — Airtel's infrastructure, not fixable by us</div>
+          <div class="fb-body">The 100.220.x.x WAN IP confirmed CG-NAT. Airtel's servers hold the real public IP. Traffic from the internet is dropped at Airtel's layer before reaching our hardware. No configuration on our routers can change this. The solution must use only outgoing connections — which both Tailscale and Cloudflare Tunnel do.</div>
+        </div>
+
+      </div>
+
+    </div><!-- end investigation -->
+
+    <!-- ══ SOLUTIONS ══ -->
+    <div class="tab-pane" id="pane-solutions">
+
+      <div class="section" id="s-all">
+        <div class="section-eyebrow">01 — Options</div>
+        <div class="section-title">All solutions to CG-NAT</div>
+        <div class="solution-grid">
+          <div class="sol-card chosen">
+            <div class="sol-name">Tailscale <span class="tag tag-g">chosen — SSH</span></div>
+            <div class="sol-body">Free VPN. Both devices reach out to Tailscale. Direct encrypted WireGuard tunnel. SSH from anywhere. Emergency recovery backup.</div>
+          </div>
+          <div class="sol-card chosen">
+            <div class="sol-name">Cloudflare Tunnel <span class="tag tag-g">chosen — web</span></div>
+            <div class="sol-body">Free. Server reaches out to Cloudflare edge. Public services at your domain. Free SSL, DDoS protection.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">ZeroTier <span class="tag tag-b">alternative</span></div>
+            <div class="sol-body">Similar to Tailscale. Free up to 25 devices. Open source, self-hostable controller.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">WireGuard + VPS <span class="tag tag-a">paid</span></div>
+            <div class="sol-body">Rent a cheap VPS with real public IP. WireGuard tunnel to spserver. More control, ~₹300/month cost.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">Airtel Static IP <span class="tag tag-a">paid</span></div>
+            <div class="sol-body">Call Airtel, pay for a dedicated real public IP. Removes CG-NAT entirely. Port forwarding works again.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">IPv6 <span class="tag tag-b">check first</span></div>
+            <div class="sol-body">If Airtel provides IPv6, every device gets a real public IPv6 address — no NAT at all. Check: <code>curl -6 ifconfig.me</code></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-chosen">
+        <div class="section-eyebrow">02 — What we use</div>
+        <div class="section-title">Our two-tool approach — covers everything for free</div>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Tailscale — private access</div>
+            <div class="ic-body">SSH from anywhere. Emergency recovery lifeline. Samba access remotely. Operates independently of Cloudflare. See the Tailscale guide for full setup.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">Cloudflare Tunnel — public services</div>
+            <div class="ic-body">Website, terminal, Filebrowser, Flask — all publicly accessible. Free SSL. DDoS protection. Real home IP never exposed. See the Cloudflare guide.</div>
+          </div>
+        </div>
+        <a class="link-card" href="guide-tailscale.html">
+          <div class="lc-icon">🔒</div>
+          <div>
+            <div class="lc-title">Tailscale guide →</div>
+            <div class="lc-sub">Full setup, WireGuard internals, commands, blockers, and troubleshooting</div>
+          </div>
+          <div class="lc-arrow">→</div>
+        </a>
+        <a class="link-card" href="guide-cloudflare.html">
+          <div class="lc-icon">☁️</div>
+          <div>
+            <div class="lc-title">Cloudflare Tunnel guide →</div>
+            <div class="lc-sub">Full setup, ingress rules, config file, blockers, and troubleshooting</div>
+          </div>
+          <div class="lc-arrow">→</div>
+        </a>
+      </div>
+
+    </div><!-- end solutions -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-diagnose">
+        <div class="section-eyebrow">01 — Diagnostics</div>
+        <div class="section-title">Commands to detect and diagnose CG-NAT</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">curl ifconfig.me</div><div class="cmd-desc">Show public IP as seen from internet. If different from router WAN IP → CG-NAT confirmed.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -4 ifconfig.me</div><div class="cmd-desc">Force IPv4 public IP check</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -6 ifconfig.me</div><div class="cmd-desc">Check if IPv6 is available — if this returns an address, you have a real public IPv6 address and can accept incoming IPv6 connections</div></div>
+          <div class="cmd-row"><div class="cmd-code">ip route show</div><div class="cmd-desc">Show routing table — default gateway should be 192.168.31.1 (backup router)</div></div>
+          <div class="cmd-row"><div class="cmd-code">traceroute 8.8.8.8</div><div class="cmd-desc">Show network path — reveals how many hops exist before reaching the internet. Multiple RFC1918/CG-NAT hops = double/triple NAT.</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 3 192.168.31.1</div><div class="cmd-desc">Ping backup router — confirms local network is working</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 3 8.8.8.8</div><div class="cmd-desc">Ping internet — confirms outgoing internet works (CG-NAT always allows outgoing)</div></div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>One-check CG-NAT detection:</b> Run <code>curl ifconfig.me</code> then check your router admin WAN IP. If they differ — CG-NAT. If router WAN is in 100.64.0.0–100.127.255.255 — CG-NAT definitively confirmed.</span>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Questions and answers</div>
+        <div class="section-title">Common CG-NAT questions</div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How do I confirm I have CG-NAT?</div>
+          <div class="ts-body">Run <code>curl ifconfig.me</code> on spserver, then check your router admin WAN IP. If the two IPs are different — you have a NAT layer you don't control. If the router WAN is in the 100.64–100.127 range — CG-NAT confirmed. Also try: ping your public IP from a mobile hotspot — if no response, it's CG-NAT.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Can I bypass CG-NAT for free?</div>
+          <div class="ts-body">Yes — Tailscale and Cloudflare Tunnel both bypass CG-NAT for free. You cannot remove CG-NAT (it's Airtel's infrastructure), but these tools make it irrelevant for every use case: SSH, public web services, file access. In many ways these solutions are better than a simple public IP — free SSL, DDoS protection, no exposed home IP.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Does CG-NAT affect download/upload speed?</div>
+          <div class="ts-body">No — CG-NAT only blocks unsolicited incoming connections. All outgoing traffic (browsing, streaming, downloading, apt update, cloudflared, Tailscale) works normally at full Airtel connection speed. spserver can reach the internet without restriction.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Port forwarding is configured but SSH still fails from outside</div>
+          <div class="ts-body">First confirm whether you have CG-NAT: compare <code>curl ifconfig.me</code> with your router WAN IP. If different — port forwarding cannot work regardless of configuration. Switch to Tailscale for SSH access. If IPs match (no CG-NAT), check UFW rules on spserver and whether sshd is actually listening on port 22.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Will upgrading to Airtel fibre remove CG-NAT?</div>
+          <div class="ts-body">Not automatically. Airtel fibre can still use CG-NAT. After upgrading, run the same two checks. If you want a guaranteed real IP, call Airtel support and request a static IP add-on — this specifically removes CG-NAT. Without explicitly requesting it, most Airtel plans use CG-NAT regardless of connection type.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','investigation','solutions','commands','troubleshoot'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '20%';
+  document.getElementById('sp-pct').textContent = '20%';
+}, 300);
+</script>
+</body>
+</html>

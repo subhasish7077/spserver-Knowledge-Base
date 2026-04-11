@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nginx Web Server — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+.main{flex:1;min-width:0;}
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:30%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+.le-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+.le-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);}
+.le-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.le-table tr:last-child td{border-bottom:none;}
+.le-table tr:hover td{background:var(--bg3);}
+.le-code{font-family:var(--mono);font-size:12px;color:var(--blue);background:#080b10;white-space:nowrap;width:38%;}
+.le-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+.le-desc b{color:var(--text);font-weight:500;}
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:280px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+/* file tree */
+.file-tree{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:2;margin:.75rem 0;}
+.ft-dir{color:var(--amber);}
+.ft-file{color:var(--green);}
+.ft-note{color:var(--text3);}
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+  .le-table{display:block;overflow-x:auto;}
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Nginx Web Server</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-nginx')">What is Nginx</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('web-vs-proxy')">Web server vs reverse proxy</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-nginx-works')">How it works</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('nginx-structure')">Directory structure</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-alternatives')">Alternatives</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install Nginx</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-site-config')">Create site config</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-enable')">Enable site</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-website')">Create website files</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify and test</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-static')">Static site config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-proxy')">Reverse proxy config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-multi')">Multiple subdomains</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-explained')">Line by line</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-nginx')">Nginx commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-logs')">Log commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 6 of 14</div>
+      <h1 class="gh-title"><span>Nginx</span> Web Server</h1>
+      <p class="gh-sub">Serving the website at dustyserver.co.in and acting as the reverse proxy that routes traffic to multiple apps running on the same server — all on different subdomains.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config files</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-nginx">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is Nginx</div>
+        <p class="section-body">
+          Nginx (pronounced "engine-x") is a <b>high-performance web server and reverse proxy</b>. It listens on port 80 (HTTP) and port 443 (HTTPS), receives incoming requests, and either serves files directly or forwards the request to another service. It is the most widely deployed web server in the world, used by Netflix, Airbnb, GitHub, and millions of other sites.
+        </p>
+        <p class="section-body">
+          On spserver, Nginx serves two roles simultaneously — it is the <b>web server</b> that hosts the dustyserver.co.in website, and it is the <b>reverse proxy</b> that will route flask.dustyserver.co.in to the Flask Docker container, blog.dustyserver.co.in to a future blog, and so on — all on the same server, all on port 80.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Nginx uses an <b>event-driven, asynchronous</b> architecture. Unlike older servers that create one thread per connection, Nginx handles thousands of concurrent connections in a single worker process. This makes it extremely efficient even on low-spec hardware like spserver.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="web-vs-proxy">
+        <div class="section-eyebrow">02 — Two roles</div>
+        <div class="section-title">Web server vs reverse proxy — both at once</div>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Web server role</div>
+            <div class="ic-body">Nginx reads the request URL, finds the matching file in <code>/var/www/dustyserver/</code>, and sends it back to the visitor. HTML, CSS, images, JavaScript — all served directly. No application code involved.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">Reverse proxy role</div>
+            <div class="ic-body">Nginx reads the incoming hostname, matches it against rules, and <b>forwards</b> the request to another process — Flask on port 5000, a Node app on port 3000, anything. It acts as the middleman between the internet and backend apps.</div>
+          </div>
+        </div>
+        <div class="diagram">
+<span class="db">Visitor requests dustyserver.co.in/index.html</span>
+<span class="dm">  Nginx finds /var/www/dustyserver/index.html</span>
+<span class="dg">  Nginx serves file directly → visitor sees website</span>
+
+<span class="db">Visitor requests flask.dustyserver.co.in/</span>
+<span class="dm">  Nginx reads Host header: flask.dustyserver.co.in</span>
+<span class="dm">  Nginx finds server block with server_name flask.dustyserver.co.in</span>
+<span class="dm">  Nginx forwards request to http://localhost:5000</span>
+<span class="dg">  Flask processes request → response goes back through Nginx → visitor</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-nginx-works">
+        <div class="section-eyebrow">03 — Internals</div>
+        <div class="section-title">How Nginx processes a request</div>
+        <p class="section-body">
+          When a request arrives at Nginx, it goes through a specific decision process to find which server block and location block to use:
+        </p>
+        <div class="diagram">
+<span class="db">HTTP request arrives on port 80</span>
+  <span class="dm">↓</span>
+<span class="dm">Nginx checks all server blocks for matching server_name</span>
+<span class="dm">  → matches "dustyserver.co.in"  ──► serves from /var/www/dustyserver</span>
+<span class="dm">  → matches "flask.dustyserver.co.in" ──► proxies to localhost:5000</span>
+<span class="dm">  → no match  ──► uses default server (first listed)</span>
+  <span class="dm">↓</span>
+<span class="dm">Within matched server block, Nginx checks location blocks</span>
+<span class="dm">  → location /  ──► matches everything (catch-all)</span>
+<span class="dm">  → location /api/  ──► only matches URLs starting with /api/</span>
+  <span class="dm">↓</span>
+<span class="dg">Request is handled according to the matched location block</span>
+        </div>
+        <p class="section-body">
+          The <b>server block</b> selects which virtual host handles the request (based on the domain name). The <b>location block</b> within that server block selects how to handle different URL paths. This two-level routing is what allows Nginx to host multiple sites and route different paths differently — all on one machine.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="nginx-structure">
+        <div class="section-eyebrow">04 — File structure</div>
+        <div class="section-title">Nginx directory structure on Ubuntu</div>
+        <div class="file-tree">
+<span class="ft-dir">/etc/nginx/</span>                     <span class="ft-note">← Nginx config root</span>
+├── <span class="ft-file">nginx.conf</span>                  <span class="ft-note">← main config (rarely edited)</span>
+├── <span class="ft-dir">sites-available/</span>            <span class="ft-note">← all site configs live here</span>
+│   ├── <span class="ft-file">default</span>              <span class="ft-note">← default page (we deleted this)</span>
+│   └── <span class="ft-file">dustyserver</span>         <span class="ft-note">← our site config</span>
+├── <span class="ft-dir">sites-enabled/</span>              <span class="ft-note">← symlinks to active configs</span>
+│   └── <span class="ft-file">dustyserver</span>         <span class="ft-note">← symlink to sites-available/dustyserver</span>
+├── <span class="ft-dir">conf.d/</span>                     <span class="ft-note">← additional configs (auto-loaded)</span>
+└── <span class="ft-dir">modules-enabled/</span>            <span class="ft-note">← loaded Nginx modules</span>
+
+<span class="ft-dir">/var/www/</span>                        <span class="ft-note">← website files</span>
+└── <span class="ft-dir">dustyserver/</span>                <span class="ft-note">← our website root</span>
+    └── <span class="ft-file">index.html</span>           <span class="ft-note">← homepage</span>
+
+<span class="ft-dir">/var/log/nginx/</span>                  <span class="ft-note">← log files</span>
+├── <span class="ft-file">access.log</span>                  <span class="ft-note">← every request logged here</span>
+└── <span class="ft-file">error.log</span>                   <span class="ft-note">← errors and warnings</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>The <b>sites-available / sites-enabled</b> pattern is Ubuntu's way of managing Nginx sites. You write config in <code>sites-available/</code> and create a symlink in <code>sites-enabled/</code> to activate it. This lets you disable a site by removing the symlink without deleting the config.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-alternatives">
+        <div class="section-eyebrow">05 — Alternatives</div>
+        <div class="section-title">Nginx vs other web servers</div>
+        <table class="kv-table">
+          <thead><tr><th>Server</th><th>Model</th><th>Config complexity</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Nginx <span style="font-size:10px;color:var(--green);font-family:var(--mono);margin-left:4px;">chosen</span></td>
+              <td class="val">Event-driven async</td>
+              <td class="desc">Medium — declarative blocks</td>
+              <td class="desc">High-traffic static files, reverse proxy, load balancing. Industry standard.</td>
+            </tr>
+            <tr>
+              <td class="key">Apache</td>
+              <td class="val">Process/thread per request</td>
+              <td class="desc">Medium — .htaccess files</td>
+              <td class="desc">Dynamic content, .htaccess flexibility, WordPress. Older standard still widely used.</td>
+            </tr>
+            <tr>
+              <td class="key">Caddy</td>
+              <td class="val">Event-driven async</td>
+              <td class="desc">Very simple — Caddyfile</td>
+              <td class="desc">Automatic HTTPS, simple setups. Excellent for beginners. Growing in popularity.</td>
+            </tr>
+            <tr>
+              <td class="key">Traefik</td>
+              <td class="val">Event-driven async</td>
+              <td class="desc">Docker labels / YAML</td>
+              <td class="desc">Docker-native reverse proxy. Auto-discovers containers. Modern production standard.</td>
+            </tr>
+            <tr>
+              <td class="key">Python built-in</td>
+              <td class="val">Single-threaded</td>
+              <td class="desc">Zero config</td>
+              <td class="desc">Development only — <code>python3 -m http.server</code>. Never use in production.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Install Nginx and open firewall</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install Nginx</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The <code>nginx</code> package from Ubuntu's repositories installs a stable version with all features needed for our setup. It also creates the directory structure at <code>/etc/nginx/</code> and <code>/var/www/html/</code>, and registers itself as a systemd service.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt install nginx -y</span>
+
+<span class="cm"># Enable auto-start on boot</span>
+<span class="nm">sudo systemctl enable nginx</span>
+
+<span class="cm"># Start now</span>
+<span class="nm">sudo systemctl start nginx</span>
+
+<span class="cm"># Check it is running</span>
+<span class="nm">sudo systemctl status nginx</span>
+<span class="cm"># Look for: Active: active (running)</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Open HTTP and HTTPS in UFW</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">UFW blocks all incoming by default. The <b>Nginx Full</b> app profile opens both port 80 (HTTP) and 443 (HTTPS) in one command. UFW knows about this profile because Nginx registers it automatically during install.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Allow both HTTP (80) and HTTPS (443)</span>
+<span class="nm">sudo ufw allow 'Nginx Full'</span>
+
+<span class="cm"># Verify</span>
+<span class="nm">sudo ufw status</span>
+<span class="cm"># Should show: Nginx Full   ALLOW   Anywhere</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-site-config">
+        <div class="section-eyebrow">02 — Configure</div>
+        <div class="section-title">Create the site config file</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Write the site config in sites-available</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Each website or app gets its own config file in <code>/etc/nginx/sites-available/</code>. The filename can be anything — we use the domain name for clarity. This file is not active yet — it becomes active when you symlink it into <code>sites-enabled/</code>.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo nano</span> /etc/nginx/sites-available/dustyserver</pre>
+            </div>
+            <p class="step-why">Paste this config:</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">dustyserver.co.in www.dustyserver.co.in</span>;
+
+    <span class="nm">root</span> <span class="str">/var/www/dustyserver</span>;
+    <span class="nm">index</span> <span class="str">index.html</span>;
+
+    <span class="kw">location</span> / {
+        <span class="nm">try_files</span> <span class="op">$uri $uri/</span> <span class="str">=404</span>;
+    }
+}</pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-enable">
+        <div class="section-eyebrow">03 — Enable</div>
+        <div class="section-title">Enable the site and remove the default</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Create symlink and remove default page</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The symlink in <code>sites-enabled/</code> is what activates the config. Nginx only reads configs from <code>sites-enabled/</code> — <code>sites-available/</code> is just storage. We also remove the default Nginx page which would otherwise intercept requests.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create symlink to enable the site</span>
+<span class="nm">sudo ln -s</span> /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/
+
+<span class="cm"># Remove the default Nginx welcome page</span>
+<span class="nm">sudo rm</span> /etc/nginx/sites-enabled/default
+
+<span class="cm"># Test config syntax BEFORE reloading — always do this</span>
+<span class="nm">sudo nginx -t</span>
+<span class="cm"># Expected: nginx: configuration file /etc/nginx/nginx.conf syntax is ok</span>
+<span class="cm">#           nginx: configuration file /etc/nginx/nginx.conf test is successful</span>
+
+<span class="cm"># Reload Nginx to apply changes (no downtime)</span>
+<span class="nm">sudo systemctl reload nginx</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>Always run <code>sudo nginx -t</code> before reloading. If there is a syntax error in your config, <code>nginx -t</code> shows you exactly where. If you reload with a broken config, Nginx fails to reload and may stop serving requests.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-website">
+        <div class="section-eyebrow">04 — Website files</div>
+        <div class="section-title">Create the website directory and homepage</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Create website directory and index.html</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Nginx looks for files in the <code>root</code> directory defined in the config. We set that to <code>/var/www/dustyserver/</code>. That directory must exist and contain an <code>index.html</code> — otherwise Nginx returns a 404.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create the website directory</span>
+<span class="nm">sudo mkdir -p</span> /var/www/dustyserver
+
+<span class="cm"># Create a simple homepage</span>
+<span class="nm">sudo nano</span> /var/www/dustyserver/index.html</pre>
+            </div>
+            <p class="step-why">Add any HTML you want. A simple test page to start:</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/var/www/dustyserver/index.html</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="kw">&lt;!DOCTYPE html&gt;</span>
+<span class="kw">&lt;html&gt;</span>
+<span class="kw">&lt;head&gt;&lt;title&gt;</span>spserver<span class="kw">&lt;/title&gt;&lt;/head&gt;</span>
+<span class="kw">&lt;body&gt;</span>
+  <span class="kw">&lt;h1&gt;</span>dustyserver.co.in<span class="kw">&lt;/h1&gt;</span>
+  <span class="kw">&lt;p&gt;</span>spserver is live.<span class="kw">&lt;/p&gt;</span>
+<span class="kw">&lt;/body&gt;</span>
+<span class="kw">&lt;/html&gt;</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">05 — Verify</div>
+        <div class="section-title">Test Nginx is working</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Test from server itself — should return your HTML</span>
+<span class="nm">curl localhost</span>
+
+<span class="cm"># Test from Windows PC browser</span>
+<span class="cm"># Open: http://192.168.31.150</span>
+
+<span class="cm"># After Cloudflare Tunnel is set up — test public URL</span>
+<span class="cm"># Open: https://dustyserver.co.in</span>
+
+<span class="cm"># Check Nginx is listening on port 80</span>
+<span class="nm">sudo ss -tlnp | grep nginx</span>
+<span class="cm"># Should show: 0.0.0.0:80 LISTEN</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>If <code>curl localhost</code> returns your HTML, Nginx is serving correctly. The site becomes publicly accessible after Cloudflare Tunnel is configured to forward dustyserver.co.in to localhost:80.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-static">
+        <div class="section-eyebrow">01 — Static site</div>
+        <div class="section-title">Static website config — complete and explained</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">dustyserver.co.in www.dustyserver.co.in</span>;
+
+    <span class="nm">root</span> <span class="str">/var/www/dustyserver</span>;
+    <span class="nm">index</span> <span class="str">index.html index.htm</span>;
+
+    <span class="kw">location</span> / {
+        <span class="nm">try_files</span> <span class="op">$uri $uri/</span> <span class="str">=404</span>;
+    }
+
+    <span class="cm"># Cache static assets</span>
+    <span class="kw">location</span> ~* \.(css|js|jpg|jpeg|png|gif|ico|svg)$ {
+        <span class="nm">expires</span> <span class="str">30d</span>;
+        <span class="nm">add_header</span> <span class="str">Cache-Control "public, immutable"</span>;
+    }
+
+    <span class="cm"># Security headers</span>
+    <span class="nm">add_header</span> <span class="str">X-Frame-Options "SAMEORIGIN"</span>;
+    <span class="nm">add_header</span> <span class="str">X-Content-Type-Options "nosniff"</span>;
+}</pre>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:38%">Directive</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">listen 80</td><td class="le-desc">Accept HTTP connections on port 80. Cloudflare Tunnel sends plain HTTP to Nginx — Cloudflare handles HTTPS on its edge.</td></tr>
+            <tr><td class="le-code">server_name dustyserver.co.in www.dustyserver.co.in</td><td class="le-desc">This server block handles requests with these Host headers. Both the apex domain and www subdomain go to the same block.</td></tr>
+            <tr><td class="le-code">root /var/www/dustyserver</td><td class="le-desc">The filesystem path where website files live. Nginx looks here for requested files.</td></tr>
+            <tr><td class="le-code">index index.html index.htm</td><td class="le-desc">When a directory is requested (e.g. /), try these filenames as the default file.</td></tr>
+            <tr><td class="le-code">location / { ... }</td><td class="le-desc">Match all URL paths. The / pattern is the catch-all — matches any URL.</td></tr>
+            <tr><td class="le-code">try_files $uri $uri/ =404</td><td class="le-desc"><b>Try to serve:</b> (1) the exact file requested, (2) as a directory with index file, (3) return 404 if neither found.</td></tr>
+            <tr><td class="le-code">location ~* \.(css|js|...)$</td><td class="le-desc">~* means case-insensitive regex match. Match any URL ending in these file extensions.</td></tr>
+            <tr><td class="le-code">expires 30d</td><td class="le-desc">Tell browsers to cache these files for 30 days — reduces repeat requests and speeds up the site.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-proxy">
+        <div class="section-eyebrow">02 — Reverse proxy</div>
+        <div class="section-title">Reverse proxy config — forwarding to a backend app</div>
+        <p class="section-body">
+          When acting as a reverse proxy for a Flask/Django/Node app, the server block uses <code>proxy_pass</code> instead of <code>root</code>. The <code>proxy_set_header</code> directives pass important metadata to the backend app.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver — add a proxy server block</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">flask.dustyserver.co.in</span>;
+
+    <span class="kw">location</span> / {
+        <span class="nm">proxy_pass</span>         <span class="str">http://localhost:5000</span>;
+        <span class="nm">proxy_http_version</span> <span class="str">1.1</span>;
+
+        <span class="cm"># Pass original request info to backend</span>
+        <span class="nm">proxy_set_header</span> Host              <span class="op">$host</span>;
+        <span class="nm">proxy_set_header</span> X-Real-IP         <span class="op">$remote_addr</span>;
+        <span class="nm">proxy_set_header</span> X-Forwarded-For   <span class="op">$proxy_add_x_forwarded_for</span>;
+        <span class="nm">proxy_set_header</span> X-Forwarded-Proto <span class="op">$scheme</span>;
+
+        <span class="cm"># WebSocket support (needed for real-time apps)</span>
+        <span class="nm">proxy_set_header</span> Upgrade           <span class="op">$http_upgrade</span>;
+        <span class="nm">proxy_set_header</span> Connection         <span class="str">"upgrade"</span>;
+
+        <span class="cm"># Timeouts</span>
+        <span class="nm">proxy_connect_timeout</span> <span class="str">60s</span>;
+        <span class="nm">proxy_send_timeout</span>    <span class="str">60s</span>;
+        <span class="nm">proxy_read_timeout</span>    <span class="str">60s</span>;
+    }
+}</pre>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:42%">Directive</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">proxy_pass http://localhost:5000</td><td class="le-desc">Forward the request to Flask running on port 5000. Can also point to another server: <code>proxy_pass http://10.0.0.2:5000</code>.</td></tr>
+            <tr><td class="le-code">proxy_http_version 1.1</td><td class="le-desc">Use HTTP/1.1 for the connection to the backend. Required for WebSocket and keep-alive connections.</td></tr>
+            <tr><td class="le-code">proxy_set_header Host $host</td><td class="le-desc">Pass the original hostname to Flask so it knows which domain was requested. Without this, Flask sees "localhost".</td></tr>
+            <tr><td class="le-code">X-Real-IP $remote_addr</td><td class="le-desc">Pass the real visitor IP to Flask. Without this, Flask logs Nginx's IP (127.0.0.1) for every request.</td></tr>
+            <tr><td class="le-code">X-Forwarded-For</td><td class="le-desc">Standard header for proxy chains. Appends the real IP to any existing forwarded-for chain.</td></tr>
+            <tr><td class="le-code">X-Forwarded-Proto $scheme</td><td class="le-desc">Tell Flask whether the original request was HTTP or HTTPS. Flask uses this to generate correct URLs.</td></tr>
+            <tr><td class="le-code">Upgrade / Connection</td><td class="le-desc">Required for WebSocket connections (e.g. ttyd, real-time apps). Passes the upgrade request through the proxy.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-multi">
+        <div class="section-eyebrow">03 — Multiple subdomains</div>
+        <div class="section-title">Hosting multiple sites on one server</div>
+        <p class="section-body">
+          Each subdomain gets its own <code>server</code> block. They can all be in the same config file or in separate files — Nginx loads everything from <code>sites-enabled/</code>. The pattern is identical each time: listen 80, set server_name, then either serve files or proxy_pass.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver — complete multi-site config</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Main website</span>
+<span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">dustyserver.co.in www.dustyserver.co.in</span>;
+    <span class="nm">root</span> <span class="str">/var/www/dustyserver</span>;
+    <span class="nm">index</span> <span class="str">index.html</span>;
+    <span class="kw">location</span> / { <span class="nm">try_files</span> <span class="op">$uri $uri/</span> <span class="str">=404</span>; }
+}
+
+<span class="cm"># Flask app</span>
+<span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">flask.dustyserver.co.in</span>;
+    <span class="kw">location</span> / {
+        <span class="nm">proxy_pass</span> <span class="str">http://localhost:5000</span>;
+        <span class="nm">proxy_set_header</span> Host <span class="op">$host</span>;
+        <span class="nm">proxy_set_header</span> X-Real-IP <span class="op">$remote_addr</span>;
+    }
+}
+
+<span class="cm"># Knowledge base docs</span>
+<span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">docs.dustyserver.co.in</span>;
+    <span class="nm">root</span> <span class="str">/var/www/dustyserver</span>;  <span class="cm"># same dir — serves index.html + guides</span>
+    <span class="nm">index</span> <span class="str">index.html</span>;
+    <span class="kw">location</span> / { <span class="nm">try_files</span> <span class="op">$uri $uri/</span> <span class="str">=404</span>; }
+}
+
+<span class="cm"># Future Django app</span>
+<span class="kw">server</span> {
+    <span class="nm">listen</span> <span class="str">80</span>;
+    <span class="nm">server_name</span> <span class="str">django.dustyserver.co.in</span>;
+    <span class="kw">location</span> / {
+        <span class="nm">proxy_pass</span> <span class="str">http://localhost:8000</span>;
+        <span class="nm">proxy_set_header</span> Host <span class="op">$host</span>;
+        <span class="nm">proxy_set_header</span> X-Real-IP <span class="op">$remote_addr</span>;
+    }
+}</pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>After editing the config always run <code>sudo nginx -t</code> to validate, then <code>sudo systemctl reload nginx</code> to apply. Reload is zero-downtime — Nginx keeps serving existing connections while workers reload with the new config.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-explained">
+        <div class="section-eyebrow">04 — Key directives</div>
+        <div class="section-title">Important Nginx directives reference</div>
+        <table class="kv-table">
+          <thead><tr><th>Directive</th><th>Where used</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td class="key">listen</td><td class="val">server</td><td class="desc">Which port to listen on. <code>listen 80</code> for HTTP, <code>listen 443 ssl</code> for HTTPS.</td></tr>
+            <tr><td class="key">server_name</td><td class="val">server</td><td class="desc">Which hostnames this block handles. Space-separated list. Supports wildcards: <code>*.dustyserver.co.in</code>.</td></tr>
+            <tr><td class="key">root</td><td class="val">server/location</td><td class="desc">Filesystem path to serve files from. Combined with the URI to find the file.</td></tr>
+            <tr><td class="key">index</td><td class="val">server/location</td><td class="desc">Default file to serve when a directory is requested.</td></tr>
+            <tr><td class="key">try_files</td><td class="val">location</td><td class="desc">Try serving each argument in order. Fall through to the last (usually =404 or a named location).</td></tr>
+            <tr><td class="key">proxy_pass</td><td class="val">location</td><td class="desc">Forward requests to another server/process. Enables reverse proxy mode.</td></tr>
+            <tr><td class="key">return</td><td class="val">server/location</td><td class="desc">Return a status code or redirect. <code>return 301 https://$host$request_uri</code> redirects HTTP to HTTPS.</td></tr>
+            <tr><td class="key">include</td><td class="val">any</td><td class="desc">Include another config file. Used by nginx.conf to load sites-enabled/.</td></tr>
+            <tr><td class="key">expires</td><td class="val">location</td><td class="desc">Set Cache-Control and Expires headers. <code>expires 30d</code> for 30 day browser cache.</td></tr>
+            <tr><td class="key">gzip</td><td class="val">http/server</td><td class="desc">Enable gzip compression. Reduces response size — improves load times.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-nginx">
+        <div class="section-eyebrow">01 — Nginx management</div>
+        <div class="section-title">Essential Nginx commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -t</div><div class="cmd-desc">Test all config files for syntax errors — ALWAYS run before reloading. Shows file and line number of errors.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -T</div><div class="cmd-desc">Test config and print the full parsed config — useful for debugging what Nginx actually sees.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl reload nginx</div><div class="cmd-desc">Reload config with zero downtime — existing connections continue, workers reload with new config. Use after config changes.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart nginx</div><div class="cmd-desc">Full restart — brief interruption to connections. Use only if reload fails or after major changes.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status nginx</div><div class="cmd-desc">Check if Nginx is running, view recent log lines, check for errors.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable nginx</div><div class="cmd-desc">Auto-start Nginx on every boot.</div></div>
+          <div class="cmd-row"><div class="cmd-code">nginx -v</div><div class="cmd-desc">Show Nginx version.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ln -s /etc/nginx/sites-available/NAME /etc/nginx/sites-enabled/</div><div class="cmd-desc">Enable a site by creating symlink — then nginx -t and reload.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo rm /etc/nginx/sites-enabled/NAME</div><div class="cmd-desc">Disable a site by removing symlink — config in sites-available is preserved.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ufw allow 'Nginx Full'</div><div class="cmd-desc">Open ports 80 and 443 in UFW using Nginx app profile.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl localhost</div><div class="cmd-desc">Test Nginx is serving from the server itself — bypasses Cloudflare and DNS.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -I http://192.168.31.150</div><div class="cmd-desc">Show HTTP response headers — check status code and server header.</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-logs">
+        <div class="section-eyebrow">02 — Logs</div>
+        <div class="section-title">Nginx log commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo tail -f /var/log/nginx/access.log</div><div class="cmd-desc">Watch incoming requests live — shows IP, method, URL, status code, response size.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tail -f /var/log/nginx/error.log</div><div class="cmd-desc">Watch errors live — first place to check when something isn't working.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tail -100 /var/log/nginx/error.log</div><div class="cmd-desc">Show last 100 lines of error log — good starting point for debugging.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo grep "404" /var/log/nginx/access.log</div><div class="cmd-desc">Filter access log for 404 errors — find missing files or broken links.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo grep "502" /var/log/nginx/error.log</div><div class="cmd-desc">Find bad gateway errors — usually means the backend app is down.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo cat /var/log/nginx/access.log | awk '{print $1}' | sort | uniq -c | sort -rn | head</div><div class="cmd-desc">Top 10 IPs by request count — find heavy users or suspicious traffic.</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during Nginx setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Default Nginx page showing instead of our website</div>
+          <div class="bb-body">
+            After creating the site config and reloading Nginx, opening the browser showed the default "Welcome to nginx!" page instead of our website. The config file was correct but the default site was taking priority.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Remove the default symlink from sites-enabled</div>
+          <div class="fb-body">
+            The default Nginx config at <code>/etc/nginx/sites-enabled/default</code> was still active and had a catch-all server block. Since it was listed first, it intercepted all requests. Fix: <code>sudo rm /etc/nginx/sites-enabled/default</code> then <code>sudo nginx -t</code> and <code>sudo systemctl reload nginx</code>. Our site then displayed correctly.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">nginx -t fails after editing config — permission denied on /var/www/dustyserver</div>
+          <div class="bb-body">
+            After creating the website directory with <code>mkdir</code> as sipu, <code>sudo nginx -t</code> passed but the site returned 403 Forbidden. The directory existed but Nginx couldn't read the files.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Set correct permissions on web root directory</div>
+          <div class="fb-body">
+            Nginx runs as the <code>www-data</code> user. The <code>/var/www/dustyserver/</code> directory and its files need to be readable by www-data. Fix: <code>sudo chown -R www-data:www-data /var/www/dustyserver</code> and <code>sudo chmod -R 755 /var/www/dustyserver</code>. Alternatively, ensure the directory has execute permission for other users so www-data can enter it.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Nginx problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">502 Bad Gateway</div>
+          <div class="ts-body">Nginx is running but the backend app (Flask, etc.) is not responding. Check: (1) Is the app running? <code>sudo systemctl status APP</code> or <code>docker compose ps</code>. (2) Is it on the right port? <code>sudo ss -tlnp | grep PORT</code>. (3) Test from server: <code>curl http://localhost:PORT</code>. (4) Check Nginx error log: <code>sudo tail -20 /var/log/nginx/error.log</code>.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">403 Forbidden</div>
+          <div class="ts-body">Nginx cannot read the requested file or directory. Causes: (1) File permissions wrong — the www-data user can't read the file. Fix: <code>sudo chmod 644 /var/www/dustyserver/index.html</code>. (2) Directory permissions wrong — www-data can't enter the directory. Fix: <code>sudo chmod 755 /var/www/dustyserver</code>. (3) SELinux/AppArmor blocking — less common on Ubuntu.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">nginx -t fails — syntax error</div>
+          <div class="ts-body">A config file has a syntax error. <code>nginx -t</code> shows the file name and line number. Common mistakes: missing semicolons at end of directives, mismatched braces <code>{ }</code>, typos in directive names, wrong quotation marks. Fix the error, run <code>nginx -t</code> again, then reload.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Config changes not taking effect after reload</div>
+          <div class="ts-body">The site config in <code>sites-available/</code> was edited but the symlink in <code>sites-enabled/</code> points to the file correctly — changes should take effect on reload. If not: (1) Verify there is no other config overriding this one. (2) Check if nginx.conf includes another directory that has conflicting rules. (3) Try <code>sudo nginx -T</code> to see the full parsed config.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Nginx shows default page instead of my site</div>
+          <div class="ts-body">The default Nginx config is still active and taking priority. Check: <code>ls /etc/nginx/sites-enabled/</code> — if <code>default</code> is listed, remove it: <code>sudo rm /etc/nginx/sites-enabled/default</code>. Then <code>sudo nginx -t</code> and reload.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Nginx starts fine but port 80 is already in use</div>
+          <div class="ts-body">Another process is on port 80. Find it: <code>sudo ss -tlnp | grep :80</code> — the last column shows the process name. Either stop that process or change Nginx to use a different port. Common culprit: Apache may be installed and running alongside Nginx.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Slow response — Nginx taking too long to respond</div>
+          <div class="ts-body">If the backend app is slow (Flask, Django), Nginx will wait — the default timeout is 60 seconds. Tune with: <code>proxy_read_timeout 30s</code> in the location block. For static files, slowness usually means the file path is wrong and Nginx is searching. Check <code>root</code> directive matches actual directory.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nginx as Docker reverse proxy</b> — run Nginx inside a Docker container, alongside your app containers on the same Docker network. Containers talk to each other by name. This is the setup in the Nginx reverse proxy guide (Phase 2).</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Gzip compression</b> — add to nginx.conf: <code>gzip on; gzip_types text/plain text/css application/json application/javascript;</code>. Reduces response sizes by 60-80% for text content. Faster page loads with zero code changes.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Rate limiting</b> — protect your apps from abuse: <code>limit_req_zone $binary_remote_addr zone=one:10m rate=10r/s;</code> and <code>limit_req zone=one burst=20;</code>. Limits clients to 10 requests per second with a burst of 20.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Load balancing</b> — distribute traffic across multiple backend instances with the <code>upstream</code> block. Run two Flask workers, Nginx distributes requests between them. Relevant when a single instance can't handle the load.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nginx caching</b> — cache responses from backend apps in memory or on disk. A database query that takes 100ms on first request returns in microseconds from cache. Configure with <code>proxy_cache_path</code> and <code>proxy_cache</code>.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Traefik as replacement</b> — in Phase 2+ when Docker is the primary deployment method, Traefik auto-discovers containers and configures routing from Docker labels. Less manual config than Nginx. Worth evaluating once Docker is comfortable.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nginx Unit</b> — Nginx's application server. Runs Python/Node/PHP apps directly without needing Gunicorn or uWSGI. Simpler stack for Flask/Django deployments.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

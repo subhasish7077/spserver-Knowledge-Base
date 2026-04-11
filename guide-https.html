@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTTPS on Cloudflare — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.ssl-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.ssl-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.ssl-card.chosen { border-color: rgba(61,220,132,0.3); background: rgba(61,220,132,0.03); }
+.ssl-card.warn-c { border-color: rgba(240,165,0,0.25); }
+.ssl-card.bad-c  { border-color: rgba(240,101,101,0.2); }
+.ssl-mode-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: .25rem; }
+.ssl-mode-sub  { font-family: var(--mono); font-size: 11px; color: var(--text3); margin-bottom: .5rem; }
+.ssl-mode-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+.flow-step {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 8px;
+  align-items: flex-start;
+}
+.flow-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-family: var(--mono); font-weight: 700;
+  color: var(--green); flex-shrink: 0; margin-top: 2px;
+}
+.flow-content .flow-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.flow-content .flow-sub   { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.flow-content .flow-sub code {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--bg3); padding: 1px 5px; border-radius: 3px; color: var(--blue);
+}
+.flow-connector {
+  width: 2px; height: 12px;
+  background: var(--border2);
+  margin-left: 12px; margin-bottom: 8px;
+  border-radius: 99px;
+}
+
+@media(max-width:768px){ .ssl-mode-grid{ grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">HTTPS on Cloudflare</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-https')">What is HTTPS</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-tls')">TLS / SSL explained</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-cf-ssl')">How Cloudflare handles SSL</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('ssl-modes')">SSL modes compared</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-flexible')">Why we use Flexible</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-mode')">Set SSL mode</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-always')">Always Use HTTPS</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-hsts')">HSTS</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify HTTPS works</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Concepts</div>
+      <div class="sidebar-link" onclick="switchTab('concepts');scrollToId('c-cert')">What is a certificate</div>
+      <div class="sidebar-link" onclick="switchTab('concepts');scrollToId('c-handshake')">TLS handshake</div>
+      <div class="sidebar-link" onclick="switchTab('concepts');scrollToId('c-cert-types')">Certificate types</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-verify')">Verify commands</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 11 of 14</div>
+      <h1 class="gh-title">HTTPS on <span>Cloudflare</span></h1>
+      <p class="gh-sub">Enabling SSL so every service on dustyserver.co.in is served over HTTPS — free, automatic, zero certificate management on spserver. Visitors see the padlock, data is encrypted, and the home IP stays hidden.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('concepts')">Concepts</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-https">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is HTTPS</div>
+        <p class="section-body">
+          HTTPS stands for <b>HTTP Secure</b>. It is the same HTTP protocol used for all web communication, but with an encryption layer added on top called <b>TLS</b> (Transport Layer Security). When a browser connects to a site over HTTPS, all data exchanged — the page content, any form inputs, cookies, credentials — is encrypted end to end.
+        </p>
+        <p class="section-body">
+          The padlock icon in the browser address bar means the connection is HTTPS. Without it, anyone on the same network (your ISP, a cafe WiFi) can see exactly what you send and receive. With HTTPS, they see only encrypted noise.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">HTTP — no encryption</div>
+            <div class="ic-body">All data transmitted in plain text. Anyone with network access (ISP, router, middleman) can read your login credentials, session cookies, and all page content. Browser shows "Not Secure" warning.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">HTTPS — encrypted</div>
+            <div class="ic-body">All data encrypted with TLS. Even if intercepted, it's unreadable without the private key. Browser shows the padlock. Required for any modern web service — browsers distrust plain HTTP.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>HTTPS is no longer optional. Modern browsers show "Not Secure" warnings for plain HTTP sites. Google's search ranking penalises non-HTTPS sites. Password managers and payment forms refuse to work without it. Every public service needs HTTPS.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-tls">
+        <div class="section-eyebrow">02 — Protocol</div>
+        <div class="section-title">TLS / SSL — what's the difference</div>
+        <p class="section-body">
+          SSL (Secure Sockets Layer) was the original encryption protocol, developed in the 1990s. It was replaced by TLS (Transport Layer Security) in 1999. SSL 2.0 and 3.0 are both deprecated and insecure. Despite this, the term "SSL" stuck — people still say "SSL certificate" when they mean a TLS certificate, and Cloudflare's settings section is called "SSL/TLS".
+        </p>
+        <p class="section-body">
+          <b>In practice:</b> when someone says SSL they mean TLS. The current standard is TLS 1.3 (released 2018), with TLS 1.2 still widely supported. TLS 1.0 and 1.1 are deprecated. Cloudflare enforces TLS 1.2 minimum by default.
+        </p>
+        <div class="diagram">
+<span class="dm">Protocol timeline:</span>
+<span class="dr">SSL 2.0 (1995)</span>  <span class="dm">← broken, never use</span>
+<span class="dr">SSL 3.0 (1996)</span>  <span class="dm">← broken (POODLE attack), never use</span>
+<span class="da">TLS 1.0 (1999)</span>  <span class="dm">← deprecated 2021</span>
+<span class="da">TLS 1.1 (2006)</span>  <span class="dm">← deprecated 2021</span>
+<span class="dg">TLS 1.2 (2008)</span>  <span class="dm">← still widely used, acceptable</span>
+<span class="dg">TLS 1.3 (2018)</span>  <span class="dm">← current standard, fastest and most secure</span>
+
+<span class="dm">Cloudflare uses TLS 1.3 for all connections on our domain ✓</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-cf-ssl">
+        <div class="section-eyebrow">03 — Architecture</div>
+        <div class="section-title">How Cloudflare handles SSL for spserver</div>
+        <p class="section-body">
+          Since Cloudflare sits between the visitor and our server (via Cloudflare Tunnel), SSL is handled at two separate legs of the connection. Cloudflare issues and manages the certificate on its edge — our server only ever receives plain HTTP from the tunnel.
+        </p>
+        <div class="flow-step">
+          <div class="flow-num">1</div>
+          <div class="flow-content">
+            <div class="flow-title">Visitor browser → Cloudflare edge</div>
+            <div class="flow-sub">Encrypted HTTPS connection. Cloudflare presents its SSL certificate for <code>*.dustyserver.co.in</code>. Browser verifies, sees padlock ✓</div>
+          </div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step">
+          <div class="flow-num">2</div>
+          <div class="flow-content">
+            <div class="flow-title">Cloudflare edge → Cloudflare Tunnel → spserver</div>
+            <div class="flow-sub">Plain HTTP over the already-encrypted Cloudflare Tunnel connection. spserver receives plain HTTP on <code>localhost:80</code> — no SSL certificate needed on the server.</div>
+          </div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step">
+          <div class="flow-num">3</div>
+          <div class="flow-content">
+            <div class="flow-title">spserver → Nginx → response</div>
+            <div class="flow-sub">Nginx serves files or proxies to apps. Response goes back through the same path. Visitor receives encrypted HTTPS response.</div>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>The Cloudflare Tunnel connection itself is already encrypted with TLS — so even in Flexible mode, the connection between Cloudflare and spserver is not transmitted in plain text over the internet. It goes through an encrypted tunnel.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ssl-modes">
+        <div class="section-eyebrow">04 — SSL modes</div>
+        <div class="section-title">Cloudflare SSL/TLS modes compared</div>
+        <div class="ssl-mode-grid">
+          <div class="ssl-card bad-c">
+            <div class="ssl-mode-name">Off</div>
+            <div class="ssl-mode-sub">No encryption</div>
+            <div class="ssl-mode-body">HTTP only. Visitors get no padlock. Browser shows "Not Secure". Never use for any real site.</div>
+          </div>
+          <div class="ssl-card chosen">
+            <div class="ssl-mode-name">Flexible <span class="tag tag-g">our choice</span></div>
+            <div class="ssl-mode-sub">HTTPS visitor ↔ Cloudflare / HTTP Cloudflare ↔ server</div>
+            <div class="ssl-mode-body">Visitors get HTTPS and the padlock. No SSL certificate needed on spserver. The Cloudflare Tunnel itself is already encrypted. Perfect for our setup.</div>
+          </div>
+          <div class="ssl-card warn-c">
+            <div class="ssl-mode-name">Full</div>
+            <div class="ssl-mode-sub">HTTPS both legs, self-signed cert OK</div>
+            <div class="ssl-mode-body">HTTPS visitor ↔ Cloudflare AND HTTPS Cloudflare ↔ server. Server needs an SSL cert but it can be self-signed. More secure than Flexible.</div>
+          </div>
+          <div class="ssl-card warn-c">
+            <div class="ssl-mode-name">Full (Strict)</div>
+            <div class="ssl-mode-sub">HTTPS both legs, valid cert required</div>
+            <div class="ssl-mode-body">Same as Full but server must have a certificate from a trusted CA. Most secure — requires installing Cloudflare Origin Certificate on Nginx.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>For a future upgrade to Full Strict: Cloudflare offers free <b>Origin Certificates</b> valid for 15 years — generated in the Cloudflare dashboard and installed on Nginx. This is the recommended production setup when you want end-to-end TLS verification.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="why-flexible">
+        <div class="section-eyebrow">05 — Decision</div>
+        <div class="section-title">Why Flexible mode is correct for our setup</div>
+        <p class="section-body">
+          Flexible mode is sometimes criticised for not encrypting the connection between Cloudflare and the origin server. In a typical setup (Cloudflare → internet → your server), this means the last mile is unencrypted. However, <b>our setup is different</b>.
+        </p>
+        <p class="section-body">
+          Traffic from Cloudflare to spserver does not travel over the open internet — it goes through a <b>Cloudflare Tunnel</b>, which is an encrypted TLS connection maintained by cloudflared. Even in Flexible mode, the Cloudflare-to-server leg is encrypted. The "Flexible" label applies to whether Cloudflare verifies a certificate on our server — not to whether the connection is encrypted.
+        </p>
+        <div class="diagram">
+<span class="db">Visitor</span>  <span class="dg">────── HTTPS (TLS 1.3) ──────</span>  <span class="da">Cloudflare edge</span>
+                                               <span class="dm">↓</span>
+<span class="da">Cloudflare edge</span>  <span class="dg">──── Encrypted Tunnel (TLS) ────</span>  <span class="dg">cloudflared on spserver</span>
+                                               <span class="dm">↓</span>
+<span class="dg">cloudflared</span>  <span class="dm">──── plain HTTP internally ────</span>  <span class="dg">Nginx on localhost:80</span>
+
+<span class="dg">Both legs are encrypted in practice ✓</span>
+<span class="dm">The "Flexible" label only means Cloudflare doesn't verify our origin cert</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-mode">
+        <div class="section-eyebrow">01 — SSL mode</div>
+        <div class="section-title">Step 1 — Set SSL mode to Flexible</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Configure SSL/TLS encryption mode in Cloudflare dashboard</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The SSL mode tells Cloudflare how to handle the connection between its edge and your server. We use Flexible — visitors get HTTPS, no certificate needed on spserver.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Cloudflare dashboard — browser steps</div></div>
+              <pre><span class="cm"># 1. Login to dash.cloudflare.com</span>
+<span class="cm"># 2. Select dustyserver.co.in</span>
+<span class="cm"># 3. Left sidebar → SSL/TLS</span>
+<span class="cm"># 4. Click "Overview"</span>
+<span class="cm"># 5. Under "SSL/TLS encryption mode"</span>
+<span class="cm">#    Select: Flexible</span>
+<span class="cm"># 6. Cloudflare saves automatically — no button to click</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>Once set to Flexible, all subdomains on dustyserver.co.in automatically get HTTPS — dustyserver.co.in, terminal.dustyserver.co.in, flask.dustyserver.co.in, all of them. No per-subdomain configuration needed.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-always">
+        <div class="section-eyebrow">02 — Force HTTPS</div>
+        <div class="section-title">Step 2 — Always Use HTTPS</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Enable automatic HTTP → HTTPS redirect</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Even with SSL enabled, someone could still type <code>http://dustyserver.co.in</code> and get a plain HTTP response. "Always Use HTTPS" tells Cloudflare to automatically redirect any HTTP request to HTTPS — the visitor always ends up on the secure version regardless of what they typed.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Cloudflare dashboard</div></div>
+              <pre><span class="cm"># 1. SSL/TLS → Edge Certificates</span>
+<span class="cm"># 2. Find "Always Use HTTPS"</span>
+<span class="cm"># 3. Toggle ON</span>
+<span class="cm">#</span>
+<span class="cm"># Result: http://dustyserver.co.in</span>
+<span class="cm">#    automatically becomes https://dustyserver.co.in</span>
+<span class="cm"># Status code: 301 Moved Permanently (permanent redirect)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-hsts">
+        <div class="section-eyebrow">03 — HSTS (optional)</div>
+        <div class="section-title">Step 3 — HTTP Strict Transport Security</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num">3</div>
+            <div class="step-title">Enable HSTS — tell browsers to always use HTTPS</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">HSTS is a security header that tells browsers "this site only works over HTTPS — never try HTTP". The browser remembers this and refuses to make plain HTTP connections to your domain for the specified duration, even if explicitly typed. This prevents certain downgrade attacks. <b>Warning:</b> once enabled with a long max-age, you cannot easily go back to HTTP. Only enable if you're committed to HTTPS permanently.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Cloudflare dashboard</div></div>
+              <pre><span class="cm"># 1. SSL/TLS → Edge Certificates</span>
+<span class="cm"># 2. Find "HTTP Strict Transport Security (HSTS)"</span>
+<span class="cm"># 3. Click "Enable HSTS"</span>
+<span class="cm"># 4. Recommended settings:</span>
+<span class="cm">#    Max Age Header: 6 months (15768000 seconds)</span>
+<span class="cm">#    Include subdomains: ON</span>
+<span class="cm">#    Preload: OFF (leave off unless you know what you're doing)</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>HSTS with a long max-age is a one-way door. If you ever disable HTTPS or let the domain lapse, visitors who have the HSTS header cached will get errors for months — their browser will refuse to connect over HTTP. For a personal lab server this is fine, but understand the commitment.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Verify</div>
+        <div class="section-title">Step 4 — Confirm HTTPS is working</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — from spserver or Windows</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Check HTTPS response headers</span>
+<span class="nm">curl -I https://dustyserver.co.in</span>
+<span class="cm"># Look for: HTTP/2 200</span>
+<span class="cm"># Look for: cf-ray: ... (confirms going through Cloudflare)</span>
+<span class="cm"># Look for: strict-transport-security (if HSTS enabled)</span>
+
+<span class="cm"># Check HTTP redirect works</span>
+<span class="nm">curl -I http://dustyserver.co.in</span>
+<span class="cm"># Should show: HTTP/1.1 301 Moved Permanently</span>
+<span class="cm"># Should show: Location: https://dustyserver.co.in/</span>
+
+<span class="cm"># Check certificate details</span>
+<span class="nm">curl -v https://dustyserver.co.in 2>&1 | grep -E "SSL|TLS|certificate|issuer"</span>
+<span class="cm"># Should show: issuer: C=US, O=Google Trust Services (Cloudflare uses GTS)</span>
+<span class="cm"># Should show: SSL connection using TLSv1.3</span>
+
+<span class="cm"># Check with openssl (install: sudo apt install openssl)</span>
+<span class="nm">echo | openssl s_client -connect dustyserver.co.in:443 -servername dustyserver.co.in 2>/dev/null | openssl x509 -noout -dates -subject</span>
+<span class="cm"># Shows: certificate validity dates and subject (who it's issued to)</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>In the browser — open https://dustyserver.co.in and click the padlock icon. You should see "Connection is secure" and a valid certificate for dustyserver.co.in issued by a Cloudflare-managed CA.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONCEPTS ══ -->
+    <div class="tab-pane" id="pane-concepts">
+
+      <div class="section" id="c-cert">
+        <div class="section-eyebrow">01 — Certificates</div>
+        <div class="section-title">What is an SSL certificate</div>
+        <p class="section-body">
+          An SSL certificate is a <b>digital document</b> that serves two purposes: it proves that a public key belongs to a specific domain, and it contains the public key itself that browsers use to establish the encrypted connection. Certificates are issued by <b>Certificate Authorities (CAs)</b> — trusted organisations that browsers recognise.
+        </p>
+        <p class="section-body">
+          When your browser connects to dustyserver.co.in, Cloudflare presents its certificate. The browser checks: (1) is the certificate for the right domain? (2) is it issued by a CA the browser trusts? (3) is it still valid (not expired)? If all three pass — the padlock appears and the connection is established.
+        </p>
+        <div class="diagram">
+<span class="dm">Certificate contains:</span>
+<span class="dg">Domain:</span>    <span class="dm">*.dustyserver.co.in  (wildcard — covers all subdomains)</span>
+<span class="dg">Issued by:</span> <span class="dm">Google Trust Services (Cloudflare's CA partner)</span>
+<span class="dg">Valid from:</span> <span class="dm">date of issuance</span>
+<span class="dg">Valid until:</span><span class="dm">~90 days later (Cloudflare auto-renews before expiry)</span>
+<span class="dg">Public key:</span> <span class="dm">used to establish encrypted session</span>
+
+<span class="dm">Cloudflare manages this certificate automatically</span>
+<span class="dm">No manual renewal, no Let's Encrypt setup, no cronjobs needed</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-handshake">
+        <div class="section-eyebrow">02 — TLS handshake</div>
+        <div class="section-title">What happens when a browser connects over HTTPS</div>
+        <p class="section-body">
+          Before any HTTP data is exchanged, the browser and server perform a <b>TLS handshake</b> — a negotiation that establishes the encryption parameters and authenticates the server. In TLS 1.3 this takes just one round trip (compared to two in TLS 1.2), making HTTPS nearly as fast as plain HTTP.
+        </p>
+        <div class="flow-step">
+          <div class="flow-num">1</div>
+          <div class="flow-content">
+            <div class="flow-title">Client Hello</div>
+            <div class="flow-sub">Browser sends: supported TLS versions, cipher suites, random number, and key share data.</div>
+          </div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step">
+          <div class="flow-num">2</div>
+          <div class="flow-content">
+            <div class="flow-title">Server Hello + Certificate</div>
+            <div class="flow-sub">Cloudflare replies with: chosen cipher suite, its certificate (containing its public key), and its own key share data. In TLS 1.3 the server also sends encrypted data already.</div>
+          </div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step">
+          <div class="flow-num">3</div>
+          <div class="flow-content">
+            <div class="flow-title">Certificate verification</div>
+            <div class="flow-sub">Browser verifies the certificate — checks domain matches, CA is trusted, cert not expired. Both sides derive the same session key from the key share data (Diffie-Hellman).</div>
+          </div>
+        </div>
+        <div class="flow-connector"></div>
+        <div class="flow-step">
+          <div class="flow-num">4</div>
+          <div class="flow-content">
+            <div class="flow-title">Encrypted HTTP begins</div>
+            <div class="flow-sub">Both sides now have a shared session key. All subsequent HTTP data is encrypted. The GET request, the HTML response, cookies — all encrypted. Handshake complete.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-cert-types">
+        <div class="section-eyebrow">03 — Certificate types</div>
+        <div class="section-title">Types of SSL certificates</div>
+        <table class="kv-table">
+          <thead><tr><th>Type</th><th>Covers</th><th>Validation</th><th>Cost</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Cloudflare Universal SSL <span class="tag tag-g">what we have</span></td>
+              <td class="desc">*.dustyserver.co.in + dustyserver.co.in</td>
+              <td class="desc">Domain validated automatically</td>
+              <td class="val green">Free</td>
+            </tr>
+            <tr>
+              <td class="key">Cloudflare Origin Certificate</td>
+              <td class="desc">*.dustyserver.co.in</td>
+              <td class="desc">For server-side SSL (Full Strict mode)</td>
+              <td class="val green">Free, 15yr validity</td>
+            </tr>
+            <tr>
+              <td class="key">Let's Encrypt</td>
+              <td class="desc">One domain or wildcard</td>
+              <td class="desc">Domain validated, auto-renews via certbot</td>
+              <td class="val green">Free, 90 day renewal</td>
+            </tr>
+            <tr>
+              <td class="key">DV (Domain Validated)</td>
+              <td class="desc">Specific domain(s)</td>
+              <td class="desc">Proves domain ownership only</td>
+              <td class="desc">Free–paid</td>
+            </tr>
+            <tr>
+              <td class="key">OV (Org Validated)</td>
+              <td class="desc">Domain + organisation</td>
+              <td class="desc">Proves org exists and owns domain</td>
+              <td class="desc">Paid</td>
+            </tr>
+            <tr>
+              <td class="key">EV (Extended Validated)</td>
+              <td class="desc">Domain + legal org name in cert</td>
+              <td class="desc">Strict legal org verification</td>
+              <td class="desc">Expensive — only for banks, legal, etc.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          Cloudflare's Universal SSL is a wildcard certificate covering <code>*.dustyserver.co.in</code> — every subdomain is automatically protected. It is automatically issued when you add a domain to Cloudflare and DNS is managed by them. Zero setup required on our side.
+        </p>
+      </div>
+
+    </div><!-- end concepts -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-verify">
+        <div class="section-eyebrow">01 — Verification</div>
+        <div class="section-title">Commands to verify HTTPS is working correctly</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">curl -I https://dustyserver.co.in</div><div class="cmd-desc">Check HTTPS response headers — look for HTTP/2 200 and cf-ray header confirming Cloudflare</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -I http://dustyserver.co.in</div><div class="cmd-desc">Verify HTTP → HTTPS redirect — should return 301 Moved Permanently to https://</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -IL https://dustyserver.co.in</div><div class="cmd-desc">Follow redirects and show all headers — useful to trace the full redirect chain</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -sv https://dustyserver.co.in 2>&1 | grep -i ssl</div><div class="cmd-desc">Show SSL/TLS version used in the connection</div></div>
+          <div class="cmd-row"><div class="cmd-code">echo | openssl s_client -connect dustyserver.co.in:443 2>/dev/null | openssl x509 -noout -text | grep -E "Subject|Issuer|Not"</div><div class="cmd-desc">Show certificate subject, issuer, and validity dates</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup dustyserver.co.in</div><div class="cmd-desc">Confirm domain resolves to Cloudflare IPs (104.21.x.x or 172.67.x.x) — required for SSL to work</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common HTTPS problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Browser shows "Not Secure" or ERR_SSL_PROTOCOL_ERROR</div>
+          <div class="ts-body">SSL mode may be set to Off in Cloudflare, or Cloudflare is not proxying the domain. Check: (1) Cloudflare dashboard → SSL/TLS → Overview — is a mode selected? (2) Cloudflare DNS tab — is the orange cloud (proxy) enabled for your domain's DNS records? If the cloud is grey (DNS only), Cloudflare is not proxying traffic and cannot provide SSL. Click the cloud to enable proxying.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">ERR_TOO_MANY_REDIRECTS — infinite redirect loop</div>
+          <div class="ts-body">Classic sign that SSL mode is set to Flexible but Nginx on spserver is also redirecting HTTP to HTTPS. The result: visitor → Cloudflare (HTTPS) → Nginx (HTTP, redirects to HTTPS) → Cloudflare (HTTPS) → loop. Fix: remove any HTTP-to-HTTPS redirect rules from Nginx config — let Cloudflare handle it via "Always Use HTTPS". Or change SSL mode to Full if Nginx has a certificate.</td></div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">SSL certificate error — certificate not for this domain</div>
+          <div class="ts-body">Browser sees a certificate mismatch. This usually happens if you are bypassing Cloudflare and connecting directly to spserver (which has no SSL cert). In normal operation through Cloudflare Tunnel, visitors never connect directly to spserver — they always go through Cloudflare, which presents the correct certificate. If you see this, check if someone has the server's direct IP and is connecting without Cloudflare.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">HTTPS works for main domain but not subdomains</div>
+          <div class="ts-body">Cloudflare's Universal SSL covers *.dustyserver.co.in (one level of wildcards). If a subdomain is not proxied through Cloudflare (grey cloud in DNS tab), it won't have SSL. Also check: is the subdomain's CNAME record in Cloudflare DNS? If the record doesn't exist, the subdomain won't work at all. Check Cloudflare DNS tab for all subdomain records.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to upgrade from Flexible to Full Strict</div>
+          <div class="ts-body">Generate a Cloudflare Origin Certificate: Cloudflare dashboard → SSL/TLS → Origin Server → Create Certificate. Download the certificate and key. On spserver, save them to <code>/etc/ssl/certs/</code> and configure Nginx to use them with <code>listen 443 ssl</code>. Then change Cloudflare SSL mode to Full Strict. This gives genuine end-to-end TLS verification.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Upgrade to Full Strict mode</b> — generate a Cloudflare Origin Certificate and install it on Nginx. Change SSL mode to Full Strict. Gives genuine TLS verification on both legs of the connection. More secure, minimal extra effort.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Minimum TLS Version</b> — in SSL/TLS → Edge Certificates, set minimum TLS version to 1.2 or 1.3. Prevents connections from very old clients using deprecated TLS versions. Already at 1.2 by default — consider bumping to 1.3 only.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Certificate Transparency monitoring</b> — Cloudflare can notify you if a certificate is ever issued for your domain outside of Cloudflare. Detects if someone obtained a fraudulent certificate for dustyserver.co.in. Enable in Cloudflare dashboard → SSL/TLS → Edge Certificates → Certificate Transparency Monitoring.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Let's Encrypt on Nginx directly</b> — if you ever want to serve content directly without Cloudflare Tunnel (e.g. from a VPS with a real IP), Let's Encrypt with certbot provides free SSL. <code>sudo apt install certbot python3-certbot-nginx</code> then <code>sudo certbot --nginx</code>. Auto-renews via cron.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>HSTS preloading</b> — submit dustyserver.co.in to the HSTS preload list (hstspreload.org). Browsers ship with a built-in list of domains that must use HTTPS — your domain gets baked into Chrome, Firefox, Safari. The strongest possible HTTPS enforcement. Irreversible — only do this if permanently committed to HTTPS.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','concepts','commands','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>

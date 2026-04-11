@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Install — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.component-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.comp-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.comp-name { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: .25rem; }
+.comp-role { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: .35rem; }
+.comp-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+.why-not-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: .75rem 0;
+}
+.wn-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.wn-title { font-size: 14px; font-weight: 600; margin-bottom: .35rem; }
+.wn-body  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.wn-body code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 4px; border-radius: 3px; color: var(--blue); }
+
+@media(max-width:600px){
+  .why-not-grid { grid-template-columns:1fr; }
+  .component-grid{ grid-template-columns:1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Docker Install</div>
+  <div class="nav-phase">Phase 2 — Containerisation</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-docker')">Why Docker</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('components')">Docker components</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-official')">Why official install method</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-alternatives')">Alternatives</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-remove')">Remove old versions</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-repo')">Add Docker repo</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install Docker</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-group')">Add user to group</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify install</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-docker')">Docker commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-system')">System commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 2 · Topic 1 of 6</div>
+      <h1 class="gh-title">Docker <span>Install</span></h1>
+      <p class="gh-sub">Installing the official Docker Engine on spserver — the full stack including the daemon, CLI, Compose plugin, and Buildx. The foundation for all containerised services.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="why-docker">
+        <div class="section-eyebrow">01 — Why Docker</div>
+        <div class="section-title">What Docker gives us</div>
+        <p class="section-body">
+          Docker packages each application into a <b>container</b> — a self-contained, isolated environment that includes everything the app needs: the code, runtime, libraries, environment variables, and config. Containers share the host's Linux kernel but are completely isolated from each other and from the host OS.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Without Docker — bare metal installs</div>
+            <div class="ic-body">Install Flask directly on Ubuntu. Install MySQL directly. Install Node directly. Over time: conflicting library versions, hard-to-reproduce environments, messy upgrades, no easy cleanup. Moving to another server means manually recreating everything.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">With Docker — containers</div>
+            <div class="ic-body">Each service runs in an isolated container with its own dependencies. No conflicts. Start, stop, update, and remove cleanly. Move to any Docker host and it runs identically. Industry standard for every modern DevOps workflow.</div>
+          </div>
+        </div>
+        <div class="diagram">
+<span class="dm">Without Docker:</span>
+<span class="dr">Flask app needs Python 3.9  +  MySQL needs libssl 1.0  +  Node app needs OpenSSL 3</span>
+<span class="dr">All installed on same Ubuntu → version conflicts → pain</span>
+
+<span class="dm">With Docker:</span>
+<span class="dg">Flask container</span>  <span class="dm">← Python 3.9, its own libs, isolated</span>
+<span class="dg">MySQL container</span>  <span class="dm">← libssl 1.0, its own libs, isolated</span>
+<span class="dg">Node container</span>   <span class="dm">← OpenSSL 3, its own libs, isolated</span>
+<span class="dm">All on same Ubuntu, zero conflicts, clean separation</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Containers are not virtual machines. They share the host kernel — so no hardware emulation overhead, no separate OS boot, minimal resource usage. A Docker container typically starts in under a second and uses only a few MB of RAM on top of the application itself.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="components">
+        <div class="section-eyebrow">02 — What gets installed</div>
+        <div class="section-title">The Docker components we install</div>
+        <p class="section-body">
+          Docker is not a single monolithic program — it is split into separate components that can be updated independently. The official install method installs all of them:
+        </p>
+        <div class="component-grid">
+          <div class="comp-card">
+            <div class="comp-name">docker-ce</div>
+            <div class="comp-role">Docker Engine (daemon)</div>
+            <div class="comp-body">The core background service — dockerd. Manages containers, images, networks, and volumes. Everything else talks to this.</div>
+          </div>
+          <div class="comp-card">
+            <div class="comp-name">docker-ce-cli</div>
+            <div class="comp-role">Command line interface</div>
+            <div class="comp-body">The <code>docker</code> command you type. Sends instructions to the Docker daemon via a Unix socket. Could run on a different machine from the daemon.</div>
+          </div>
+          <div class="comp-card">
+            <div class="comp-name">containerd.io</div>
+            <div class="comp-role">Container runtime</div>
+            <div class="comp-body">The actual container runtime that runs containers at the OS level. Docker Engine delegates to containerd. Kubernetes uses containerd directly without Docker Engine.</div>
+          </div>
+          <div class="comp-card">
+            <div class="comp-name">docker-buildx-plugin</div>
+            <div class="comp-role">Extended build system</div>
+            <div class="comp-body">Modern image building with BuildKit. Faster builds, better caching, multi-platform support. Required for <code>docker build</code> on modern Docker.</div>
+          </div>
+          <div class="comp-card">
+            <div class="comp-name">docker-compose-plugin</div>
+            <div class="comp-role">Multi-container orchestration</div>
+            <div class="comp-body">The <code>docker compose</code> command (note: no hyphen). Manages multi-container applications from a YAML file. Essential for everything we build in Phase 2.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Note the difference: <b>docker-compose-plugin</b> (what we install) provides <code>docker compose</code> as a Docker CLI plugin. The old standalone <b>docker-compose</b> (with hyphen, version 1.x) is a separate Python tool — deprecated and no longer maintained. Always use the plugin version.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="why-official">
+        <div class="section-eyebrow">03 — Installation method</div>
+        <div class="section-title">Why we use the official Docker repository — not apt</div>
+        <p class="section-body">
+          Ubuntu's default package repositories contain a package called <code>docker</code> — but this is <b>not Docker</b>. It is an entirely unrelated system tray application. Installing it won't give you containers at all. Even the <code>docker.io</code> package in Ubuntu's repos is an older community-maintained version that lags behind the official release by months or more.
+        </p>
+        <div class="why-not-grid">
+          <div class="wn-card">
+            <div class="wn-title" style="color:var(--red)">❌ sudo apt install docker</div>
+            <div class="wn-body">Installs a system tray application called "docker" — has nothing to do with containers. Complete wrong package.</div>
+          </div>
+          <div class="wn-card">
+            <div class="wn-title" style="color:var(--amber)">⚠ sudo apt install docker.io</div>
+            <div class="wn-body">Installs the community-maintained Debian/Ubuntu Docker package. Older version, fewer features, slower updates. Does not include Compose plugin.</div>
+          </div>
+          <div class="wn-card">
+            <div class="wn-title" style="color:var(--blue)">⚠ snap install docker</div>
+            <div class="wn-body">Snap-packaged Docker. Works but has filesystem restrictions (snaps run in a sandbox) that can cause issues with volume mounts and bind mounts.</div>
+          </div>
+          <div class="wn-card">
+            <div class="wn-title" style="color:var(--green)">✓ Official Docker repo</div>
+            <div class="wn-body">Latest stable version directly from Docker Inc. All components included. Verified GPG signatures. Automatic security updates. Industry standard method.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-alternatives">
+        <div class="section-eyebrow">04 — Alternatives</div>
+        <div class="section-title">Docker vs container alternatives</div>
+        <table class="kv-table">
+          <thead><tr><th>Tool</th><th>Daemon?</th><th>Compose support?</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Docker <span class="tag tag-g">chosen</span></td>
+              <td class="val">Yes — dockerd</td>
+              <td class="val green">Yes — plugin</td>
+              <td class="desc">Industry standard. Largest ecosystem, most tutorials, best tooling. Requires root daemon.</td>
+            </tr>
+            <tr>
+              <td class="key">Podman</td>
+              <td class="val green">No — daemonless</td>
+              <td class="val green">Yes — podman-compose</td>
+              <td class="desc">Rootless by default — more secure. Docker-compatible CLI. Red Hat's alternative. Growing adoption.</td>
+            </tr>
+            <tr>
+              <td class="key">containerd</td>
+              <td class="val">Yes</td>
+              <td class="val">No native</td>
+              <td class="desc">Low-level runtime. Used by Kubernetes directly. Not designed for direct developer use.</td>
+            </tr>
+            <tr>
+              <td class="key">LXC / LXD</td>
+              <td class="val">Yes</td>
+              <td class="val">No</td>
+              <td class="desc">System containers — more like lightweight VMs. Full init system, persistent. Different use case from Docker app containers.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-remove">
+        <div class="section-eyebrow">01 — Clean slate</div>
+        <div class="section-title">Step 1 — Remove any conflicting packages</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Remove old or wrong Docker packages</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">If any version of Docker was previously installed — via apt, snap, or any other method — it must be removed first. Conflicting packages cause the official install to fail or behave unexpectedly. On a fresh Ubuntu Server install these likely don't exist but the removal command does nothing if they aren't installed — safe to run either way.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt remove</span> docker docker-engine docker.io containerd runc -y
+<span class="cm"># These may not be installed — that's fine, apt will just say "not installed"</span>
+<span class="cm"># What matters is they are absent before we add the official repo</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-repo">
+        <div class="section-eyebrow">02 — Add repository</div>
+        <div class="section-title">Step 2 — Add Docker's official apt repository</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Install dependencies and add Docker GPG key</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Before apt can use Docker's repository, it needs to verify that packages are genuinely from Docker Inc. — not tampered with. The GPG key is Docker's cryptographic signature that apt uses to verify every package before installing. This is why we download and save the key first.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Install packages needed to use apt over HTTPS</span>
+<span class="nm">sudo apt update</span>
+<span class="nm">sudo apt install -y</span> ca-certificates curl gnupg lsb-release
+
+<span class="cm"># Create directory for apt keyrings</span>
+<span class="nm">sudo install</span> -m 0755 -d /etc/apt/keyrings
+
+<span class="cm"># Download Docker's official GPG key and save it</span>
+<span class="nm">curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg</span>
+<span class="nm">sudo chmod a+r</span> /etc/apt/keyrings/docker.gpg</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Add the Docker apt repository</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">This adds Docker's repository to apt's sources list, pointing to the correct architecture and Ubuntu release. The <code>$(dpkg --print-architecture)</code> resolves to <code>amd64</code> on spserver, and <code>$(lsb_release -cs)</code> resolves to <code>noble</code> (Ubuntu 24.04's codename). These auto-detect your system so the command works on any Ubuntu version.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Add Docker repository to apt sources</span>
+<span class="nm">echo</span> \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | <span class="nm">sudo tee</span> /etc/apt/sources.list.d/docker.list > /dev/null
+
+<span class="cm"># Refresh apt package list — now includes Docker packages</span>
+<span class="nm">sudo apt update</span>
+
+<span class="cm"># Confirm Docker packages are now available from the official repo</span>
+<span class="nm">apt-cache policy docker-ce</span>
+<span class="cm"># Should show: Candidate: 5:27.x.x-1~ubuntu.24.04~noble</span>
+<span class="cm">#              download.docker.com as the source</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">03 — Install</div>
+        <div class="section-title">Step 3 — Install Docker Engine and all components</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Install all Docker components in one command</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">One apt command installs the complete Docker stack — engine, CLI, runtime, build tools, and Compose. All from Docker's official repository, all signed with their GPG key, all the latest stable versions.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt install -y</span> \
+  docker-ce \
+  docker-ce-cli \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
+<span class="cm"># Enable Docker daemon to start on boot</span>
+<span class="nm">sudo systemctl enable docker</span>
+
+<span class="cm"># Start Docker daemon now</span>
+<span class="nm">sudo systemctl start docker</span>
+
+<span class="cm"># Verify Docker daemon is running</span>
+<span class="nm">sudo systemctl status docker</span>
+<span class="cm"># Look for: Active: active (running)</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-group">
+        <div class="section-eyebrow">04 — Permissions</div>
+        <div class="section-title">Step 4 — Add sipu to the docker group</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Grant sipu permission to run Docker without sudo</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">By default, the Docker socket (<code>/var/run/docker.sock</code>) is only accessible by root and members of the <code>docker</code> group. Without this, every <code>docker</code> command requires <code>sudo</code>. Adding sipu to the docker group gives direct access to the Docker socket — meaning <code>docker ps</code> works without sudo.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Add sipu to the docker group</span>
+<span class="nm">sudo usermod -aG docker sipu</span>
+
+<span class="cm"># IMPORTANT: Log out and back in for the group change to take effect</span>
+<span class="cm"># The group membership is only applied at login time</span>
+<span class="nm">exit</span>
+
+<span class="cm"># SSH back in</span>
+<span class="cm"># ssh sipu@192.168.31.150</span>
+
+<span class="cm"># Verify you are now in the docker group</span>
+<span class="nm">groups</span>
+<span class="cm"># Should include: docker</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span><b>Security note:</b> members of the <code>docker</code> group have effective root access to the host — a container can be configured to mount the host filesystem. Only add trusted users. In production environments, consider using rootless Docker (Podman) instead for stronger isolation.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">05 — Verify</div>
+        <div class="section-title">Step 5 — Confirm everything works</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run after logging back in</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Check Docker version — installed version: 29.x.x</span>
+<span class="nm">docker --version</span>
+<span class="cm"># Docker version 29.x.x, build xxxxxxx</span>
+
+<span class="cm"># Check Docker Compose version</span>
+<span class="nm">docker compose version</span>
+<span class="cm"># Docker Compose version v2.x.x</span>
+
+<span class="cm"># Run the hello-world container — ultimate verification</span>
+<span class="cm"># Pulls image from Docker Hub, runs it, prints output</span>
+<span class="nm">docker run hello-world</span>
+<span class="cm"># Should print: "Hello from Docker!"</span>
+<span class="cm"># This confirms: pull works, run works, networking works</span>
+
+<span class="cm"># Verify no sudo needed</span>
+<span class="nm">docker ps</span>
+<span class="cm"># Should work without sudo and show empty container list</span>
+
+<span class="cm"># Check Docker daemon info</span>
+<span class="nm">docker info</span>
+<span class="cm"># Shows storage driver, runtime, server info</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>If <code>docker run hello-world</code> prints "Hello from Docker!" without using sudo — Docker is fully installed, the daemon is running, hub access works, and permissions are correct. You're ready for Phase 2.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-docker">
+        <div class="section-eyebrow">01 — Docker commands</div>
+        <div class="section-title">Essential post-install Docker commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker --version</div><div class="cmd-desc">Show Docker Engine version</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose version</div><div class="cmd-desc">Show Docker Compose plugin version</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker info</div><div class="cmd-desc">Full Docker daemon info — storage driver, runtime, OS, kernel version, total containers/images</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker run hello-world</div><div class="cmd-desc">Pull and run the minimal hello-world container — confirms Docker is working end to end</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker ps</div><div class="cmd-desc">List running containers — should work without sudo after adding sipu to docker group</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker ps -a</div><div class="cmd-desc">List all containers including stopped ones</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker images</div><div class="cmd-desc">List all downloaded images on disk</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker system df</div><div class="cmd-desc">Show Docker disk usage — how much space images, containers, volumes and build cache are using</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker system prune</div><div class="cmd-desc">Remove stopped containers, unused networks, dangling images — free disk space safely</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker system prune -a</div><div class="cmd-desc">Remove everything unused — including images not referenced by any container. More aggressive cleanup.</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-system">
+        <div class="section-eyebrow">02 — System management</div>
+        <div class="section-title">Docker daemon and service commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status docker</div><div class="cmd-desc">Check Docker daemon status — should show active (running)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart docker</div><div class="cmd-desc">Restart Docker daemon — stops all containers, use with caution</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable docker</div><div class="cmd-desc">Auto-start Docker daemon on boot — should already be set by install</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u docker -f</div><div class="cmd-desc">Follow Docker daemon logs live — useful when containers fail to start</div></div>
+          <div class="cmd-row"><div class="cmd-code">groups</div><div class="cmd-desc">Show groups for current user — confirms 'docker' is listed after adding sipu to group</div></div>
+          <div class="cmd-row"><div class="cmd-code">ls -la /var/run/docker.sock</div><div class="cmd-desc">Check Docker socket permissions — should show group 'docker' with read-write access</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo apt-cache policy docker-ce</div><div class="cmd-desc">Check which version of docker-ce is installed and available from the repo</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo apt upgrade docker-ce</div><div class="cmd-desc">Upgrade Docker Engine to the latest version from Docker's official repo</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during Docker install</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">docker: command not found after install — wrong package installed</div>
+          <div class="bb-body">
+            Initially ran <code>sudo apt install docker</code> without checking the package name carefully. The command succeeded but <code>docker --version</code> returned "command not found". The <code>docker</code> package in Ubuntu's repos is a completely different application — a system management tool, not Docker the container platform.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Remove wrong package, use official Docker repository method</div>
+          <div class="fb-body">
+            Removed the wrong package: <code>sudo apt remove docker</code>. Then followed the official Docker documentation to add Docker's own repository and install <code>docker-ce</code>, <code>docker-ce-cli</code>, <code>containerd.io</code>, and the plugins. This installs the real Docker Engine from Docker Inc. directly.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Permission denied — docker commands require sudo even after group add</div>
+          <div class="bb-body">
+            After running <code>sudo usermod -aG docker sipu</code>, tried <code>docker ps</code> immediately. Got "permission denied while trying to connect to the Docker daemon socket". The group change wasn't taking effect.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Must log out and log back in — group changes apply at login</div>
+          <div class="fb-body">
+            Linux group membership changes only take effect when you start a new login session. The current SSH session still has the old group list. Fix: <code>exit</code> to close the SSH session, then <code>ssh sipu@192.168.31.150</code> to reconnect. After reconnecting, <code>groups</code> showed <code>docker</code> in the list and <code>docker ps</code> worked without sudo. Alternatively, <code>newgrp docker</code> applies the group change in the current session without re-logging in.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Docker install problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">docker: command not found</div>
+          <div class="ts-body">Wrong package installed or Docker not in PATH. Check: (1) Which Docker package is installed: <code>apt list --installed | grep docker</code>. If it shows <code>docker</code> (not <code>docker-ce</code>) — wrong package. Remove it and install from official repo. (2) If docker-ce is installed but command not found — PATH issue: check <code>which docker</code>, should show <code>/usr/bin/docker</code>. Try relogging.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Cannot connect to Docker daemon — permission denied</div>
+          <div class="ts-body">Running docker commands without sudo and not in docker group, or group change not applied yet. Fix: (1) Check groups: <code>groups</code> — if docker not listed, log out and back in. (2) If still not working: <code>sudo usermod -aG docker sipu</code> then log out/in again. (3) Verify socket permissions: <code>ls -la /var/run/docker.sock</code> — should show group docker. (4) As a temporary workaround: use <code>sudo docker</code> until group is applied.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">docker run hello-world fails — cannot pull image</div>
+          <div class="ts-body">Docker cannot reach Docker Hub. Check internet connectivity: <code>curl -I https://hub.docker.com</code>. If that fails — DNS issue or firewall. Check: <code>ping 8.8.8.8</code> (internet) and <code>ping hub.docker.com</code> (DNS). If DNS fails, check <code>/etc/resolv.conf</code>. Docker daemon also needs outgoing internet access — UFW only blocks incoming by default so this is usually not a UFW issue.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">apt update fails after adding Docker repo — NO_PUBKEY error</div>
+          <div class="ts-body">The GPG key was not saved correctly. Re-download the key: <code>curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg</code> then ensure permissions are correct: <code>sudo chmod a+r /etc/apt/keyrings/docker.gpg</code>. Then run <code>sudo apt update</code> again.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to check which Docker version is installed</div>
+          <div class="ts-body"><code>docker --version</code> shows the CLI version. <code>docker info | grep "Server Version"</code> shows the daemon version (should match). <code>docker compose version</code> shows Compose plugin version. Our installed version: Docker Engine 29.x.x. To update later: <code>sudo apt update && sudo apt upgrade docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin</code>.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Rootless Docker</b> — run Docker as a non-root user without the docker group. Provides stronger security isolation — a container escape doesn't give root access to the host. Enabled with <code>dockerd-rootless-setuptool.sh install</code>. Recommended for production.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker resource limits</b> — constrain how much CPU and RAM each container can use. Prevents a runaway container from taking down the whole server. Set in docker-compose.yml: <code>deploy.resources.limits.memory: 512m</code>. Important as more services are added.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Private Docker registry</b> — host your own Docker image registry on spserver instead of pushing images to Docker Hub. Install <code>registry:2</code> container. Useful for storing custom images privately without cloud dependency.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker daemon configuration</b> — edit <code>/etc/docker/daemon.json</code> to configure log rotation (prevents logs from filling disk), change storage driver, configure DNS, set default ulimits. Important for a long-running server.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Podman as an alternative</b> — daemonless, rootless-by-default container tool from Red Hat. Docker-compatible CLI — most docker commands work unchanged. No central daemon means no single point of failure. Worth learning alongside Docker.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>k3s — Kubernetes on spserver</b> — Phase 4 goal. k3s is a lightweight Kubernetes distribution that runs on spserver's hardware. Once Docker is comfortable, k3s is the natural next step — uses containerd directly, Docker knowledge transfers fully.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>

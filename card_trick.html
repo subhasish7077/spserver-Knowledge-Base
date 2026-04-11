@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The 21 Card Trick</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@400;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Cormorant+Upright:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --felt: #0b2116;
+    --felt-glow: #1e4a30;
+    --gold: #c9a84c;
+    --gold-bright: #e8c96a;
+    --gold-dim: #6a5228;
+    --card-bg: #fdf8f0;
+    --card-border: #cfc3a0;
+    --red: #c0271a;
+    --black: #1a1a1a;
+    --text: #e8dfc8;
+    --card-w: 108px;
+    --card-h: 152px;
+    --peek-h: 44px;
+  }
+
+  body {
+    background: var(--felt);
+    background-image:
+      radial-gradient(ellipse at 50% 0%, var(--felt-glow) 0%, transparent 60%),
+      repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.01) 10px, rgba(255,255,255,0.01) 20px);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+    font-family: 'EB Garamond', serif;
+    color: var(--text);
+  }
+
+  /* ── Header ── */
+  .header { text-align: center; margin-bottom: 22px; }
+  .header::before, .header::after {
+    content: '';
+    display: block;
+    width: 190px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--gold), transparent);
+    margin: 6px auto;
+  }
+  .header h1 {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: clamp(1.15rem, 4vw, 1.8rem);
+    color: var(--gold-bright);
+    text-shadow: 0 0 28px rgba(201,168,76,0.35), 0 2px 4px rgba(0,0,0,0.8);
+    letter-spacing: 0.04em;
+  }
+  .header p {
+    font-family: 'Cormorant Upright', serif;
+    font-style: italic;
+    font-size: 1rem;
+    color: #c8b98a;
+    letter-spacing: 0.12em;
+    margin-top: 5px;
+  }
+
+  /* ── Screens ── */
+  .screen { display: none; width: 100%; max-width: 480px; flex-direction: column; align-items: center; }
+  .screen.active { display: flex; }
+
+  /* ── Start Screen ── */
+  #start-screen { gap: 20px; margin-top: 30px; }
+  .crystal-ball {
+    font-size: 5rem;
+    animation: float 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 16px rgba(201,168,76,0.4));
+  }
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+  .tagline { font-family: 'Cormorant Upright', serif; font-style: italic; color: rgba(210,195,160,0.72); font-size: 1.1rem; letter-spacing: 0.04em; }
+  .btn-gold {
+    font-family: 'Cinzel', serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--felt);
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold), #9a7020);
+    border: none;
+    padding: 12px 36px;
+    cursor: pointer;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+    box-shadow: 0 4px 18px rgba(201,168,76,0.28);
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+  .btn-gold:hover { background: linear-gradient(135deg, #f0d870, var(--gold-bright), var(--gold)); transform: translateY(-2px); box-shadow: 0 7px 24px rgba(201,168,76,0.42); }
+
+  /* ── Trick Screen ── */
+  #trick-screen { gap: 0; }
+
+  /* Round indicator */
+  .round-indicator {
+    font-family: 'Cormorant Upright', serif;
+    font-style: italic;
+    font-size: 0.95rem;
+    letter-spacing: 0.1em;
+    color: #b0a07a;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .round-pip {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    border: 1px solid var(--gold-dim);
+    transition: background 0.4s, border-color 0.4s;
+  }
+  .round-pip.done { background: var(--gold); border-color: var(--gold); }
+
+  /* Col labels */
+  .col-labels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .col-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.58rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #c9a84c;
+    text-align: center;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(201,168,76,0.35);
+  }
+
+  /* Columns wrapper */
+  .columns-wrapper {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    width: 100%;
+    transition: opacity 0.35s ease;
+  }
+  .columns-wrapper.fading { opacity: 0; }
+
+  /* Column */
+  .card-column { display: flex; flex-direction: column; align-items: center; }
+
+  /* Peeking stack */
+  .card-stack {
+    position: relative;
+    width: var(--card-w);
+    height: calc(6 * var(--peek-h));
+    flex-shrink: 0;
+  }
+
+  .card-peek {
+    position: absolute;
+    left: 0;
+    width: var(--card-w);
+    height: var(--card-h);
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    padding: 4px 5px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+  }
+  .card-peek.in { opacity: 1; transform: translateY(0); }
+  .card-peek::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 40%);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+  .peek-rank { font-family: 'Cinzel', serif; font-size: 1rem; font-weight: 600; line-height: 1; }
+  .peek-suit { font-size: 0.88rem; line-height: 1; margin-top: 2px; }
+
+  /* Full card */
+  .card-full {
+    width: var(--card-w);
+    height: var(--card-h);
+    flex-shrink: 0;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    box-shadow: 0 5px 14px rgba(0,0,0,0.6), 0 0 0 1.5px rgba(201,168,76,0.14);
+    padding: 4px 5px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px) scale(0.93);
+    transition: opacity 0.32s ease, transform 0.32s ease, box-shadow 0.2s;
+    cursor: default;
+  }
+  .card-full.in { opacity: 1; transform: translateY(0) scale(1); }
+  .card-full:hover {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 12px 26px rgba(0,0,0,0.65), 0 0 0 2px rgba(201,168,76,0.4);
+    z-index: 20;
+  }
+  .card-full::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.17) 0%, transparent 42%);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+  .card-corner { display: flex; flex-direction: column; align-items: center; line-height: 1; gap: 1px; }
+  .card-corner.flip { transform: rotate(180deg); }
+  .card-rank-full { font-family: 'Cinzel', serif; font-size: 0.88rem; font-weight: 600; line-height: 1; }
+  .card-suit-corner { font-size: 0.72rem; line-height: 1; margin-top: 1px; }
+  .card-center-suit {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 2.1rem; line-height: 1; user-select: none;
+  }
+
+  .red   { color: var(--red); }
+  .black { color: var(--black); }
+
+  /* ── Instruction box ── */
+  .instruction-box {
+    margin-top: 20px;
+    border: 1px solid var(--gold-dim);
+    padding: 13px 18px;
+    text-align: center;
+    position: relative;
+    width: 100%;
+  }
+  .instruction-box::before {
+    content: '✦';
+    position: absolute; top: -0.68em; left: 50%; transform: translateX(-50%);
+    background: var(--felt); padding: 0 7px; color: var(--gold); font-size: 0.82rem;
+  }
+  .instruction-box p { font-style: italic; font-size: 0.95rem; color: var(--text); line-height: 1.55; }
+  .instruction-box strong { color: var(--gold-bright); font-style: normal; }
+
+  /* ── Column Picker ── */
+  .col-picker {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    width: 100%;
+    margin-top: 16px;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+  }
+  .col-picker.visible { opacity: 1; transform: translateY(0); }
+
+  .pick-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    padding: 10px 4px;
+    cursor: pointer;
+    transition: all 0.18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .pick-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--gold);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.22s ease;
+    z-index: 0;
+  }
+  .pick-btn:hover::before { transform: scaleX(1); }
+  .pick-btn:hover { color: var(--felt); border-color: var(--gold); }
+  .pick-btn span { position: relative; z-index: 1; }
+  .pick-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
+
+  /* ── Collecting animation ── */
+  .collecting-msg {
+    font-family: 'Cormorant Upright', serif;
+    font-style: italic;
+    font-size: 1rem;
+    letter-spacing: 0.06em;
+    color: #b0a07a;
+    text-align: center;
+    margin-top: 14px;
+    height: 1.2em;
+    transition: opacity 0.3s;
+  }
+
+  /* ── Reveal Screen ── */
+  #reveal-screen { gap: 0; margin-top: 10px; }
+
+  .reveal-intro {
+    font-family: 'Cormorant Upright', serif;
+    font-style: italic;
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    color: #c8b98a;
+    text-align: center;
+    margin-bottom: 10px;
+  }
+
+  .reveal-tagline {
+    font-style: italic;
+    font-size: 1.15rem;
+    color: var(--text);
+    text-align: center;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease 0.4s forwards;
+  }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* 3D flip container */
+  .flip-container {
+    perspective: 900px;
+    width: 200px;
+    height: 280px;
+    margin: 0 auto 28px;
+  }
+  .flip-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    animation: flipReveal 1s cubic-bezier(0.3,0,0.2,1) 1.0s forwards;
+    transform: rotateY(180deg);
+  }
+  @keyframes flipReveal {
+    from { transform: rotateY(180deg); }
+    to   { transform: rotateY(0deg); }
+  }
+
+  .flip-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+  }
+
+  /* Card back */
+  .flip-back {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background: #1a5c38;
+    border: 3px solid var(--gold-dim);
+    border-radius: 10px;
+    transform: rotateY(180deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.7);
+  }
+  .flip-back-inner {
+    width: calc(100% - 16px);
+    height: calc(100% - 16px);
+    border: 1px solid var(--gold-dim);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: repeating-linear-gradient(
+      45deg, rgba(255,255,255,0.03), rgba(255,255,255,0.03) 2px, transparent 2px, transparent 12px
+    );
+  }
+
+  /* Card front (reveal) */
+  .flip-front {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    background: var(--card-bg);
+    border: 2px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.65), 0 0 0 2px rgba(201,168,76,0.25);
+  }
+  .flip-front::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 40%);
+    border-radius: 10px;
+    pointer-events: none;
+  }
+  .reveal-corner { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+  .reveal-corner.flip-r { transform: rotate(180deg); align-self: flex-end; }
+  .reveal-rank { font-family: 'Cinzel', serif; font-size: 1.7rem; font-weight: 600; line-height: 1; }
+  .reveal-suit-c { font-size: 1.3rem; line-height: 1; margin-top: 3px; }
+  .reveal-center {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 5.5rem; line-height: 1; user-select: none;
+  }
+
+  .reveal-question {
+    font-family: 'Cinzel', serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.5s ease 2.4s forwards;
+  }
+
+  .btn-ghost {
+    font-family: 'Cinzel', serif;
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    padding: 9px 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: 0;
+    animation: fadeUp 0.5s ease 2.6s forwards;
+  }
+  .btn-ghost:hover { color: var(--gold); border-color: var(--gold); }
+
+  /* ── Suspense overlay ── */
+  #suspense-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(8, 22, 14, 0.92);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 18px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  #suspense-overlay.visible { opacity: 1; pointer-events: all; }
+  .suspense-line {
+    font-family: 'Cinzel', serif;
+    font-size: clamp(0.85rem, 3vw, 1.15rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    text-align: center;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.5s ease, transform 0.5s ease, color 0.5s ease;
+    padding: 0 24px;
+  }
+  .suspense-line.show { opacity: 1; transform: translateY(0); }
+  .suspense-line.bright { color: var(--gold-bright); font-size: clamp(1rem, 4vw, 1.4rem); }
+  .suspense-orb {
+    font-size: 3.5rem;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    animation: pulse-orb 1.5s ease-in-out infinite;
+  }
+  .suspense-orb.show { opacity: 1; }
+  @keyframes pulse-orb {
+    0%,100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(201,168,76,0.3)); }
+    50%      { transform: scale(1.12); filter: drop-shadow(0 0 20px rgba(201,168,76,0.7)); }
+  }
+
+  /* Gold glow on reveal */
+  @keyframes goldGlow {
+    0%,100% { box-shadow: 0 8px 32px rgba(0,0,0,0.65), 0 0 0 2px rgba(201,168,76,0.25); }
+    50%      { box-shadow: 0 8px 40px rgba(0,0,0,0.65), 0 0 20px rgba(201,168,76,0.5), 0 0 0 3px rgba(201,168,76,0.5); }
+  }
+  .flip-front.glowing { animation: goldGlow 2s ease 1.8s infinite; }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <h1>The 21 Card Trick</h1>
+  <p>A Classic Feat of Mentalism</p>
+</header>
+
+<!-- ── START SCREEN ── -->
+<div id="start-screen" class="screen active">
+  <div class="crystal-ball">🔮</div>
+  <p class="tagline">Think of any card. The mind sees all.</p>
+  <button class="btn-gold" onclick="startTrick()">Begin the Trick</button>
+</div>
+
+<!-- ── TRICK SCREEN ── -->
+<div id="trick-screen" class="screen">
+  <div class="round-indicator" id="round-indicator">
+    <span id="round-text">Round 1 of 3</span>
+    <div class="round-pip" id="pip-0"></div>
+    <div class="round-pip" id="pip-1"></div>
+    <div class="round-pip" id="pip-2"></div>
+  </div>
+
+  <div class="col-labels">
+    <div class="col-label">Column I</div>
+    <div class="col-label">Column II</div>
+    <div class="col-label">Column III</div>
+  </div>
+
+  <div class="columns-wrapper" id="columns-wrapper"></div>
+
+  <div class="instruction-box">
+    <p id="instruction-text">Look at all 21 cards and <strong>think of one</strong>. Don't say it aloud!</p>
+    <p id="instruction-text">Select the column where your card lies!</p>
+  </div>
+
+  <div class="col-picker" id="col-picker">
+    <button class="pick-btn" onclick="pickColumn(0)"><span>Column I</span></button>
+    <button class="pick-btn" onclick="pickColumn(1)"><span>Column II</span></button>
+    <button class="pick-btn" onclick="pickColumn(2)"><span>Column III</span></button>
+  </div>
+
+  <div class="collecting-msg" id="collecting-msg"></div>
+</div>
+
+<!-- ── REVEAL SCREEN ── -->
+<div id="reveal-screen" class="screen">
+  <p class="reveal-intro">✦ &nbsp; The Mind Sees &nbsp; ✦</p>
+  <p class="reveal-tagline" id="reveal-tagline"></p>
+
+  <div class="flip-container">
+    <div class="flip-inner">
+      <div class="flip-face flip-back">
+        <div class="flip-back-inner">🂠</div>
+      </div>
+      <div class="flip-face flip-front" id="reveal-card-front">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <p class="reveal-question">Was this your card?</p>
+  <button class="btn-ghost" onclick="resetTrick()">↺ &nbsp; Play Again</button>
+</div>
+
+<!-- ── SUSPENSE OVERLAY ── -->
+<div id="suspense-overlay">
+  <div class="suspense-orb" id="s-orb">🔮</div>
+  <div class="suspense-line" id="s-line1"></div>
+  <div class="suspense-line bright" id="s-line2"></div>
+  <div class="suspense-line" id="s-line3"></div>
+</div>
+
+<script>
+  const SUITS = ['♠','♥','♦','♣'];
+  const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+  const RED   = new Set(['♥','♦']);
+
+  let cards = []; // flat array of 21 cards (row-major order for display)
+  let round = 0;  // 0, 1, 2
+
+  /* ── Deck utilities ── */
+  function buildDeck() {
+    return SUITS.flatMap(s => RANKS.map(r => ({ rank: r, suit: s, red: RED.has(s) })));
+  }
+  function shuffle(a) {
+    const b = [...a];
+    for (let i = b.length-1; i > 0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [b[i],b[j]] = [b[j],b[i]];
+    }
+    return b;
+  }
+
+  /* ── Layout: row-major
+     Display: 3 cols × 7 rows, dealt left-to-right, top-to-bottom
+     flat index i → col = i%3, row = i÷3
+     column c has flat indices: c, c+3, c+6, c+9, c+12, c+15, c+18
+  ── */
+  function getColumnCards(col) {
+    return Array.from({length:7}, (_,row) => cards[row*3 + col]);
+  }
+
+  /* ── Collecting: put chosen col in middle ── */
+  function collectCards(chosenCol) {
+    const others = [0,1,2].filter(c => c !== chosenCol);
+    cards = [
+      ...getColumnCards(others[0]),
+      ...getColumnCards(chosenCol),
+      ...getColumnCards(others[1]),
+    ];
+    // After collecting into a flat stack, the new "flat" becomes the
+    // row-major source for the next re-deal (it's dealt out row-by-row again)
+  }
+
+  /* ── Color helper ── */
+  function cc(card) { return card.red ? 'red' : 'black'; }
+
+  /* ── Screen switching ── */
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  /* ── Render the 3 fanned columns ── */
+  function renderColumns(animate) {
+    const wrapper = document.getElementById('columns-wrapper');
+    wrapper.innerHTML = '';
+
+    [0,1,2].forEach(col => {
+      const colCards = getColumnCards(col); // 7 cards for this column
+
+      const colEl = document.createElement('div');
+      colEl.className = 'card-column';
+
+      /* Peeking stack: cards 0–5 */
+      const stack = document.createElement('div');
+      stack.className = 'card-stack';
+
+      colCards.slice(0,6).forEach((card, i) => {
+        const el = document.createElement('div');
+        el.className = 'card-peek';
+        el.style.top = `${i * 44}px`;
+        el.innerHTML = `
+          <div class="peek-rank ${cc(card)}">${card.rank}</div>
+          <div class="peek-suit ${cc(card)}">${card.suit}</div>`;
+        stack.appendChild(el);
+        if (animate) setTimeout(() => el.classList.add('in'), 60 + col*70 + i*45);
+        else el.classList.add('in');
+      });
+      colEl.appendChild(stack);
+
+      /* Full card: card 6 */
+      const last = colCards[6];
+      const full = document.createElement('div');
+      full.className = 'card-full';
+      full.innerHTML = `
+        <div class="card-corner ${cc(last)}">
+          <div class="card-rank-full">${last.rank}</div>
+          <div class="card-suit-corner">${last.suit}</div>
+        </div>
+        <div class="card-center-suit ${cc(last)}">${last.suit}</div>
+        <div class="card-corner flip ${cc(last)}">
+          <div class="card-rank-full">${last.rank}</div>
+          <div class="card-suit-corner">${last.suit}</div>
+        </div>`;
+      colEl.appendChild(full);
+      if (animate) setTimeout(() => full.classList.add('in'), 60 + col*70 + 6*45);
+      else full.classList.add('in');
+
+      wrapper.appendChild(colEl);
+    });
+  }
+
+  /* ── Show/hide column picker ── */
+  function showPicker() {
+    const picker = document.getElementById('col-picker');
+    picker.querySelectorAll('.pick-btn').forEach(b => b.disabled = false);
+    picker.classList.add('visible');
+  }
+  function hidePicker() {
+    document.getElementById('col-picker').classList.remove('visible');
+  }
+
+  /* ── Update round pips ── */
+  function updateRoundUI() {
+    document.getElementById('round-text').textContent = `Round ${round+1} of 3`;
+    for (let i=0; i<3; i++) {
+      document.getElementById(`pip-${i}`).classList.toggle('done', i < round);
+    }
+  }
+
+  /* ── Start the trick ── */
+  function startTrick() {
+    cards = shuffle(buildDeck()).slice(0, 21);
+    round = 0;
+    showScreen('trick-screen');
+    updateRoundUI();
+    renderColumns(true);
+    document.getElementById('instruction-text').innerHTML =
+      'Look at all 21 cards and <strong>think of one</strong>. Don\'t say it aloud!';
+    document.getElementById('collecting-msg').textContent = '';
+    setTimeout(showPicker, 900);
+  }
+
+  /* ── Suspense overlay helper ── */
+  function showSuspense(lines, orbEmoji, duration, onDone) {
+    const overlay = document.getElementById('suspense-overlay');
+    const orb     = document.getElementById('s-orb');
+    const l1      = document.getElementById('s-line1');
+    const l2      = document.getElementById('s-line2');
+    const l3      = document.getElementById('s-line3');
+
+    // Reset
+    [l1,l2,l3].forEach(l => { l.textContent = ''; l.classList.remove('show'); });
+    orb.textContent = orbEmoji || '🔮';
+    orb.classList.remove('show');
+
+    overlay.classList.add('visible');
+
+    const show = (el, text, delay) => setTimeout(() => {
+      el.textContent = text;
+      el.classList.add('show');
+    }, delay);
+
+    if (lines[0]) show(l1, lines[0], 200);
+    if (orbEmoji) setTimeout(() => orb.classList.add('show'), 500);
+    if (lines[1]) show(l2, lines[1], 900);
+    if (lines[2]) show(l3, lines[2], 1600);
+
+    setTimeout(() => {
+      [l1,l2,l3].forEach(l => l.classList.remove('show'));
+      orb.classList.remove('show');
+      setTimeout(() => {
+        overlay.classList.remove('visible');
+        if (onDone) onDone();
+      }, 400);
+    }, duration);
+  }
+
+  /* ── User picks a column ── */
+  function pickColumn(chosenCol) {
+    document.getElementById('col-picker').querySelectorAll('.pick-btn').forEach(b => b.disabled = true);
+    hidePicker();
+
+    const colNames = ['Column I', 'Column II', 'Column III'];
+    const roundLines = [
+      ['The cards remember everything…', colNames[chosenCol] + ' it is.', 'Weaving it into the middle…'],
+      ['Shuffling the fates once more…', 'Your card hides among them all.', 'But not for long…'],
+      ['Final pass. The mind locks on.', 'Narrowing… narrowing…', 'There. I have it.'],
+    ];
+
+    const lines = roundLines[round];
+    const duration = round < 2 ? 2800 : 3200;
+
+    document.getElementById('instruction-text').innerHTML = 'Concentrating…';
+
+    showSuspense(lines, round < 2 ? '🃏' : '🔮', duration, () => {
+      const wrapper = document.getElementById('columns-wrapper');
+      wrapper.classList.add('fading');
+
+      setTimeout(() => {
+        collectCards(chosenCol);
+        round++;
+        updateRoundUI();
+
+        if (round < 3) {
+          renderColumns(false);
+          wrapper.classList.remove('fading');
+          document.getElementById('collecting-msg').textContent = '';
+          document.getElementById('instruction-text').innerHTML =
+            `Good. Now — which column is your card in <strong>now</strong>?`;
+
+          setTimeout(() => {
+            const allCards = wrapper.querySelectorAll('.card-peek, .card-full');
+            allCards.forEach((c,i) => setTimeout(() => c.classList.add('in'), i * 30));
+          }, 30);
+
+          setTimeout(showPicker, 500);
+        } else {
+          wrapper.classList.remove('fading');
+          document.getElementById('collecting-msg').textContent = '';
+
+          // Final suspense before reveal
+          showSuspense(
+            ['Silence…', 'I see it clearly now.', 'Your card is…'],
+            '✨', 3000,
+            revealCard
+          );
+        }
+      }, 350);
+    });
+  }
+
+  /* ── Reveal the 11th card (index 10) ── */
+  function revealCard() {
+    const chosenCard = cards[10]; // always position 11 after 3 rounds
+
+    // Build reveal card front
+    const front = document.getElementById('reveal-card-front');
+    front.innerHTML = `
+      <div class="reveal-corner ${cc(chosenCard)}">
+        <div class="reveal-rank">${chosenCard.rank}</div>
+        <div class="reveal-suit-c">${chosenCard.suit}</div>
+      </div>
+      <div class="reveal-center ${cc(chosenCard)}">${chosenCard.suit}</div>
+      <div class="reveal-corner flip-r ${cc(chosenCard)}">
+        <div class="reveal-rank">${chosenCard.rank}</div>
+        <div class="reveal-suit-c">${chosenCard.suit}</div>
+      </div>`;
+
+    // Set tagline
+    document.getElementById('reveal-tagline').textContent =
+      `Your card is the ${chosenCard.rank} of ${suitName(chosenCard.suit)}…`;
+
+    // Recreate the flip animation by cloning
+    const inner = document.querySelector('.flip-inner');
+    const clone = inner.cloneNode(true);
+    inner.parentNode.replaceChild(clone, inner);
+
+    setTimeout(() => {
+      document.querySelector('.flip-front').classList.add('glowing');
+    }, 2200);
+
+    showScreen('reveal-screen');
+  }
+
+  function suitName(suit) {
+    return {'♠':'Spades','♥':'Hearts','♦':'Diamonds','♣':'Clubs'}[suit] || suit;
+  }
+
+  /* ── Reset ── */
+  function resetTrick() {
+    showScreen('start-screen');
+    document.getElementById('columns-wrapper').innerHTML = '';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Concepts — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.concept-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.cc-icon  { font-size: 22px; margin-bottom: .35rem; }
+.cc-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: .25rem; }
+.cc-body  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.cc-body code {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--bg3); padding: 1px 4px; border-radius: 3px; color: var(--blue);
+}
+
+.layer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: .75rem 0;
+}
+.layer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.layer.readonly { background: rgba(91,163,245,0.06); border-color: rgba(91,163,245,0.2); }
+.layer.writable { background: rgba(61,220,132,0.06); border-color: rgba(61,220,132,0.2); }
+.layer.base     { background: rgba(240,165,0,0.06);  border-color: rgba(240,165,0,0.2); }
+.layer-num  { font-family: var(--mono); font-size: 11px; font-weight: 700; width: 20px; flex-shrink: 0; }
+.layer-name { font-weight: 500; color: var(--text); flex: 1; }
+.layer-note { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+.layer-badge {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 4px;
+}
+.lb-ro { background: var(--blue2); color: var(--blue); }
+.lb-rw { background: var(--green2); color: var(--green); }
+
+.port-demo {
+  background: #080b10;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  margin: .75rem 0;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.pd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pd-row:last-child { border-bottom: none; }
+.pd-type  { width: 60px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+.pd-val   { color: var(--blue); flex: 1; }
+.pd-note  { font-size: 11px; color: var(--text3); }
+.type-ports   { color: var(--amber); }
+.type-expose  { color: var(--green); }
+.type-vol     { color: var(--purple); }
+
+@media(max-width:600px){ .concept-grid{ grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Docker Concepts</div>
+  <div class="nav-phase">Phase 2 — Containerisation</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Core concepts</div>
+      <div class="sidebar-link" onclick="switchTab('core');scrollToId('image-container')">Image vs Container</div>
+      <div class="sidebar-link" onclick="switchTab('core');scrollToId('layers')">Image layers</div>
+      <div class="sidebar-link" onclick="switchTab('core');scrollToId('registry')">Registry and Docker Hub</div>
+      <div class="sidebar-link" onclick="switchTab('core');scrollToId('lifecycle')">Container lifecycle</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Networking</div>
+      <div class="sidebar-link" onclick="switchTab('networking');scrollToId('n-ports')">ports vs expose</div>
+      <div class="sidebar-link" onclick="switchTab('networking');scrollToId('n-networks')">Docker networks</div>
+      <div class="sidebar-link" onclick="switchTab('networking');scrollToId('n-dns')">Container DNS</div>
+      <div class="sidebar-link" onclick="switchTab('networking');scrollToId('n-drivers')">Network drivers</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Storage</div>
+      <div class="sidebar-link" onclick="switchTab('storage');scrollToId('s-volumes')">Volumes</div>
+      <div class="sidebar-link" onclick="switchTab('storage');scrollToId('s-bind')">Bind mounts</div>
+      <div class="sidebar-link" onclick="switchTab('storage');scrollToId('s-compare')">When to use each</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-images')">Image commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-containers')">Container commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-network')">Network commands</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 2 · Topic 2 of 6</div>
+      <h1 class="gh-title">Docker <span>Concepts</span></h1>
+      <p class="gh-sub">The mental model behind Docker — images, containers, layers, registries, networks, volumes, and ports. Understanding these makes every docker command and docker-compose file obvious.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('core')">Core concepts</button>
+      <button class="tab-btn" onclick="switchTab('networking')">Networking</button>
+      <button class="tab-btn" onclick="switchTab('storage')">Storage</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ CORE CONCEPTS ══ -->
+    <div class="tab-pane active" id="pane-core">
+
+      <div class="section" id="image-container">
+        <div class="section-eyebrow">01 — Fundamental distinction</div>
+        <div class="section-title">Image vs Container — the most important concept</div>
+        <p class="section-body">
+          Everything in Docker starts with understanding this distinction. Confusing images and containers is the most common source of Docker confusion.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">Image — the blueprint</div>
+            <div class="ic-body">A read-only template. Defines what the container will contain — OS, runtime, libraries, code, environment variables. Built from a Dockerfile or pulled from a registry. Stored on disk. An image on its own does nothing — it just exists as a file.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Container — the running instance</div>
+            <div class="ic-body">A live, running process created from an image. Has its own process space, filesystem layer, and network interface. Multiple containers can run from the same image simultaneously — each fully isolated from the others.</div>
+          </div>
+        </div>
+        <div class="diagram">
+<span class="dm">Python analogy:</span>
+<span class="db">Image</span>  <span class="dm">=  class definition  (blueprint, stored on disk, not running)</span>
+<span class="dg">Container</span>  <span class="dm">=  object instance    (running, has state, uses resources)</span>
+
+<span class="dm">Docker reality:</span>
+<span class="db">python:3.11-slim</span>  <span class="dm">(image — on disk, ~125MB)</span>
+    <span class="dm">↓  docker run</span>
+<span class="dg">container-1</span>  <span class="dm">(running Flask app on port 5000)</span>
+<span class="dg">container-2</span>  <span class="dm">(running a different Flask app — same image, different container)</span>
+<span class="dg">container-3</span>  <span class="dm">(running a bash session — same image again)</span>
+<span class="dm">All three from the same image, all isolated from each other</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>When you change code in your app and want the container to pick it up — you must <b>rebuild the image</b> and create a new container from it. The running container doesn't see changes to source files unless you're using a bind mount (covered in the Storage tab).</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="layers">
+        <div class="section-eyebrow">02 — How images are built</div>
+        <div class="section-title">Image layers — why Docker builds are fast</div>
+        <p class="section-body">
+          Docker images are not monolithic blobs — they are built in <b>layers</b>. Each instruction in a Dockerfile creates one layer. Layers are read-only and stacked on top of each other. When a container runs, Docker adds a thin writable layer on top — changes go there, the image layers remain unchanged.
+        </p>
+        <div class="layer-stack">
+          <div class="layer writable">
+            <div class="layer-num">5</div>
+            <div class="layer-name">Container writable layer</div>
+            <div class="layer-note">files created/modified at runtime</div>
+            <div class="layer-badge lb-rw">read-write</div>
+          </div>
+          <div class="layer readonly">
+            <div class="layer-num">4</div>
+            <div class="layer-name">COPY . . (your code)</div>
+            <div class="layer-note">~10KB — changes every build</div>
+            <div class="layer-badge lb-ro">read-only</div>
+          </div>
+          <div class="layer readonly">
+            <div class="layer-num">3</div>
+            <div class="layer-name">RUN pip install -r requirements.txt</div>
+            <div class="layer-note">~50MB — cached if requirements.txt unchanged</div>
+            <div class="layer-badge lb-ro">read-only</div>
+          </div>
+          <div class="layer readonly">
+            <div class="layer-num">2</div>
+            <div class="layer-name">COPY requirements.txt .</div>
+            <div class="layer-note">~1KB</div>
+            <div class="layer-badge lb-ro">read-only</div>
+          </div>
+          <div class="layer readonly">
+            <div class="layer-num">1</div>
+            <div class="layer-name">WORKDIR /app</div>
+            <div class="layer-note">directory structure</div>
+            <div class="layer-badge lb-ro">read-only</div>
+          </div>
+          <div class="layer base">
+            <div class="layer-num">0</div>
+            <div class="layer-name">FROM python:3.11-slim</div>
+            <div class="layer-note">~125MB base — pulled once, cached forever</div>
+            <div class="layer-badge" style="background:var(--amber2);color:var(--amber)">base</div>
+          </div>
+        </div>
+        <p class="section-body">
+          The power of layers is <b>caching</b>. Docker only rebuilds layers that have changed, plus all layers after them. If you change <code>app.py</code> but not <code>requirements.txt</code>, Docker skips rebuilding the pip install layer (the slow one) and only rebuilds the COPY layer. This is why copying <code>requirements.txt</code> before copying the rest of your code is a deliberate optimisation.
+        </p>
+        <div class="diagram">
+<span class="dm">Change app.py only — rebuild time: ~2 seconds</span>
+<span class="dg">Layer 0:</span> <span class="dm">FROM python → ✓ cached</span>
+<span class="dg">Layer 1:</span> <span class="dm">WORKDIR   → ✓ cached</span>
+<span class="dg">Layer 2:</span> <span class="dm">COPY requirements.txt → ✓ cached (file unchanged)</span>
+<span class="dg">Layer 3:</span> <span class="dm">RUN pip install → ✓ cached (dependencies unchanged)</span>
+<span class="da">Layer 4:</span> <span class="dm">COPY . . → ✗ rebuild (app.py changed)</span>
+
+<span class="dm">Change requirements.txt — rebuild time: ~60 seconds</span>
+<span class="dg">Layer 0–1:</span> <span class="dm">✓ cached</span>
+<span class="da">Layer 2–4:</span> <span class="dm">✗ all rebuilt (requirements.txt changed → pip install reruns)</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="registry">
+        <div class="section-eyebrow">03 — Where images come from</div>
+        <div class="section-title">Registries and Docker Hub</div>
+        <p class="section-body">
+          A <b>registry</b> is a server that stores and distributes Docker images — like PyPI for Python packages, but for container images. <b>Docker Hub</b> is the default public registry. When you write <code>image: nginx:latest</code> in a docker-compose file, Docker pulls it from Docker Hub automatically.
+        </p>
+        <div class="concept-grid">
+          <div class="concept-card">
+            <div class="cc-icon">🌐</div>
+            <div class="cc-title">Docker Hub</div>
+            <div class="cc-body">Default registry at hub.docker.com. Millions of public images. Official images from Nginx, MySQL, Python, Node etc. Free for public images.</div>
+          </div>
+          <div class="concept-card">
+            <div class="cc-icon">📦</div>
+            <div class="cc-title">Official images</div>
+            <div class="cc-body">Maintained by the software's own team. Verified, regularly updated, security-patched. Examples: <code>nginx</code>, <code>python</code>, <code>mysql</code>, <code>postgres</code>.</div>
+          </div>
+          <div class="concept-card">
+            <div class="cc-icon">👤</div>
+            <div class="cc-title">User images</div>
+            <div class="cc-body">Published by individuals or organisations. Format: <code>username/image:tag</code>. Verify before using — quality varies.</div>
+          </div>
+          <div class="concept-card">
+            <div class="cc-icon">🏷️</div>
+            <div class="cc-title">Image tags</div>
+            <div class="cc-body">Version identifiers. <code>nginx:latest</code> = newest. <code>python:3.11-slim</code> = specific version + variant. Always pin versions in production.</div>
+          </div>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — image naming examples</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Official image — no username prefix</span>
+<span class="nm">docker pull</span> nginx              <span class="cm"># = nginx:latest from Docker Hub</span>
+<span class="nm">docker pull</span> python:3.11-slim   <span class="cm"># specific version + variant</span>
+<span class="nm">docker pull</span> mysql:8.0          <span class="cm"># pinned to MySQL 8.0.x</span>
+
+<span class="cm"># User/org image</span>
+<span class="nm">docker pull</span> filebrowser/filebrowser
+
+<span class="cm"># Your own locally-built image (no pull needed)</span>
+<span class="nm">docker build</span> -t myflaskapp:latest .
+<span class="cm"># myflaskapp is only on this machine until you push it to a registry</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="lifecycle">
+        <div class="section-eyebrow">04 — Container lifecycle</div>
+        <div class="section-title">States a container goes through</div>
+        <div class="diagram">
+<span class="dm">Image on disk</span>
+      <span class="dm">↓  docker run / docker compose up</span>
+<span class="dg">Running</span>    <span class="dm">← process is active, using CPU/RAM</span>
+      <span class="dm">↓  docker stop (graceful) or docker kill (immediate)</span>
+<span class="da">Stopped</span>    <span class="dm">← process ended, container still exists on disk</span>
+      <span class="dm">↓  docker start (restart) or docker rm (delete)</span>
+<span class="db">Removed</span>    <span class="dm">← container gone, image still on disk</span>
+      <span class="dm">↓  docker rmi (remove image)</span>
+<span class="dm">Image gone</span> <span class="dm">← nothing left (unless pushed to registry)</span>
+
+<span class="dm">Key insight: stopped containers still exist — they take disk space</span>
+<span class="dm">Run 'docker ps -a' to see them, 'docker rm NAME' to delete</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Use <code>docker run --rm</code> to automatically delete the container when it exits — perfect for one-off commands. Use <code>docker compose up -d</code> for services — Compose manages restarts and keeps containers around between runs.</span>
+        </div>
+      </div>
+
+    </div><!-- end core -->
+
+    <!-- ══ NETWORKING ══ -->
+    <div class="tab-pane" id="pane-networking">
+
+      <div class="section" id="n-ports">
+        <div class="section-eyebrow">01 — The most important distinction</div>
+        <div class="section-title">ports vs expose — critical difference</div>
+        <p class="section-body">
+          This is the most misunderstood Docker networking concept. <code>ports</code> and <code>expose</code> look similar but have fundamentally different effects. Getting this wrong either exposes services you shouldn't, or makes services unreachable.
+        </p>
+        <div class="port-demo">
+          <div class="pd-row">
+            <div class="pd-type type-ports">ports:</div>
+            <div class="pd-val">"8082:80"</div>
+            <div class="pd-note">host_port:container_port — maps to HOST, publicly accessible</div>
+          </div>
+          <div class="pd-row">
+            <div class="pd-type type-expose">expose:</div>
+            <div class="pd-val">"5000"</div>
+            <div class="pd-note">internal only — only containers on same network can reach it</div>
+          </div>
+          <div class="pd-row">
+            <div class="pd-type type-vol" style="color:var(--purple)">nothing:</div>
+            <div class="pd-val" style="color:var(--text3)">—</div>
+            <div class="pd-note">container is completely isolated from everything</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--amber)">ports: "8082:80"</div>
+            <div class="ic-body">Maps host port 8082 to container port 80. Anyone who can reach the host can reach this port — your browser, Cloudflare Tunnel, other machines on the network. Use only for entry-point services like Nginx. The format is <code>HOST:CONTAINER</code>.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">expose: "5000"</div>
+            <div class="ic-body">Documents that the container listens on port 5000, but does NOT map it to the host. Only other containers on the same Docker network can reach it by container name. Perfect for Flask, databases, backend services that should not be publicly reachable.</div>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span><b>Correct security pattern for our setup:</b> Nginx container uses <code>ports: "8082:80"</code> (public). Flask container uses <code>expose: "5000"</code> (internal). Database containers use <code>expose</code> too. Only Nginx is publicly reachable — everything else is internal.</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">docker-compose.yml — correct pattern</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">services</span>:
+  <span class="nm">nginx</span>:
+    <span class="kw">ports</span>:
+      - <span class="str">"8082:80"</span>    <span class="cm"># PUBLIC — Cloudflare Tunnel hits this</span>
+
+  <span class="nm">flask</span>:
+    <span class="kw">expose</span>:
+      - <span class="str">"5000"</span>      <span class="cm"># INTERNAL — only nginx can reach this</span>
+
+  <span class="nm">mysql</span>:
+    <span class="kw">expose</span>:
+      - <span class="str">"3306"</span>      <span class="cm"># INTERNAL — only flask can reach this</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="n-networks">
+        <div class="section-eyebrow">02 — Container communication</div>
+        <div class="section-title">Docker networks — how containers find each other</div>
+        <p class="section-body">
+          By default, containers are isolated from each other even on the same host. To allow containers to communicate, they must be on the same <b>Docker network</b>. Docker creates a virtual network where containers can reach each other using their <b>service names</b> as hostnames — Docker has built-in DNS that resolves container names to their internal IPs automatically.
+        </p>
+        <div class="diagram">
+<span class="dm">docker-compose creates network: nginx-proxy_appnet</span>
+
+<span class="dg">nginx container</span>   <span class="dm">internal IP: 172.18.0.2  hostname: nginx</span>
+<span class="dg">flask container</span>   <span class="dm">internal IP: 172.18.0.3  hostname: flask</span>
+<span class="dg">mysql container</span>   <span class="dm">internal IP: 172.18.0.4  hostname: mysql</span>
+
+<span class="dm">From inside nginx container:</span>
+<span class="dm">proxy_pass http://flask:5000</span>    <span class="dm">← Docker DNS resolves "flask" → 172.18.0.3</span>
+
+<span class="dm">From inside flask container:</span>
+<span class="dm">host="mysql", port=3306         ← Docker DNS resolves "mysql" → 172.18.0.4</span>
+
+<span class="dm">These IPs are internal to Docker — not reachable from outside</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>The service name in docker-compose.yml <b>is</b> the hostname. If your service is named <code>flask</code>, containers on the same network reach it at <code>http://flask:PORT</code>. This is why Nginx proxy_pass uses the service name — Docker's internal DNS handles resolution automatically.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="n-dns">
+        <div class="section-eyebrow">03 — Name resolution</div>
+        <div class="section-title">Docker's built-in DNS</div>
+        <p class="section-body">
+          Docker runs an embedded DNS server at IP <code>127.0.0.11</code> inside every container. This server resolves container names to their internal IPs within a Docker network. It also forwards external DNS queries (like google.com) to the host's DNS resolver.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — test DNS from inside a container</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Open a shell inside the nginx container</span>
+<span class="nm">docker compose exec nginx bash</span>
+
+<span class="cm"># Inside the container — test DNS resolution</span>
+<span class="nm">ping flask</span>         <span class="cm"># resolves to flask container's internal IP</span>
+<span class="nm">ping google.com</span>    <span class="cm"># resolves via external DNS (forwarded by Docker)</span>
+
+<span class="cm"># See which DNS server the container uses</span>
+<span class="nm">cat</span> /etc/resolv.conf
+<span class="cm"># nameserver 127.0.0.11  ← Docker's embedded DNS</span>
+
+<span class="cm"># Test connectivity to flask by name</span>
+<span class="nm">curl http://flask:5000</span></pre>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Docker DNS only works between containers on the <b>same user-defined network</b>. The default bridge network does NOT support container name resolution — only IP addresses work there. Always define a named network in docker-compose.yml and attach services to it.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="n-drivers">
+        <div class="section-eyebrow">04 — Network types</div>
+        <div class="section-title">Docker network drivers</div>
+        <table class="kv-table">
+          <thead><tr><th>Driver</th><th>Use case</th><th>Container DNS</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">bridge <span class="tag tag-g">default</span></td>
+              <td class="desc">Multi-container apps on one host. What docker-compose uses.</td>
+              <td class="val green">Yes (named)</td>
+              <td class="desc">Creates a virtual switch. Containers get private IPs. Port mapping to host available. Most common driver.</td>
+            </tr>
+            <tr>
+              <td class="key">host</td>
+              <td class="desc">Container shares host network stack.</td>
+              <td class="desc">N/A — uses host</td>
+              <td class="desc">No network isolation. Container ports are host ports directly. Useful for performance but removes isolation.</td>
+            </tr>
+            <tr>
+              <td class="key">none</td>
+              <td class="desc">Complete network isolation.</td>
+              <td class="desc">No network</td>
+              <td class="desc">Container has no network interface at all. For maximum isolation when network access is not needed.</td>
+            </tr>
+            <tr>
+              <td class="key">overlay</td>
+              <td class="desc">Multi-host networking.</td>
+              <td class="val green">Yes</td>
+              <td class="desc">Docker Swarm mode. Containers across multiple hosts communicate as if on the same network. Not needed on single spserver.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end networking -->
+
+    <!-- ══ STORAGE ══ -->
+    <div class="tab-pane" id="pane-storage">
+
+      <div class="section" id="s-volumes">
+        <div class="section-eyebrow">01 — Persistent data</div>
+        <div class="section-title">Docker volumes — the correct way to persist data</div>
+        <p class="section-body">
+          By default, any data written inside a container is lost when the container is removed. Docker volumes solve this — they are storage areas managed by Docker, stored outside the container's filesystem, and persist independently of the container's lifecycle.
+        </p>
+        <div class="diagram">
+<span class="dm">Without volume:</span>
+<span class="da">MySQL container</span>  <span class="dm">writes /var/lib/mysql/</span>
+<span class="dr">docker rm mysql_container</span>  <span class="dm">→ database data gone ✗</span>
+
+<span class="dm">With named volume:</span>
+<span class="dg">MySQL container</span>  <span class="dm">writes /var/lib/mysql/</span>
+<span class="dm">   ↕ Docker mounts</span>
+<span class="dg">mysql-data volume</span>  <span class="dm">← stored at /var/lib/docker/volumes/mysql-data/</span>
+<span class="dg">docker rm mysql_container</span>  <span class="dm">→ volume survives ✓</span>
+<span class="dg">docker run mysql again</span>      <span class="dm">→ database data restored ✓</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">docker-compose.yml — named volume example</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">services</span>:
+  <span class="nm">mysql</span>:
+    <span class="kw">image</span>: <span class="str">mysql:8.0</span>
+    <span class="kw">volumes</span>:
+      - <span class="str">mysql-data:/var/lib/mysql</span>   <span class="cm"># named volume</span>
+    <span class="kw">environment</span>:
+      <span class="nm">MYSQL_ROOT_PASSWORD</span>: <span class="str">secret</span>
+
+<span class="kw">volumes</span>:
+  <span class="nm">mysql-data</span>:   <span class="cm"># declare the volume — Docker manages it</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-bind">
+        <div class="section-eyebrow">02 — Bind mounts</div>
+        <div class="section-title">Bind mounts — map host directory into container</div>
+        <p class="section-body">
+          A bind mount maps a specific directory on the host filesystem directly into the container. Unlike volumes (which Docker manages), bind mounts point to an exact path you control. Changes on either side (host or container) are immediately visible to the other.
+        </p>
+        <div class="diagram">
+<span class="dm">Bind mount:</span>
+<span class="dg">/home/sipu/projects/flaskapp</span>  <span class="dm">(host — your actual files)</span>
+         <span class="da">↕ mounted as</span>
+<span class="dg">/app</span>  <span class="dm">(inside container)</span>
+
+<span class="dm">Edit app.py on host → instantly visible inside container at /app/app.py</span>
+<span class="dm">Flask restarts (with debug=True) → changes live immediately</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">docker-compose.yml — bind mount for dev</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">services</span>:
+  <span class="nm">flask</span>:
+    <span class="kw">build</span>: <span class="str">.</span>
+    <span class="kw">volumes</span>:
+      - <span class="str">.:/app</span>   <span class="cm"># . = current host dir, /app = container dir</span>
+    <span class="cm"># Changes to any file in . appear instantly in /app inside container</span>
+    <span class="cm"># Still need debug=True in Flask for auto-reload on code changes</span></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">docker-compose.yml — bind mount for config</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="kw">services</span>:
+  <span class="nm">nginx</span>:
+    <span class="kw">image</span>: <span class="str">nginx:latest</span>
+    <span class="kw">volumes</span>:
+      - <span class="str">./nginx/nginx.conf:/etc/nginx/nginx.conf</span>   <span class="cm"># single file mount</span>
+      - <span class="str">./html:/usr/share/nginx/html</span>              <span class="cm"># directory mount</span>
+    <span class="cm"># Edit nginx.conf on host → change is live (after nginx reload)</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-compare">
+        <div class="section-eyebrow">03 — Choosing the right storage</div>
+        <div class="section-title">Volume vs bind mount vs no mount</div>
+        <table class="kv-table">
+          <thead><tr><th>Storage type</th><th>Managed by</th><th>Path control</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Named volume</td>
+              <td class="desc">Docker</td>
+              <td class="desc">Docker chooses path in /var/lib/docker/volumes/</td>
+              <td class="desc"><b>Database data, persistent app state.</b> Survives container removal. Portable across machines. Backup-friendly.</td>
+            </tr>
+            <tr>
+              <td class="key">Bind mount</td>
+              <td class="desc">You</td>
+              <td class="desc">You specify exact host path</td>
+              <td class="desc"><b>Development code, config files.</b> Edit on host, see changes in container. Not suitable for databases — ownership/permission issues.</td>
+            </tr>
+            <tr>
+              <td class="key">No mount</td>
+              <td class="desc">N/A</td>
+              <td class="desc">Container filesystem only</td>
+              <td class="desc"><b>Stateless services, one-off containers.</b> Data lost on container removal — fine for stateless apps.</td>
+            </tr>
+            <tr>
+              <td class="key">tmpfs mount</td>
+              <td class="desc">Host RAM</td>
+              <td class="desc">In-memory only</td>
+              <td class="desc"><b>Sensitive temporary data.</b> Stored in host RAM, never written to disk. Lost on container stop. Useful for secrets or temporary caches.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>Common mistake:</b> Using a bind mount for a database (MySQL, PostgreSQL). The container's database process writes files with specific ownership (mysql:mysql user inside container). On the host, these files may have wrong permissions or UIDs. Always use named volumes for databases.</span>
+        </div>
+      </div>
+
+    </div><!-- end storage -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-images">
+        <div class="section-eyebrow">01 — Images</div>
+        <div class="section-title">Image management commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker images</div><div class="cmd-desc">List all images on disk — shows repository, tag, image ID, size</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker pull nginx:latest</div><div class="cmd-desc">Download an image from Docker Hub without running it</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker build -t myapp:latest .</div><div class="cmd-desc">Build image from Dockerfile in current directory, tag as myapp:latest</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker build --no-cache -t myapp .</div><div class="cmd-desc">Build without layer cache — force full rebuild of all layers</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker rmi nginx:latest</div><div class="cmd-desc">Remove an image from disk — must stop all containers using it first</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker image prune</div><div class="cmd-desc">Remove dangling images (untagged, not used by any container)</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker history myapp:latest</div><div class="cmd-desc">Show all layers in an image with their sizes and commands</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker inspect myapp:latest</div><div class="cmd-desc">Full JSON details about an image — config, layers, environment variables</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker tag myapp:latest myapp:v1.0</div><div class="cmd-desc">Add another tag to an existing image — useful for versioning</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker save myapp:latest | gzip > myapp.tar.gz</div><div class="cmd-desc">Export image to a file — useful for transferring to another machine</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-containers">
+        <div class="section-eyebrow">02 — Containers</div>
+        <div class="section-title">Container management commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker run -d -p 8080:80 nginx</div><div class="cmd-desc">Run nginx container in background (-d), map port 8080 to container port 80</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker run --rm -it python:3.11 bash</div><div class="cmd-desc">Run interactively (-it), remove when done (--rm) — great for one-off experiments</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker ps</div><div class="cmd-desc">List running containers</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker ps -a</div><div class="cmd-desc">List all containers including stopped ones</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker stop CONTAINER</div><div class="cmd-desc">Gracefully stop a container — sends SIGTERM, waits 10s, then SIGKILL</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker start CONTAINER</div><div class="cmd-desc">Start a stopped container</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker rm CONTAINER</div><div class="cmd-desc">Remove a stopped container — container must be stopped first</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker exec -it CONTAINER bash</div><div class="cmd-desc">Open an interactive shell inside a running container — essential for debugging</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker exec CONTAINER cat /app/app.py</div><div class="cmd-desc">Run a single command inside a running container without opening full shell</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker logs CONTAINER</div><div class="cmd-desc">Show container stdout/stderr output</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker logs -f CONTAINER</div><div class="cmd-desc">Follow container logs live — Ctrl+C to stop</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker inspect CONTAINER</div><div class="cmd-desc">Full JSON details — network settings, mounts, environment, restart count</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker stats</div><div class="cmd-desc">Live stream of CPU, memory, network, and disk I/O for all running containers</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker cp CONTAINER:/path/file .</div><div class="cmd-desc">Copy a file from inside a container to the host</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-network">
+        <div class="section-eyebrow">03 — Networks and volumes</div>
+        <div class="section-title">Network and volume commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker network ls</div><div class="cmd-desc">List all Docker networks — shows name, driver, scope</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker network inspect NETWORK</div><div class="cmd-desc">Show full network details including which containers are connected and their IPs</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker network create mynet</div><div class="cmd-desc">Create a user-defined bridge network manually</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume ls</div><div class="cmd-desc">List all Docker volumes — shows name and driver</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume inspect VOLUME</div><div class="cmd-desc">Show volume details including the host path where data is stored</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume prune</div><div class="cmd-desc">Remove all volumes not used by any container — careful, deletes data</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multi-stage builds</b> — use multiple FROM statements in a Dockerfile to build in one stage and copy only the final artifact to a minimal runtime image. Dramatically reduces image size — a Go binary built in a 1GB build image can run in a 10MB scratch image.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker layer caching in CI/CD</b> — in GitHub Actions, save and restore the Docker layer cache between runs using <code>cache-from</code> and <code>cache-to</code>. Turns 5-minute builds into 30-second builds when only code changes.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker networking deep dive</b> — understand how Docker creates virtual ethernet pairs (veth), how iptables rules forward port traffic, how the embedded DNS works at the packet level. Highly relevant for debugging complex networking issues.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker secrets</b> — store sensitive data (passwords, API keys) as Docker secrets instead of environment variables. Secrets are encrypted in the Swarm, only accessible to containers that need them, not visible in <code>docker inspect</code>.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Container health checks</b> — add a HEALTHCHECK instruction to Dockerfiles. Docker periodically runs the check and marks containers as healthy or unhealthy. docker-compose restarts unhealthy containers automatically. Essential for production reliability.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Kubernetes mental model mapping</b> — once Docker concepts are solid: Image → same in K8s. Container → same. Pod → group of containers. Deployment → manages Pod replicas. Service → networking like docker-compose networks. The concepts translate directly.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['core','networking','storage','commands','future'];
+let visited = new Set(['core']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '20%';
+  document.getElementById('sp-pct').textContent = '20%';
+}, 300);
+</script>
+</body>
+</html>

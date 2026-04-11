@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tailscale VPN — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.use-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.use-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.use-icon  { font-size: 22px; margin-bottom: .4rem; }
+.use-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: .3rem; }
+.use-body  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+.device-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.device-dot.online  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.device-dot.offline { background: var(--text3); }
+.device-name { font-family: var(--mono); font-size: 13px; color: var(--blue); flex: 1; }
+.device-ip   { font-family: var(--mono); font-size: 12px; color: var(--text3); }
+.device-os   { font-size: 12px; color: var(--text2); }
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Tailscale VPN</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-tailscale')">What is Tailscale</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-needed')">Why we need it</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-it-works')">How it bypasses CG-NAT</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('wireguard')">WireGuard underneath</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('use-cases')">Use cases on spserver</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-alternatives')">Alternatives</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-account')">Create account</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-server')">Install on spserver</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-windows')">Install on Windows</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify and test SSH</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-expiry')">Disable key expiry</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-ts')">Tailscale commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-ssh')">SSH via Tailscale</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 8 of 14</div>
+      <h1 class="gh-title"><span>Tailscale</span> VPN</h1>
+      <p class="gh-sub">Secure SSH access to spserver from any network in the world — phone, work laptop, a cafe, anywhere — without exposing a single port to the internet. The emergency recovery lifeline for the entire stack.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-tailscale">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is Tailscale</div>
+        <p class="section-body">
+          Tailscale is a <b>zero-config VPN</b> that connects your devices into a private encrypted network — called a tailnet. Every device gets a stable IP address in the <code>100.x.x.x</code> range. These devices can reach each other directly, as if they were on the same local network, regardless of where they physically are in the world.
+        </p>
+        <p class="section-body">
+          You install Tailscale on spserver and your Windows PC. Both login with the same Tailscale account. They automatically find each other and establish an encrypted tunnel. From that point, <code>ssh sipu@100.x.x.x</code> works from any network — mobile data, work WiFi, a hotel — without any router configuration, port forwarding, or firewall rules.
+        </p>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>Tailscale is free for personal use — up to 100 devices, unlimited bandwidth, no time limits. No credit card required. Just a Google, GitHub, or Microsoft account to sign in.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="why-needed">
+        <div class="section-eyebrow">02 — Why we need it</div>
+        <div class="section-title">The problem Tailscale solves</div>
+        <p class="section-body">
+          Airtel uses <b>CG-NAT</b> — Carrier Grade NAT. Your router's WAN IP is <code>100.220.x.x</code>, which is Airtel's internal address space, not a real public IP. Incoming connections from the internet never reach your router — Airtel's NAT layer drops them before they get there.
+        </p>
+        <p class="section-body">
+          This means standard port forwarding cannot work. SSH on port 22 is unreachable from outside the home network by direct connection. We need a method that doesn't rely on <b>incoming</b> connections at all.
+        </p>
+        <div class="diagram">
+<span class="dr">Without Tailscale — external SSH fails:</span>
+<span class="db">Your phone</span>  <span class="dm">──► ssh sipu@106.215.x.x ──►</span>  <span class="dr">Airtel CG-NAT</span>  <span class="dm">← packet dropped here</span>
+<span class="dm">                                               never reaches router or spserver</span>
+
+<span class="dg">With Tailscale — works from anywhere:</span>
+<span class="db">Your phone</span>  <span class="dm">──► ssh sipu@100.x.x.x ──►</span>  <span class="dg">Tailscale tunnel</span>  <span class="dm">──►</span>  <span class="dg">spserver</span>
+<span class="dm">             No incoming connections needed — all outgoing ↑</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-it-works">
+        <div class="section-eyebrow">03 — How it works</div>
+        <div class="section-title">How Tailscale bypasses CG-NAT</div>
+        <p class="section-body">
+          CG-NAT only blocks <b>unsolicited incoming</b> connections. Outgoing connections always work. Tailscale exploits this — both devices reach <b>out</b> to Tailscale's coordination servers simultaneously. These servers help the devices discover each other and broker a direct connection using a technique called <b>NAT traversal</b>.
+        </p>
+        <div class="diagram">
+<span class="dm">Phase 1 — Coordination (both devices reach OUT)</span>
+<span class="dg">spserver</span>     <span class="dm">──── outgoing HTTPS ────►</span>  <span class="da">login.tailscale.com</span>
+<span class="db">Your Windows PC</span>  <span class="dm">──── outgoing HTTPS ────►</span>  <span class="da">login.tailscale.com</span>
+<span class="dm">             CG-NAT allows both ↑ (they are outgoing)</span>
+<span class="dm">             Coordination server exchanges IP/port info between devices</span>
+
+<span class="dm">Phase 2 — Direct tunnel established (STUN/DERP)</span>
+<span class="dg">spserver</span>  <span class="dm">◄═══════ encrypted WireGuard tunnel ═══════►</span>  <span class="db">Your Windows PC</span>
+<span class="dm">          spserver IP on tailnet: 100.78.211.x (example)</span>
+<span class="dm">          Direct P2P when possible, DERP relay server otherwise</span>
+        </div>
+        <p class="section-body">
+          When direct P2P connection is not possible (some strict NAT configurations), Tailscale uses <b>DERP relay servers</b> — Tailscale's own servers that relay encrypted traffic between devices. Even in relay mode, Tailscale is fast enough for SSH, Samba, and most use cases.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Run <code>tailscale netcheck</code> to see your connection type. "Direct" means P2P (fastest). "Relay" means traffic goes through a DERP server (still encrypted, slightly higher latency). With Airtel CG-NAT, you usually get direct connection.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="wireguard">
+        <div class="section-eyebrow">04 — Under the hood</div>
+        <div class="section-title">WireGuard — what Tailscale is built on</div>
+        <p class="section-body">
+          Tailscale is built entirely on top of <b>WireGuard</b> — a modern, extremely fast VPN protocol built into the Linux kernel since version 5.6. WireGuard is simpler, faster, and more secure than older protocols like OpenVPN or IPsec.
+        </p>
+        <p class="section-body">
+          The difference: raw WireGuard requires manually generating key pairs for every device, manually exchanging public keys, and manually configuring peers. For 2 devices that's manageable. For 10+ it becomes painful. Tailscale takes WireGuard and adds automatic key management, peer discovery, NAT traversal, and a coordination layer so you never touch any of that manually.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">Raw WireGuard</div>
+            <div class="ic-body">You manage key pairs, configure each peer manually, set up a server, handle NAT yourself. Powerful but complex. Better when you need full control or can't use Tailscale's infrastructure.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Tailscale on WireGuard</div>
+            <div class="ic-body">Install, login, done. Keys managed automatically. Peers discovered automatically. NAT traversal handled automatically. Same WireGuard encryption and performance — zero manual configuration.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="use-cases">
+        <div class="section-eyebrow">05 — Use cases</div>
+        <div class="section-title">How we use Tailscale on spserver</div>
+        <div class="use-grid">
+          <div class="use-card">
+            <div class="use-icon">🔑</div>
+            <div class="use-title">Remote SSH</div>
+            <div class="use-body">Primary use. <code>ssh sipu@100.x.x.x</code> works from any network worldwide. Mobile hotspot, work WiFi, hotel — always connects.</div>
+          </div>
+          <div class="use-card">
+            <div class="use-icon">🚨</div>
+            <div class="use-title">Emergency recovery</div>
+            <div class="use-body">If Cloudflare Tunnel breaks, Nginx crashes, or UFW locks out SSH — Tailscale still works independently. The recovery path when everything else fails.</div>
+          </div>
+          <div class="use-card">
+            <div class="use-icon">📁</div>
+            <div class="use-title">Remote Samba</div>
+            <div class="use-body">Connect to <code>\\100.x.x.x\shared</code> from any Tailscale device. Full network drive access anywhere — not just the home network.</div>
+          </div>
+          <div class="use-card">
+            <div class="use-icon">🔍</div>
+            <div class="use-title">Debug local services</div>
+            <div class="use-body">Access services running on local ports (not on Cloudflare Tunnel) remotely. <code>http://100.x.x.x:PORT</code> reaches any service on spserver.</div>
+          </div>
+        </div>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span><b>Never remove Tailscale from spserver.</b> It is the last resort access method. If cloudflared goes down, if Nginx breaks, if UFW gets misconfigured — Tailscale is how you SSH in and fix it. It operates completely independently of everything else.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-alternatives">
+        <div class="section-eyebrow">06 — Alternatives</div>
+        <div class="section-title">Tailscale vs other VPN solutions</div>
+        <table class="kv-table">
+          <thead><tr><th>Tool</th><th>Setup effort</th><th>Cost</th><th>Needs VPS?</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Tailscale <span class="tag tag-g">chosen</span></td>
+              <td class="desc">Minimal — install + login</td>
+              <td class="val green">Free (100 devices)</td>
+              <td class="desc">No</td>
+              <td class="desc">Best balance of simplicity and features. Built on WireGuard.</td>
+            </tr>
+            <tr>
+              <td class="key">ZeroTier</td>
+              <td class="desc">Easy</td>
+              <td class="val green">Free (25 devices)</td>
+              <td class="desc">No</td>
+              <td class="desc">Open source, self-hostable controller. Good alternative.</td>
+            </tr>
+            <tr>
+              <td class="key">WireGuard (raw)</td>
+              <td class="desc">Complex — manual key mgmt</td>
+              <td class="val green">Free</td>
+              <td class="desc">No (but harder)</td>
+              <td class="desc">Full control. Good learning exercise after Tailscale is comfortable.</td>
+            </tr>
+            <tr>
+              <td class="key">Headscale</td>
+              <td class="desc">Medium — needs VPS</td>
+              <td class="val amber">VPS cost</td>
+              <td class="desc">Yes</td>
+              <td class="desc">Self-hosted Tailscale coordination server. No data through Tailscale infra.</td>
+            </tr>
+            <tr>
+              <td class="key">OpenVPN</td>
+              <td class="desc">Complex</td>
+              <td class="val green">Free</td>
+              <td class="desc">No (but harder)</td>
+              <td class="desc">Older, slower, more complex. WireGuard has largely replaced it.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-account">
+        <div class="section-eyebrow">01 — Account</div>
+        <div class="section-title">Step 1 — Create a Tailscale account</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Sign up at tailscale.com</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Go to <b>tailscale.com</b> and sign up using Google, GitHub, or Microsoft account. No credit card required. The free Personal plan supports up to 100 devices with unlimited bandwidth. After signing up you'll see your empty admin dashboard at <b>login.tailscale.com/admin/machines</b>.</p>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>All devices added later must login with the same account. This is what ties them together into your private tailnet.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-server">
+        <div class="section-eyebrow">02 — Install on server</div>
+        <div class="section-title">Step 2 — Install Tailscale on spserver</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Install using the official script</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Tailscale provides a one-line install script that detects your Linux distro (Ubuntu 24.04 in our case), adds their apt repository, and installs the latest stable version. It also sets up the systemd service to auto-start on boot.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Official one-line install script</span>
+<span class="nm">curl -fsSL https://tailscale.com/install.sh | sh</span>
+
+<span class="cm"># Verify installation</span>
+<span class="nm">tailscale version</span>
+<span class="cm"># Should print: 1.x.x</span>
+
+<span class="cm"># Connect to your Tailscale account</span>
+<span class="cm"># This prints a URL — open it in your browser</span>
+<span class="nm">sudo tailscale up</span>
+
+<span class="cm"># Visit the URL shown, login with your account</span>
+<span class="cm"># Click "Connect" — spserver joins your tailnet</span>
+
+<span class="cm"># Get spserver's Tailscale IP — save this</span>
+<span class="nm">tailscale ip</span>
+<span class="cm"># Example output: 100.78.211.34</span>
+<span class="cm"># This IP is stable — it never changes for this device</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Verify service is enabled and running</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The install script should enable auto-start automatically, but worth verifying. If spserver reboots and Tailscale doesn't start, you lose the ability to SSH in remotely — the install script should handle this but check to be sure.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Check Tailscale daemon status</span>
+<span class="nm">sudo systemctl status tailscaled</span>
+<span class="cm"># Look for: Active: active (running)</span>
+
+<span class="cm"># Verify it is set to auto-start on boot</span>
+<span class="nm">sudo systemctl is-enabled tailscaled</span>
+<span class="cm"># Should print: enabled</span>
+
+<span class="cm"># If not enabled, enable it</span>
+<span class="nm">sudo systemctl enable tailscaled</span>
+
+<span class="cm"># Check connection status</span>
+<span class="nm">tailscale status</span>
+<span class="cm"># Shows all devices in your tailnet and their status</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-windows">
+        <div class="section-eyebrow">03 — Install on Windows</div>
+        <div class="section-title">Step 3 — Install Tailscale on your Windows PC</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Install and login on Windows</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Download the Windows installer from tailscale.com/download. Login with the <b>same account</b> as spserver. Tailscale runs as a system tray app — it connects automatically and stays connected in the background. Both devices should now appear in your admin dashboard.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows</div></div>
+              <pre><span class="cm"># 1. Download from: https://tailscale.com/download/windows</span>
+<span class="cm"># 2. Install → follow prompts</span>
+<span class="cm"># 3. Tailscale icon appears in system tray</span>
+<span class="cm"># 4. Click icon → Log in → use SAME account as spserver</span>
+<span class="cm"># 5. Both spserver and Windows PC now in your tailnet</span>
+
+<span class="cm"># Verify in admin dashboard:</span>
+<span class="cm"># https://login.tailscale.com/admin/machines</span>
+<span class="cm"># Should show two devices: spserver and your Windows PC</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Test</div>
+        <div class="section-title">Step 4 — Verify SSH via Tailscale works</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">SSH into spserver using Tailscale IP</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The real test is connecting from a network that is NOT your home — use your mobile hotspot. Disconnect your PC from home WiFi, enable mobile hotspot, then try SSH. If it works, Tailscale is correctly bypassing CG-NAT.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows Terminal / PowerShell</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># SSH using Tailscale IP (works from any network)</span>
+<span class="nm">ssh</span> sipu@100.x.x.x   <span class="cm"># replace with your spserver Tailscale IP</span>
+
+<span class="cm"># Add a shortcut to ~/.ssh/config on Windows</span>
+<span class="cm"># C:\Users\subha\.ssh\config</span>
+Host spserver-remote
+    HostName 100.x.x.x    <span class="cm"># spserver Tailscale IP</span>
+    User sipu
+
+<span class="cm"># Then connect with:</span>
+<span class="nm">ssh</span> spserver-remote</pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>Once confirmed working on mobile hotspot, Tailscale SSH works from anywhere — office, travel, cafe. The Tailscale IP never changes so the SSH config entry stays valid forever.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-expiry">
+        <div class="section-eyebrow">05 — Key expiry</div>
+        <div class="section-title">Step 5 — Disable key expiry for spserver</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">Disable expiry in Tailscale admin</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">By default, Tailscale auth keys expire after 180 days. After expiry, <code>tailscale up</code> asks you to re-authenticate — which means opening a browser URL on the server. For a headless server this is annoying. Disabling expiry means Tailscale stays connected indefinitely without re-auth.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Tailscale admin — browser steps</div></div>
+              <pre><span class="cm"># 1. Go to: https://login.tailscale.com/admin/machines</span>
+<span class="cm"># 2. Find "spserver" in the list</span>
+<span class="cm"># 3. Click the three-dot menu (⋯) next to spserver</span>
+<span class="cm"># 4. Select "Disable key expiry"</span>
+<span class="cm"># 5. Confirm</span>
+<span class="cm"># spserver now stays connected indefinitely</span>
+
+<span class="cm"># Alternatively via CLI:</span>
+<span class="nm">sudo tailscale up --accept-routes</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-ts">
+        <div class="section-eyebrow">01 — Tailscale commands</div>
+        <div class="section-title">All useful Tailscale commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">tailscale status</div><div class="cmd-desc">List all devices in your tailnet and their connection status (online/offline, IPs)</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale ip</div><div class="cmd-desc">Show this device's Tailscale IP — the stable 100.x.x.x address</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale ip -4</div><div class="cmd-desc">Show only the IPv4 Tailscale address</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tailscale up</div><div class="cmd-desc">Connect to Tailscale / re-authenticate if expired</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tailscale down</div><div class="cmd-desc">Disconnect from Tailscale (device stays registered but goes offline)</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale ping 100.x.x.x</div><div class="cmd-desc">Ping another Tailscale device — confirms connectivity and shows latency</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale netcheck</div><div class="cmd-desc">Diagnose network — shows NAT type, UDP availability, latency to DERP servers, connection type (direct/relay)</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale version</div><div class="cmd-desc">Show installed Tailscale version</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale logout</div><div class="cmd-desc">Log out and remove this device from the tailnet</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tailscale up --reset</div><div class="cmd-desc">Re-authenticate — generates a new auth URL to login again</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status tailscaled</div><div class="cmd-desc">Check Tailscale daemon status — should show active (running)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart tailscaled</div><div class="cmd-desc">Restart Tailscale daemon if connection drops</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u tailscaled -f</div><div class="cmd-desc">Follow Tailscale daemon logs live — useful for debugging connection issues</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-ssh">
+        <div class="section-eyebrow">02 — SSH via Tailscale</div>
+        <div class="section-title">SSH and service access through Tailscale</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">ssh sipu@100.x.x.x</div><div class="cmd-desc">SSH into spserver from any network using Tailscale IP</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh spserver-remote</div><div class="cmd-desc">SSH using the alias in ~/.ssh/config (after setting up the Host block)</div></div>
+          <div class="cmd-row"><div class="cmd-code">scp file.txt sipu@100.x.x.x:~/</div><div class="cmd-desc">Copy a file to spserver over Tailscale</div></div>
+          <div class="cmd-row"><div class="cmd-code">\\100.x.x.x\shared</div><div class="cmd-desc">Access Samba shares remotely via Tailscale (File Explorer on Windows)</div></div>
+          <div class="cmd-row"><div class="cmd-code">http://100.x.x.x:PORT</div><div class="cmd-desc">Access any service on spserver by port — bypasses Cloudflare Tunnel, hits the service directly</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during Tailscale setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">tailscale up showed a URL but no browser on server</div>
+          <div class="bb-body">
+            Running <code>sudo tailscale up</code> on the headless server printed a long authentication URL in the terminal. The server has no browser — couldn't just click it. Wasn't immediately obvious how to authenticate.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Copy the URL and open it on any device</div>
+          <div class="fb-body">
+            The URL printed by <code>tailscale up</code> can be opened on <b>any device</b> — your Windows PC, phone, tablet. Copy the full URL from the terminal output (it starts with <code>https://login.tailscale.com/a/...</code>), paste it into your Windows PC's browser, login with your account, and click Connect. spserver is then authenticated. You don't need to open the URL on the server itself.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Tailscale stopped working after 180 days — re-auth required</div>
+          <div class="bb-body">
+            After ~6 months, SSH via Tailscale stopped connecting. Running <code>tailscale status</code> showed spserver as offline. On the server, <code>tailscale status</code> said authentication was expired and re-authentication was needed.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Disable key expiry in Tailscale admin dashboard</div>
+          <div class="fb-body">
+            Default Tailscale keys expire after 180 days. Re-authenticate: <code>sudo tailscale up</code> → copy the URL → open on Windows browser → login. Then permanently disable expiry in the admin dashboard (login.tailscale.com/admin/machines → spserver → ⋯ → Disable key expiry). This was the moment we learned to do this immediately after setup — it's now in the setup steps.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Tailscale problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">SSH via Tailscale IP times out or refuses connection</div>
+          <div class="ts-body">Check in order: (1) Is Tailscale running on spserver? <code>sudo systemctl status tailscaled</code>. (2) Is spserver showing as online in Tailscale admin? Visit login.tailscale.com/admin/machines. (3) Is sshd running on spserver? Tailscale provides the network path — sshd must still be running for SSH to work: <code>sudo systemctl status ssh</code>. (4) Has the auth key expired? Run <code>tailscale status</code> on spserver — if it shows "Needs reauthentication", run <code>sudo tailscale up</code>.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">spserver shows as offline in Tailscale dashboard</div>
+          <div class="ts-body">spserver rebooted and Tailscale didn't reconnect, or the key expired. If you can access spserver locally: <code>sudo tailscale up</code>. If key expired, this generates a new URL — open it on any device. If you can't reach spserver at all, you need physical access or to wait until someone is on the local network to SSH in via 192.168.31.150.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Tailscale connection works but is slow / high latency</div>
+          <div class="ts-body">Run <code>tailscale netcheck</code> to check connection type. "relay" mode means traffic goes through Tailscale's DERP servers, adding latency. This is normal for some network configurations. For SSH it's fast enough. For large file transfers via Samba it may feel slower than local network. Direct mode (P2P) is usually achievable — try restarting tailscaled: <code>sudo systemctl restart tailscaled</code>.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Tailscale installed but can't find the IP</div>
+          <div class="ts-body">Run <code>tailscale ip</code> — if it says "Tailscale is stopped" or returns nothing, Tailscale isn't connected. Run <code>sudo tailscale up</code> to connect. If it prints an IP, you're good. The IP is also visible in the Tailscale admin dashboard next to each device name.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Can I use Tailscale and Cloudflare Tunnel at the same time?</div>
+          <div class="ts-body">Yes — they are completely independent and do not interfere. Cloudflare Tunnel handles public web traffic. Tailscale handles private SSH and admin access. Both run simultaneously on spserver. This is the recommended setup — public services via Cloudflare, private access via Tailscale.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Tailscale SSH</b> — enable Tailscale's built-in SSH server (<code>sudo tailscale up --ssh</code>). Handles SSH authentication through Tailscale identity — no sshd config needed, no SSH keys to manage per device. Experimental but powerful.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Tailscale ACLs</b> — in the admin dashboard, write access control rules to define exactly which devices can reach which others and on which ports. Useful if you add more devices and want to restrict what your phone can access vs your PC.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Tailscale Funnel</b> — expose a local service publicly via Tailscale's infrastructure without Cloudflare Tunnel. Limited to Tailscale's domain (not your custom domain) but useful for quick sharing or testing.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Headscale</b> — self-hosted open-source replacement for Tailscale's coordination server. Run your own Tailscale backend on a cheap VPS. All device coordination happens through your server — no data through Tailscale's infrastructure. Good Phase 4+ project.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>WireGuard directly</b> — learn raw WireGuard to understand what Tailscale is doing underneath. Highly relevant for DevOps and network security roles. Generate key pairs, configure peers, manage routing tables manually. Builds deep networking understanding.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Mobile access</b> — install Tailscale on your Android or iOS phone. SSH into spserver from your phone using a terminal app like Termius or JuiceSSH. Full server access from anywhere with just a phone.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>

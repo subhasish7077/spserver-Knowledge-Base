@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domain + DNS — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+.main{flex:1;min-width:0;}
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:22%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;width:20%;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.blue{color:var(--blue);}
+.kv-table .val.amber{color:var(--amber);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:280px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+/* dns record type cards */
+.record-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin:.75rem 0;}
+.record-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;}
+.record-type{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--green);margin-bottom:.3rem;}
+.record-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:.3rem;}
+.record-desc{font-size:13px;color:var(--text2);line-height:1.6;}
+.record-card.used{border-color:rgba(61,220,132,0.2);background:rgba(61,220,132,0.03);}
+.record-card.used .record-type{color:var(--green);}
+.record-card.info-t .record-type{color:var(--blue);}
+.record-card.note-t .record-type{color:var(--amber);}
+/* current dns table */
+.dns-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;font-family:var(--mono);}
+.dns-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);}
+.dns-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+.dns-table tr:last-child td{border-bottom:none;}
+.dns-table tr:hover td{background:var(--bg3);}
+.dns-table .t-type{color:var(--amber);width:8%;}
+.dns-table .t-name{color:var(--blue);width:30%;}
+.dns-table .t-val{color:var(--text);width:38%;}
+.dns-table .t-note{color:var(--text3);font-size:12px;font-family:var(--sans);}
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+  .record-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Domain + DNS</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Concepts</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-dns')">What is DNS</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('dns-lookup')">DNS lookup flow</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('record-types')">DNS record types</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('nameservers')">What are nameservers</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-cloudflare')">Why Cloudflare DNS</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-register')">Register domain</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-cloudflare')">Add to Cloudflare</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-nameservers')">Update nameservers</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify propagation</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-https')">Enable HTTPS</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">DNS records</div>
+      <div class="sidebar-link" onclick="switchTab('records');scrollToId('r-current')">Current records</div>
+      <div class="sidebar-link" onclick="switchTab('records');scrollToId('r-add')">Add subdomain</div>
+      <div class="sidebar-link" onclick="switchTab('records');scrollToId('r-propagation')">Propagation explained</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-dns')">DNS check commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 10 of 14</div>
+      <h1 class="gh-title">Domain <span>+ DNS</span></h1>
+      <p class="gh-sub">Registering dustyserver.co.in, moving DNS management to Cloudflare, and understanding how the internet translates a domain name into a connection to spserver.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('records')">DNS records</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-dns">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is DNS</div>
+        <p class="section-body">
+          DNS stands for <b>Domain Name System</b>. It is the internet's phonebook — it translates human-readable domain names like <code>dustyserver.co.in</code> into IP addresses that computers use to connect. Without DNS, you would have to remember and type IP addresses for every website you visit.
+        </p>
+        <p class="section-body">
+          A domain name is structured hierarchically from right to left. In <code>flask.dustyserver.co.in</code>: <code>.in</code> is the top-level domain (country code for India), <code>.co</code> is a second-level domain under .in (short for commercial), <code>dustyserver</code> is the registered name, and <code>flask</code> is a subdomain.
+        </p>
+        <div class="diagram">
+<span class="dm">        flask  .  dustyserver  .  co  .  in</span>
+<span class="dm">        ↑          ↑            ↑     ↑</span>
+<span class="db">    subdomain</span>  <span class="dg">registered</span>  <span class="da">second</span>  <span class="da">top-level</span>
+<span class="dm">    (you create) </span><span class="dg">name</span>        <span class="da">level</span>   <span class="da">domain (TLD)</span>
+<span class="dm">                 (you buy)</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>DNS is a distributed system — not one server knows everything. Thousands of servers around the world hold pieces of the DNS database and query each other as needed. This is why DNS changes can take minutes to hours to propagate globally.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="dns-lookup">
+        <div class="section-eyebrow">02 — How it works</div>
+        <div class="section-title">The full DNS lookup flow</div>
+        <p class="section-body">
+          When you type <code>dustyserver.co.in</code> in a browser, a multi-step lookup happens in milliseconds:
+        </p>
+        <div class="diagram">
+<span class="db">Browser types: dustyserver.co.in</span>
+    <span class="dm">↓</span>
+<span class="dm">1. Check browser DNS cache → not found</span>
+<span class="dm">2. Check OS DNS cache → not found</span>
+<span class="dm">3. Ask configured DNS resolver (8.8.8.8 — Google DNS)</span>
+    <span class="dm">↓</span>
+<span class="dm">4. Resolver asks root nameserver: "who handles .in?"</span>
+<span class="da">   Root server replies: "ask ns1.registry.in"</span>
+    <span class="dm">↓</span>
+<span class="dm">5. Resolver asks .in nameserver: "who handles dustyserver.co.in?"</span>
+<span class="da">   .in server replies: "ask kobe.ns.cloudflare.com"</span>
+    <span class="dm">↓</span>
+<span class="dm">6. Resolver asks Cloudflare nameserver: "what is dustyserver.co.in?"</span>
+<span class="dg">   Cloudflare replies: "104.21.33.66" (Cloudflare edge IP)</span>
+    <span class="dm">↓</span>
+<span class="dm">7. Browser connects to 104.21.33.66</span>
+<span class="dm">8. Cloudflare routes through tunnel to spserver</span>
+<span class="dg">   Website loads ✓</span>
+        </div>
+        <p class="section-body">
+          Notice that step 5 is where our nameserver setting matters. By changing GoDaddy's nameservers to point to Cloudflare (<code>kobe.ns.cloudflare.com</code>), we made Cloudflare the authority for all DNS records under <code>dustyserver.co.in</code>. Cloudflare now answers all DNS queries for our domain.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="record-types">
+        <div class="section-eyebrow">03 — Record types</div>
+        <div class="section-title">DNS record types</div>
+        <div class="record-grid">
+          <div class="record-card used">
+            <div class="record-type">A</div>
+            <div class="record-name">Address record</div>
+            <div class="record-desc">Maps a domain to an IPv4 address. The most fundamental record. We don't need one — Cloudflare Tunnel creates CNAME records instead.</div>
+          </div>
+          <div class="record-card used">
+            <div class="record-type">CNAME</div>
+            <div class="record-name">Canonical Name</div>
+            <div class="record-desc">Maps a domain to another domain name (alias). All our subdomains are CNAMEs pointing to Cloudflare's tunnel endpoint. Created automatically by <code>cloudflared tunnel route dns</code>.</div>
+          </div>
+          <div class="record-card used">
+            <div class="record-type">NS</div>
+            <div class="record-name">Nameserver</div>
+            <div class="record-desc">Defines which servers are authoritative for this domain. We have two: kobe.ns.cloudflare.com and saanvi.ns.cloudflare.com. Cannot be deleted — required.</div>
+          </div>
+          <div class="record-card used">
+            <div class="record-type">SOA</div>
+            <div class="record-name">Start of Authority</div>
+            <div class="record-desc">Master record for the zone — contains admin info. Auto-managed by Cloudflare. Cannot be deleted.</div>
+          </div>
+          <div class="record-card info-t">
+            <div class="record-type">AAAA</div>
+            <div class="record-name">IPv6 Address</div>
+            <div class="record-desc">Maps a domain to an IPv6 address. Equivalent of A record for IPv6. Not configured on dustyserver.co.in yet — future improvement.</div>
+          </div>
+          <div class="record-card info-t">
+            <div class="record-type">MX</div>
+            <div class="record-name">Mail Exchange</div>
+            <div class="record-desc">Points to mail servers for the domain. Needed if you want @dustyserver.co.in email addresses. Not set up yet.</div>
+          </div>
+          <div class="record-card note-t">
+            <div class="record-type">TXT</div>
+            <div class="record-name">Text record</div>
+            <div class="record-desc">Stores arbitrary text. Used for domain verification (Google Search Console, email SPF/DKIM), and other services that need to confirm you own the domain.</div>
+          </div>
+          <div class="record-card note-t">
+            <div class="record-type">SRV</div>
+            <div class="record-name">Service record</div>
+            <div class="record-desc">Specifies the host and port for a specific service. Used for VoIP, game servers, and other protocols. Not needed for web hosting.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="nameservers">
+        <div class="section-eyebrow">04 — Nameservers</div>
+        <div class="section-title">What are nameservers and why they matter</div>
+        <p class="section-body">
+          Nameservers are the servers that answer DNS queries for your domain. When you register a domain, the registrar (GoDaddy in our case) assigns their own nameservers by default. Whoever controls the nameservers controls all DNS records for the domain.
+        </p>
+        <p class="section-body">
+          By changing the nameservers to Cloudflare's, we handed DNS management to Cloudflare. GoDaddy still <b>owns</b> the registration — they hold the contract with the .in registry. But Cloudflare now <b>manages</b> all DNS records, answers all DNS queries, and controls what IP addresses the domain resolves to.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--amber)">GoDaddy's role</div>
+            <div class="ic-body">Domain registrar — holds the legal registration contract with the .in registry. Pays the yearly renewal fee. That's it. GoDaddy has no control over DNS records anymore.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Cloudflare's role</div>
+            <div class="ic-body">DNS manager — answers all queries for dustyserver.co.in. Controls all A, CNAME, MX, TXT records. Also provides SSL certificates, DDoS protection, Cloudflare Tunnel routing, and analytics.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Our Cloudflare nameservers: <b>kobe.ns.cloudflare.com</b> and <b>saanvi.ns.cloudflare.com</b>. These are assigned uniquely per domain — yours may be different nameserver names in the kobe/saanvi family.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="why-cloudflare">
+        <div class="section-eyebrow">05 — Decision</div>
+        <div class="section-title">Why Cloudflare DNS over GoDaddy DNS</div>
+        <table class="kv-table">
+          <thead><tr><th>Feature</th><th>GoDaddy DNS</th><th>Cloudflare DNS</th></tr></thead>
+          <tbody>
+            <tr><td class="key">Cost</td><td class="val amber">Free</td><td class="val green">Free</td></tr>
+            <tr><td class="key">SSL certificate</td><td class="val amber">Paid add-on</td><td class="val green">Free — automatic</td></tr>
+            <tr><td class="key">DDoS protection</td><td class="val amber">None</td><td class="val green">Free — always on</td></tr>
+            <tr><td class="key">Cloudflare Tunnel</td><td class="val amber">Not supported</td><td class="val green">Required</td></tr>
+            <tr><td class="key">DNS speed</td><td class="val">Standard</td><td class="val green">Fastest globally (1.1.1.1)</td></tr>
+            <tr><td class="key">Analytics</td><td class="val amber">None</td><td class="val green">Free request analytics</td></tr>
+            <tr><td class="key">Propagation</td><td class="val">Standard</td><td class="val green">Near-instant globally</td></tr>
+            <tr><td class="key">API access</td><td class="val amber">Limited</td><td class="val green">Full REST API</td></tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          The most critical reason: Cloudflare Tunnel <b>requires</b> DNS to be managed by Cloudflare. The tunnel creates CNAME records pointing to Cloudflare's infrastructure — this only works if Cloudflare controls the DNS. Everything else (free SSL, DDoS protection, analytics) is a bonus.
+        </p>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-register">
+        <div class="section-eyebrow">01 — Register</div>
+        <div class="section-title">Step 1 — Register the domain on GoDaddy</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Purchase dustyserver.co.in on GoDaddy</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Search for the domain on GoDaddy, add to cart, and purchase. <b>Why .co.in?</b> It is India's commercial domain extension — affordable (usually under ₹500/year), credible, and specifically available on GoDaddy where .co.in domains were easily accessible at the time. Cloudflare Registrar does not support .co.in domains, which is why GoDaddy was used.</p>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>After purchasing, GoDaddy sends a verification email to your registered email address. ICANN (the international domain authority) requires email verification for all new registrations. The domain shows "On Hold" until you verify — click the link in that email immediately.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-cloudflare">
+        <div class="section-eyebrow">02 — Cloudflare</div>
+        <div class="section-title">Step 2 — Add domain to Cloudflare</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Add dustyserver.co.in to your Cloudflare account</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Cloudflare needs to know about your domain before it can manage DNS for it. Adding it to Cloudflare scans for existing DNS records and gives you the nameservers to set on GoDaddy.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Cloudflare dashboard — browser steps</div></div>
+              <pre><span class="cm"># 1. Go to dash.cloudflare.com</span>
+<span class="cm"># 2. Click "Add a Site"</span>
+<span class="cm"># 3. Enter: dustyserver.co.in</span>
+<span class="cm"># 4. Select the Free plan → Continue</span>
+<span class="cm"># 5. Cloudflare scans existing DNS records (auto-imports from GoDaddy)</span>
+<span class="cm"># 6. Click Continue</span>
+<span class="cm"># 7. Cloudflare shows your assigned nameservers — SAVE THESE:</span>
+<span class="cm">#    kobe.ns.cloudflare.com</span>
+<span class="cm">#    saanvi.ns.cloudflare.com</span>
+<span class="cm">#    (your names may differ slightly)</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-nameservers">
+        <div class="section-eyebrow">03 — Nameservers</div>
+        <div class="section-title">Step 3 — Update nameservers on GoDaddy</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Point GoDaddy to Cloudflare nameservers</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">This is the critical step that hands DNS control to Cloudflare. Once you update these nameservers, Cloudflare becomes the authority for all DNS queries about dustyserver.co.in. GoDaddy still owns the registration but Cloudflare answers all DNS lookups.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">GoDaddy dashboard — browser steps</div></div>
+              <pre><span class="cm"># 1. Login to GoDaddy → My Products → Domains</span>
+<span class="cm"># 2. Click "Manage" next to dustyserver.co.in</span>
+<span class="cm"># 3. Scroll to "Nameservers" section</span>
+<span class="cm"># 4. Click "Change" → Select "Custom Nameservers"</span>
+<span class="cm"># 5. Enter Cloudflare's nameservers:</span>
+<span class="cm">#    Nameserver 1: kobe.ns.cloudflare.com</span>
+<span class="cm">#    Nameserver 2: saanvi.ns.cloudflare.com</span>
+<span class="cm"># 6. Save</span>
+<span class="cm"># 7. GoDaddy warns "changing nameservers may break your services" — confirm</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>Nameserver changes propagate across the global DNS system. Cloudflare typically shows your domain as Active within 15-30 minutes. Full global propagation can take up to 24 hours in rare cases, but is usually much faster.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Verify</div>
+        <div class="section-title">Step 4 — Verify propagation</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Confirm Cloudflare is now authoritative</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Verify the nameserver change has propagated by checking which nameservers are listed for your domain. Once Cloudflare nameservers are returned, the domain is fully under Cloudflare management.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver or Windows</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Check which nameservers are authoritative for your domain</span>
+<span class="nm">nslookup -type=NS dustyserver.co.in</span>
+<span class="cm"># Should return: kobe.ns.cloudflare.com and saanvi.ns.cloudflare.com</span>
+<span class="cm"># If it still returns GoDaddy nameservers — wait and check again</span>
+
+<span class="cm"># Alternative check using dig</span>
+<span class="nm">dig NS dustyserver.co.in</span>
+<span class="cm"># Returns NS records with Cloudflare nameservers when propagated</span>
+
+<span class="cm"># Check if domain resolves to Cloudflare IPs</span>
+<span class="nm">nslookup dustyserver.co.in</span>
+<span class="cm"># After Cloudflare Tunnel is set up, should return:</span>
+<span class="cm"># 104.21.x.x and 172.67.x.x (Cloudflare edge IPs)</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>In Cloudflare dashboard, the domain shows <b>Active</b> status once propagation is detected. You'll also receive an email from Cloudflare confirming the domain is active.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-https">
+        <div class="section-eyebrow">05 — HTTPS</div>
+        <div class="section-title">Step 5 — Enable HTTPS on Cloudflare</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Toggle HTTPS in Cloudflare SSL/TLS settings</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Cloudflare provides free SSL certificates. HTTPS is handled at Cloudflare's edge — visitors connect to Cloudflare over HTTPS, Cloudflare connects to spserver over plain HTTP through the tunnel. No certificate needs to be installed on spserver.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Cloudflare dashboard</div></div>
+              <pre><span class="cm"># 1. Cloudflare dashboard → dustyserver.co.in</span>
+<span class="cm"># 2. SSL/TLS → Overview</span>
+<span class="cm"># 3. SSL/TLS encryption mode → select "Flexible"</span>
+<span class="cm">#    (Flexible: HTTPS visitor↔Cloudflare, HTTP Cloudflare↔server)</span>
+<span class="cm">#    (Full: HTTPS both legs — use if Nginx has SSL cert)</span>
+<span class="cm"># 4. Edge Certificates tab → Always Use HTTPS → toggle ON</span>
+<span class="cm">#    (redirects all HTTP requests to HTTPS automatically)</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>We use <b>Flexible</b> mode — Cloudflare handles HTTPS with visitors, then sends plain HTTP to cloudflared on our server. Since the Cloudflare Tunnel connection is already encrypted, this is secure. Full mode would require installing an SSL certificate on Nginx.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ DNS RECORDS ══ -->
+    <div class="tab-pane" id="pane-records">
+
+      <div class="section" id="r-current">
+        <div class="section-eyebrow">01 — Current state</div>
+        <div class="section-title">All DNS records on dustyserver.co.in</div>
+        <p class="section-body">Every subdomain accessible from the internet has a CNAME record pointing to the Cloudflare Tunnel endpoint. These are created automatically by <code>cloudflared tunnel route dns</code>.</p>
+        <table class="dns-table">
+          <thead><tr><th>Type</th><th>Name</th><th>Value / Target</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="t-type">CNAME</td>
+              <td class="t-name">dustyserver.co.in</td>
+              <td class="t-val">b72cf76b-....cfargotunnel.com</td>
+              <td class="t-note">Main website via Cloudflare Tunnel</td>
+            </tr>
+            <tr>
+              <td class="t-type">CNAME</td>
+              <td class="t-name">www</td>
+              <td class="t-val">b72cf76b-....cfargotunnel.com</td>
+              <td class="t-note">www subdomain → same tunnel</td>
+            </tr>
+            <tr>
+              <td class="t-type">CNAME</td>
+              <td class="t-name">terminal</td>
+              <td class="t-val">b72cf76b-....cfargotunnel.com</td>
+              <td class="t-note">ttyd browser terminal</td>
+            </tr>
+            <tr>
+              <td class="t-type">CNAME</td>
+              <td class="t-name">fileserver</td>
+              <td class="t-val">b72cf76b-....cfargotunnel.com</td>
+              <td class="t-note">Filebrowser file manager</td>
+            </tr>
+            <tr>
+              <td class="t-type">CNAME</td>
+              <td class="t-name">flask</td>
+              <td class="t-val">b72cf76b-....cfargotunnel.com</td>
+              <td class="t-note">Flask Docker app</td>
+            </tr>
+            <tr>
+              <td class="t-type">NS</td>
+              <td class="t-name">dustyserver.co.in</td>
+              <td class="t-val">kobe.ns.cloudflare.com</td>
+              <td class="t-note">Primary nameserver — cannot delete</td>
+            </tr>
+            <tr>
+              <td class="t-type">NS</td>
+              <td class="t-name">dustyserver.co.in</td>
+              <td class="t-val">saanvi.ns.cloudflare.com</td>
+              <td class="t-note">Secondary nameserver — cannot delete</td>
+            </tr>
+            <tr>
+              <td class="t-type">SOA</td>
+              <td class="t-name">dustyserver.co.in</td>
+              <td class="t-val">auto-managed</td>
+              <td class="t-note">Zone authority record — auto-managed</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>All CNAME records point to the same tunnel endpoint (<code>b72cf76b-....cfargotunnel.com</code>). Cloudflare routes each subdomain to the correct local service based on the hostname in the HTTP request — this is handled by cloudflared's ingress rules, not by DNS.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="r-add">
+        <div class="section-eyebrow">02 — Add subdomain</div>
+        <div class="section-title">Adding a new subdomain — two methods</div>
+
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Method 1 — CLI (recommended)</div>
+            <div class="ic-body">Use the cloudflared command. Creates the CNAME automatically. Faster and less error-prone than dashboard.<br><br><code>cloudflared tunnel route dns spserver newapp.dustyserver.co.in</code></div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">Method 2 — Cloudflare Dashboard</div>
+            <div class="ic-body">Go to DNS → Add record → Type: CNAME → Name: newapp → Target: b72cf76b-0820-44cb-90df-f4c58ed87184.cfargotunnel.com → Save.</div>
+          </div>
+        </div>
+
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Only use <b>second-level subdomains</b> — e.g. <code>newapp.dustyserver.co.in</code>. Third-level subdomains like <code>new.app.dustyserver.co.in</code> cause DNS issues on Cloudflare's free plan. This was learned the hard way during the Flask setup.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="r-propagation">
+        <div class="section-eyebrow">03 — Propagation</div>
+        <div class="section-title">DNS propagation explained</div>
+        <p class="section-body">
+          After creating or changing a DNS record, the change must spread to DNS resolvers worldwide. This is called <b>DNS propagation</b>. DNS resolvers cache records for a time period defined by the record's TTL (Time To Live). Until the cache expires, old resolvers still return old values.
+        </p>
+        <p class="section-body">
+          Cloudflare sets a TTL of 1 minute for records managed through Cloudflare Tunnel (CNAMEs). This means new subdomains propagate very quickly — typically 1-5 minutes for most of the world. Some resolvers may take longer if they override TTL with a minimum cache time.
+        </p>
+        <div class="diagram">
+<span class="dm">You run:</span> <span class="dg">cloudflared tunnel route dns spserver newapp.dustyserver.co.in</span>
+<span class="dm">Cloudflare creates CNAME record immediately</span>
+
+<span class="dm">DNS propagation timeline:</span>
+<span class="dg">1-2 min:</span>   <span class="dm">Cloudflare's own resolvers know (1.1.1.1 etc.)</span>
+<span class="dg">2-5 min:</span>   <span class="dm">Most major resolvers updated (Google 8.8.8.8, etc.)</span>
+<span class="da">5-30 min:</span>  <span class="dm">Regional and ISP resolvers updated</span>
+<span class="dr">Up to 24h:</span> <span class="dm">Rare edge cases — resolvers ignoring TTL</span>
+
+<span class="dm">Test if ready:</span> <span class="dg">nslookup newapp.dustyserver.co.in</span>
+<span class="dm">Ready when it returns Cloudflare IPs (104.21.x.x or 172.67.x.x)</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>If a subdomain works from your phone on mobile data but not from your PC at home — your home router or ISP's DNS is caching the old value. Try incognito mode (browser cache bypass) or flush your PC's DNS: <code>ipconfig /flushdns</code> on Windows.</span>
+        </div>
+      </div>
+
+    </div><!-- end records -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-dns">
+        <div class="section-eyebrow">01 — DNS diagnostics</div>
+        <div class="section-title">DNS checking and diagnostic commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">nslookup dustyserver.co.in</div><div class="cmd-desc">Basic DNS lookup — shows IP address the domain resolves to. Should return Cloudflare IPs.</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup -type=NS dustyserver.co.in</div><div class="cmd-desc">Look up nameservers for the domain — should return kobe.ns.cloudflare.com and saanvi.ns.cloudflare.com after propagation.</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup -type=CNAME flask.dustyserver.co.in</div><div class="cmd-desc">Look up CNAME record for a specific subdomain — shows the tunnel endpoint it points to.</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup -type=MX dustyserver.co.in</div><div class="cmd-desc">Look up mail exchange records — useful when setting up email in the future.</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig dustyserver.co.in</div><div class="cmd-desc">Detailed DNS query output — shows full response including TTL, query time, and which server answered. Install: sudo apt install dnsutils</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig dustyserver.co.in +short</div><div class="cmd-desc">Dig with short output — just the IP addresses, nothing else.</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig NS dustyserver.co.in</div><div class="cmd-desc">Query nameserver records with dig — more detail than nslookup.</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig @8.8.8.8 dustyserver.co.in</div><div class="cmd-desc">Query specifically through Google DNS — bypasses your local resolver cache to get a fresh answer.</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig @1.1.1.1 dustyserver.co.in</div><div class="cmd-desc">Query through Cloudflare DNS — shows what Cloudflare returns for the domain.</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig +trace dustyserver.co.in</div><div class="cmd-desc">Trace the full DNS resolution path — shows each step from root servers to Cloudflare nameservers. Educational and useful for debugging.</div></div>
+          <div class="cmd-row"><div class="cmd-code">ipconfig /flushdns</div><div class="cmd-desc">Windows — flush the local DNS cache. Run when a subdomain works on mobile but not on your PC.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo resolvectl flush-caches</div><div class="cmd-desc">Linux — flush systemd-resolved DNS cache on spserver.</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during domain setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Domain showed "On Hold" after purchase — unusable</div>
+          <div class="bb-body">
+            Immediately after purchasing dustyserver.co.in on GoDaddy, the domain showed status "On Hold" in the GoDaddy dashboard. Attempts to add it to Cloudflare failed or showed it as unverified.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Check email inbox — click GoDaddy's verification link</div>
+          <div class="fb-body">
+            GoDaddy sent a verification email to the registered email address immediately after purchase. ICANN requires all new domain registrations to verify the registrant's email within 15 days — if not verified, the domain is suspended. Opening the email and clicking "Verify" changed the domain status from "On Hold" to "Active" within minutes.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Nameserver change in GoDaddy not taking effect</div>
+          <div class="bb-body">
+            After updating nameservers in GoDaddy to Cloudflare's, running <code>nslookup -type=NS dustyserver.co.in</code> still returned GoDaddy's nameservers after 30 minutes. Cloudflare dashboard still showed "Pending" status.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Resolution</div>
+          <div class="fb-title">Normal propagation delay — wait and verify again</div>
+          <div class="fb-body">
+            This was normal DNS propagation time — not an error. The .in TLD registry takes time to update their records after a nameserver change is submitted. After waiting ~2 hours and running <code>nslookup</code> again, Cloudflare's nameservers were returned. Cloudflare dashboard also changed from "Pending" to "Active". No action was required — just patience.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Third-level subdomain (flask.test.dustyserver.co.in) caused DNS issues</div>
+          <div class="bb-body">
+            During Flask app setup, used <code>flask.test.dustyserver.co.in</code> as the subdomain. The <code>cloudflared tunnel route dns</code> command ran without error, but the subdomain either didn't resolve or showed SSL certificate errors.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Switch to second-level subdomain — flask.dustyserver.co.in</div>
+          <div class="fb-body">
+            Cloudflare's free plan SSL certificates cover <code>*.dustyserver.co.in</code> (one level of wildcard) but not <code>*.*.dustyserver.co.in</code> (two levels). A third-level subdomain like <code>flask.test.dustyserver.co.in</code> is not covered by the wildcard certificate. The fix was to use <code>flask.dustyserver.co.in</code> directly — a single-level subdomain covered by Cloudflare's certificate. Works perfectly since.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common DNS and domain problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Domain not resolving — nslookup returns nothing or NXDOMAIN</div>
+          <div class="ts-body">Causes and fixes: (1) Nameservers not propagated yet — wait and check again with <code>nslookup -type=NS dustyserver.co.in</code>. (2) DNS record not created — check Cloudflare dashboard DNS tab, create the missing record. (3) Domain "On Hold" in GoDaddy — verify email. (4) Domain expired — renew in GoDaddy dashboard. (5) Wrong DNS record type — ensure CNAME points to the correct tunnel endpoint.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">SSL certificate error — "not secure" warning in browser</div>
+          <div class="ts-body">Possible causes: (1) Third-level subdomain not covered by wildcard certificate — switch to second-level subdomain. (2) Cloudflare SSL mode set to "Off" — check SSL/TLS settings in dashboard. (3) Tunnel is bypassed and browser is connecting directly to Nginx on HTTP — check Cloudflare proxy status (orange cloud icon in DNS tab must be enabled).</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Subdomain works on mobile data but not on home PC</div>
+          <div class="ts-body">Your home router or ISP's DNS server is caching the old DNS record. Fix: (1) Try incognito window — bypasses browser cache but not OS/router cache. (2) Flush Windows DNS: <code>ipconfig /flushdns</code> in Command Prompt. (3) Restart router to clear its DNS cache. (4) Change your PC's DNS to 8.8.8.8 temporarily to bypass ISP's slow-updating resolver.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Cloudflare shows domain as "Pending" for more than 24 hours</div>
+          <div class="ts-body">In rare cases, the .in TLD registry is slow to propagate nameserver changes. Check: (1) Verify you saved the correct Cloudflare nameservers in GoDaddy — copy-paste from Cloudflare dashboard, don't type from memory. (2) Run <code>dig +trace dustyserver.co.in</code> to see which nameservers are actually responding. (3) Contact GoDaddy support if it has been more than 48 hours — may need manual intervention.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">NS and SOA records in Cloudflare can't be deleted</div>
+          <div class="ts-body">This is expected and correct. NS records define the authoritative nameservers — they are required for the domain to work. SOA is the zone's master record — also required. Cloudflare protects these records and won't let you delete them. They are auto-managed by Cloudflare. No action needed.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to check if a record propagated globally</div>
+          <div class="ts-body">Use <b>dnschecker.org</b> or <b>whatsmydns.net</b> — these tools check your domain from multiple locations around the world simultaneously and show where propagation has completed. Useful when you want to know if a change has reached specific regions (India, US, Europe etc.).</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Email Routing</b> — get free @dustyserver.co.in email addresses that forward to your Gmail. Set up in Cloudflare dashboard → Email → Email Routing. Creates MX and TXT records automatically. Great for professional contact address.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Transfer domain to Cloudflare Registrar</b> — Cloudflare sells domains at cost price (zero markup). When dustyserver.co.in comes up for renewal, transfer it to Cloudflare Registrar for cheaper renewal fees and tighter integration. Note: .co.in may not be supported yet — check Cloudflare's supported TLDs list.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Wildcard subdomain</b> — create a wildcard CNAME record <code>*.dustyserver.co.in → tunnel</code> so any subdomain you create in cloudflared config automatically resolves without a separate DNS record. Requires Cloudflare Pro plan for wildcard proxying.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>SPF, DKIM, DMARC records</b> — email authentication records. If you set up email sending from spserver (newsletters, notifications), these TXT records tell receiving servers your emails are legitimate and prevent them from going to spam.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare Page Rules</b> — create rules like "redirect all http:// to https://" or "cache everything at /assets/*" or "bypass cache for /api/*". More granular control over how Cloudflare handles different URL patterns on your domain.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Additional domains</b> — add more domains to the same Cloudflare account and point them to the same tunnel. Each domain gets its own set of DNS records but they can all route through spserver. Useful for hosting multiple projects.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','records','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

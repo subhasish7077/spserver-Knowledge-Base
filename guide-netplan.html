@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Static IP with Netplan — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+
+.main{flex:1;min-width:0;}
+
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:35%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.blue{color:var(--blue);}
+.kv-table .val.amber{color:var(--amber);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+
+/* LINE EXPLAIN — side by side code + explanation */
+.le-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+.le-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);}
+.le-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.le-table tr:last-child td{border-bottom:none;}
+.le-code{font-family:var(--mono);font-size:12px;color:var(--blue);background:#080b10;white-space:nowrap;width:40%;}
+.le-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+.le-desc b{color:var(--text);font-weight:500;}
+
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:260px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+
+/* blocker banner */
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+  .le-table{display:block;overflow-x:auto;}
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Static IP with Netplan</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-dhcp')">Why static IP</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-netplan')">What is Netplan</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-subnet')">Subnet masks</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-dns')">What is DNS</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('network-diagram')">Network diagram</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('alternatives')">Alternatives</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-udev')">Step 1 — udev rename</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-yaml')">Step 2 — Write YAML</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-apply')">Step 3 — Apply</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Step 4 — Verify</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-full')">Full config file</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-explained')">Line by line</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-netplan')">Netplan commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-network')">Network commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 2 of 14</div>
+      <h1 class="gh-title">Static IP with <span>Netplan</span></h1>
+      <p class="gh-sub">Giving spserver a permanent, fixed IP address so SSH, Samba, and Cloudflare Tunnel always know where to find it — regardless of reboots.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config file</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-dhcp">
+        <div class="section-eyebrow">01 — The problem</div>
+        <div class="section-title">Why a static IP is non-negotiable for a server</div>
+        <p class="section-body">
+          By default, your router assigns IP addresses automatically using <b>DHCP</b> (Dynamic Host Configuration Protocol). Every device that connects — your PC, phone, server — gets an IP from a pool. The problem is that IP can change. Today spserver is 192.168.31.150, after a reboot it might be 192.168.31.92.
+        </p>
+        <p class="section-body">
+          For a desktop or phone this is fine — you don't type IP addresses to use them. But for a server, the IP address is how everything finds it. SSH connections, Samba drive mappings, Cloudflare Tunnel configuration, and any other service that points to the server by IP — all break the moment the IP changes.
+        </p>
+        <div class="diagram">
+<span class="dm">Without static IP — DHCP assigns random IPs:</span>
+<span class="da">Monday:   spserver → 192.168.31.150</span>   <span class="dm">← SSH works</span>
+<span class="dr">Tuesday:  spserver → 192.168.31.92</span>    <span class="dm">← SSH broken, Samba broken</span>
+<span class="dr">          ssh sipu@192.168.31.150</span>      <span class="dm">← connection refused, wrong IP</span>
+
+<span class="dm">With static IP — always the same:</span>
+<span class="dg">Every day: spserver → 192.168.31.150</span>  <span class="dm">← always works</span>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>A static IP is one of the first things configured on any server — home lab or production. Everything else in this knowledge base depends on spserver always being at 192.168.31.150.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-netplan">
+        <div class="section-eyebrow">02 — The tool</div>
+        <div class="section-title">What is Netplan</div>
+        <p class="section-body">
+          Netplan is Ubuntu's network configuration abstraction layer. Instead of configuring the network backend directly, you write a simple <b>YAML file</b> describing what you want — static IP, gateway, DNS — and Netplan translates that into the correct configuration for the backend it uses.
+        </p>
+        <p class="section-body">
+          On Ubuntu Server, the backend is <b>systemd-networkd</b>. On Ubuntu Desktop it is NetworkManager. Netplan sits above both and you write the same YAML regardless of what's underneath.
+        </p>
+        <div class="diagram">
+<span class="dm">You write:</span>  <span class="dg">/etc/netplan/01-netcfg.yaml</span>  <span class="dm">(simple YAML)</span>
+         <span class="dm">↓</span>
+<span class="db">Netplan reads and validates the YAML</span>
+         <span class="dm">↓</span>
+<span class="da">systemd-networkd</span>  <span class="dm">(the actual backend that manages the interface)</span>
+         <span class="dm">↓</span>
+<span class="dg">ethusb0 gets IP 192.168.31.150 — permanently</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Netplan has been the default network configuration tool on Ubuntu since version 18.04. The older <code>/etc/network/interfaces</code> method still works but is deprecated and not recommended on modern Ubuntu.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-subnet">
+        <div class="section-eyebrow">03 — Concept</div>
+        <div class="section-title">Understanding subnet masks — what /24 means</div>
+        <p class="section-body">
+          When we write <code>192.168.31.150/24</code>, the <b>/24</b> is a subnet mask in CIDR (Classless Inter-Domain Routing) notation. It tells the operating system which part of the IP address identifies the network and which part identifies the device.
+        </p>
+        <p class="section-body">
+          <b>/24</b> means the first 24 bits (the first three numbers) define the network. So all devices with 192.168.31.x are on the same network — they can talk to each other directly without going through a router or the internet.
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Notation</th><th>Network range</th><th>Max devices</th><th>Typical use</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">/24 <span style="font-size:10px;color:var(--green);font-family:var(--mono);margin-left:4px;">← our setup</span></td>
+              <td class="val">192.168.31.0 – 192.168.31.255</td>
+              <td class="val">254</td>
+              <td class="desc">Home and small office networks</td>
+            </tr>
+            <tr>
+              <td class="key">/16</td>
+              <td class="val">192.168.0.0 – 192.168.255.255</td>
+              <td class="val">65,534</td>
+              <td class="desc">Larger corporate networks</td>
+            </tr>
+            <tr>
+              <td class="key">/8</td>
+              <td class="val">10.0.0.0 – 10.255.255.255</td>
+              <td class="val">16 million</td>
+              <td class="desc">Large enterprise, ISP internal</td>
+            </tr>
+            <tr>
+              <td class="key">/32</td>
+              <td class="val">Single IP address only</td>
+              <td class="val">1</td>
+              <td class="desc">Host-specific routes, firewall rules</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          In our Netplan config, <code>192.168.31.150/24</code> tells the OS — my IP is 150, I'm on the 192.168.31.x network, and anything in that range is reachable directly. Everything else goes through the gateway (192.168.31.1, the router).
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-dns">
+        <div class="section-eyebrow">04 — Concept</div>
+        <div class="section-title">What are nameservers / DNS</div>
+        <p class="section-body">
+          DNS (Domain Name System) translates human-readable domain names like <code>google.com</code> into IP addresses that computers actually use. Without DNS configured on your server, you could ping 8.8.8.8 (an IP) but not ping google.com (a domain name).
+        </p>
+        <p class="section-body">
+          In the Netplan config we specify <b>8.8.8.8</b> (Google's primary DNS) and <b>8.8.4.4</b> (Google's secondary). Every time spserver needs to look up a domain — for apt update, curl, cloudflared — it asks these servers.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">8.8.8.8 / 8.8.4.4</div>
+            <div class="ic-body">Google Public DNS. Fast, reliable, globally available. Default choice for most servers. Zero configuration needed beyond adding to Netplan.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">1.1.1.1 / 1.0.0.1</div>
+            <div class="ic-body">Cloudflare DNS. Fastest DNS resolver in the world according to independent benchmarks. Privacy-focused. Valid alternative to Google DNS.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="network-diagram">
+        <div class="section-eyebrow">05 — Architecture</div>
+        <div class="section-title">Full network diagram</div>
+        <div class="diagram">
+<span class="dm">                    Internet</span>
+                        <span class="dm">↕</span>
+<span class="dr">         Airtel CG-NAT (100.220.x.x WAN)</span>   <span class="dm">← blocks all incoming</span>
+                        <span class="dm">↕</span>
+<span class="da">         Airtel Modem (192.168.1.1)</span>
+                        <span class="dm">↕</span>
+<span class="da">         Backup Router (192.168.31.1)</span>        <span class="dm">← our default gateway</span>
+                <span class="dm">↕               ↕</span>
+<span class="dg">    spserver              </span><span class="db">  Your PC</span>
+<span class="dg">    192.168.31.150        </span><span class="db">  192.168.31.7</span>
+<span class="dg">    ethusb0 (USB eth)     </span><span class="db">  (DHCP — changes sometimes)</span>
+<span class="dg">    static — never changes</span>
+        </div>
+        <p class="section-body">
+          The router at 192.168.31.1 is the <b>default gateway</b> — all traffic that isn't destined for the local 192.168.31.x range gets sent there first. The router then decides where it goes.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="alternatives">
+        <div class="section-eyebrow">06 — Alternatives</div>
+        <div class="section-title">Other ways to configure a static IP</div>
+        <table class="kv-table">
+          <thead><tr><th>Method</th><th>Status</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Netplan YAML <span style="font-size:10px;color:var(--green);font-family:var(--mono);margin-left:4px;">chosen</span></td>
+              <td class="val green">Used</td>
+              <td class="desc">Modern Ubuntu standard. Simple YAML, handles everything via systemd-networkd.</td>
+            </tr>
+            <tr>
+              <td class="key">/etc/network/interfaces</td>
+              <td class="val amber">Deprecated</td>
+              <td class="desc">Old Debian/Ubuntu method. Still works but deprecated on Ubuntu 18.04+. Mixing with Netplan causes conflicts.</td>
+            </tr>
+            <tr>
+              <td class="key">NetworkManager (nmcli)</td>
+              <td class="val">Desktop tool</td>
+              <td class="desc">Designed for desktops and laptops switching between WiFi networks. Overkill for a server. Ubuntu Server uses systemd-networkd instead.</td>
+            </tr>
+            <tr>
+              <td class="key">DHCP reservation on router</td>
+              <td class="val">Valid alternative</td>
+              <td class="desc">Configure the router to always give spserver the same IP based on its MAC address. No server-side config needed. Depends on the router — if you change routers, the reservation is lost.</td>
+            </tr>
+            <tr>
+              <td class="key">ip addr add (manual)</td>
+              <td class="val">Temporary only</td>
+              <td class="desc">Manually assign an IP via ip command. Does not persist across reboots. Only useful for temporary testing.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-udev">
+        <div class="section-eyebrow">01 — Before Netplan</div>
+        <div class="section-title">Step 1 — Rename the interface with udev</div>
+        <p class="section-body">
+          The USB ethernet adapter had a long auto-generated name like <code>enx00e04c680bc2</code> based on its MAC address. This needed to be renamed to <code>ethusb0</code> before writing the Netplan config — because the interface name in the YAML must match the actual interface name exactly.
+        </p>
+        <p class="section-body">
+          See the dedicated <b>udev guide</b> for the full rename process. After the rename and reboot, <code>ip link show</code> shows <code>ethusb0</code> — and that is the name used in Netplan.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>If your interface name is different from ethusb0, replace it everywhere in the Netplan YAML. The name must exactly match what <code>ip link show</code> shows.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-yaml">
+        <div class="section-eyebrow">02 — Write the config</div>
+        <div class="section-title">Step 2 — Create the Netplan YAML file</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Open the config file</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Netplan reads all <code>.yaml</code> files from <code>/etc/netplan/</code> alphabetically. The file is usually named with a number prefix (01-) to control ordering. The name after the prefix can be anything — we used <b>netcfg</b> to indicate it is the network config.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div>
+                <div class="code-filename">bash</div>
+                <button class="code-copy" onclick="copyCode(this)">copy</button>
+              </div>
+              <pre><span class="cm"># Open the Netplan config file for editing</span>
+<span class="nm">sudo nano</span> /etc/netplan/01-netcfg.yaml
+
+<span class="cm"># If the file already exists, check what's there first</span>
+<span class="nm">cat</span> /etc/netplan/01-netcfg.yaml
+
+<span class="cm"># List all files in netplan directory</span>
+<span class="nm">ls -la</span> /etc/netplan/</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Write the YAML config</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why"><b>YAML is space-sensitive.</b> Every indent must be exactly 2 spaces — never tabs, never 3 or 4 spaces. A single wrong indent will silently break networking and lock you out of SSH. Always double-check indentation before applying.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div>
+                <div class="code-filename">/etc/netplan/01-netcfg.yaml</div>
+                <button class="code-copy" onclick="copyCode(this)">copy</button>
+              </div>
+              <pre><span class="kw">network</span>:
+  <span class="nm">version</span>: <span class="str">2</span>
+  <span class="nm">renderer</span>: <span class="str">networkd</span>
+  <span class="kw">ethernets</span>:
+    <span class="nm">ethusb0</span>:
+      <span class="nm">dhcp4</span>: <span class="str">false</span>
+      <span class="nm">dhcp6</span>: <span class="str">false</span>
+      <span class="nm">optional</span>: <span class="str">false</span>
+      <span class="nm">addresses</span>:
+        - <span class="str">192.168.31.150/24</span>
+      <span class="kw">routes</span>:
+        - <span class="nm">to</span>: <span class="str">default</span>
+          <span class="nm">via</span>: <span class="str">192.168.31.1</span>
+      <span class="kw">nameservers</span>:
+        <span class="nm">addresses</span>:
+          - <span class="str">8.8.8.8</span>
+          - <span class="str">8.8.4.4</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>Use <b>Ctrl+X → Y → Enter</b> to save and exit nano. After saving, do not apply yet — test first with <code>sudo netplan try</code>.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-apply">
+        <div class="section-eyebrow">03 — Apply safely</div>
+        <div class="section-title">Step 3 — Test and apply the config</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Test the config first (safe)</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why"><code>netplan try</code> applies the config temporarily. If anything goes wrong — SSH drops, you lose network — it automatically reverts after 120 seconds. This is the safe way to test. Only use <code>netplan apply</code> after confirming <code>try</code> worked.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div>
+                <div class="code-filename">bash</div>
+                <button class="code-copy" onclick="copyCode(this)">copy</button>
+              </div>
+              <pre><span class="cm"># Test config — auto-reverts in 120 seconds if you don't confirm</span>
+<span class="nm">sudo netplan try</span>
+
+<span class="cm"># If you see "Do you want to keep these settings?" — network is working</span>
+<span class="cm"># Press Enter to confirm and keep the changes</span>
+
+<span class="cm"># If SSH drops after running this — wait 120 seconds and reconnect</span>
+<span class="cm"># Netplan will have reverted to old settings automatically</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Apply permanently</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Once <code>netplan try</code> confirms everything works, apply permanently. This writes the config to systemd-networkd and persists across reboots.</p>
+            <div class="code-block">
+              <div class="code-header">
+                <div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div>
+                <div class="code-filename">bash</div>
+                <button class="code-copy" onclick="copyCode(this)">copy</button>
+              </div>
+              <pre><span class="nm">sudo netplan apply</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Verify</div>
+        <div class="section-title">Step 4 — Confirm it worked</div>
+        <div class="code-block">
+          <div class="code-header">
+            <div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div>
+            <div class="code-filename">bash — run these after applying</div>
+            <button class="code-copy" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="cm"># Check the IP was assigned correctly</span>
+<span class="nm">ip addr show ethusb0</span>
+<span class="cm"># Look for: inet 192.168.31.150/24</span>
+
+<span class="cm"># Check the default route is correct</span>
+<span class="nm">ip route show</span>
+<span class="cm"># Look for: default via 192.168.31.1 dev ethusb0</span>
+
+<span class="cm"># Test router is reachable</span>
+<span class="nm">ping -c 3 192.168.31.1</span>
+
+<span class="cm"># Test internet connectivity (IP, no DNS)</span>
+<span class="nm">ping -c 3 8.8.8.8</span>
+
+<span class="cm"># Test DNS resolution works</span>
+<span class="nm">ping -c 3 google.com</span>
+
+<span class="cm"># View full interface status from systemd-networkd</span>
+<span class="nm">networkctl status ethusb0</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>If all three pings succeed — router reachable, internet reachable, DNS working — the static IP is correctly configured and will persist across every reboot.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-full">
+        <div class="section-eyebrow">01 — Full file</div>
+        <div class="section-title">Complete Netplan config</div>
+        <div class="code-block">
+          <div class="code-header">
+            <div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div>
+            <div class="code-filename">/etc/netplan/01-netcfg.yaml</div>
+            <button class="code-copy" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><span class="kw">network</span>:
+  <span class="nm">version</span>: <span class="str">2</span>
+  <span class="nm">renderer</span>: <span class="str">networkd</span>
+  <span class="kw">ethernets</span>:
+    <span class="nm">ethusb0</span>:
+      <span class="nm">dhcp4</span>: <span class="str">false</span>
+      <span class="nm">dhcp6</span>: <span class="str">false</span>
+      <span class="nm">optional</span>: <span class="str">false</span>
+      <span class="nm">addresses</span>:
+        - <span class="str">192.168.31.150/24</span>
+      <span class="kw">routes</span>:
+        - <span class="nm">to</span>: <span class="str">default</span>
+          <span class="nm">via</span>: <span class="str">192.168.31.1</span>
+      <span class="kw">nameservers</span>:
+        <span class="nm">addresses</span>:
+          - <span class="str">8.8.8.8</span>
+          - <span class="str">8.8.4.4</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-explained">
+        <div class="section-eyebrow">02 — Line by line</div>
+        <div class="section-title">Every line explained</div>
+        <table class="le-table">
+          <thead><tr><th style="width:38%">Line</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">network:</td><td class="le-desc">Root key — everything must be nested under this.</td></tr>
+            <tr><td class="le-code">version: 2</td><td class="le-desc">Netplan config format version. Always 2 on modern Ubuntu. Do not change.</td></tr>
+            <tr><td class="le-code">renderer: networkd</td><td class="le-desc">Use systemd-networkd as the backend. Correct for Ubuntu Server. Desktop uses <code>NetworkManager</code> instead.</td></tr>
+            <tr><td class="le-code">ethernets:</td><td class="le-desc">Config section for ethernet interfaces. WiFi would go under <code>wifis:</code> instead.</td></tr>
+            <tr><td class="le-code">ethusb0:</td><td class="le-desc">The interface name. Must exactly match what <code>ip link show</code> returns. Renamed from the long MAC-based name via udev.</td></tr>
+            <tr><td class="le-code">dhcp4: false</td><td class="le-desc">Disable IPv4 auto-assignment (DHCP). We are setting our own fixed address instead.</td></tr>
+            <tr><td class="le-code">dhcp6: false</td><td class="le-desc">Disable IPv6 auto-assignment. Not needed for our setup.</td></tr>
+            <tr><td class="le-code">optional: false</td><td class="le-desc">The system waits for this interface to come up before finishing boot. Critical — without this, SSH may not be available immediately after reboot.</td></tr>
+            <tr><td class="le-code">addresses:</td><td class="le-desc">List of IP addresses to assign to this interface.</td></tr>
+            <tr><td class="le-code">- 192.168.31.150/24</td><td class="le-desc">Our fixed IP. The /24 means this is on the 192.168.31.x network. Devices sharing this prefix can communicate directly.</td></tr>
+            <tr><td class="le-code">routes:</td><td class="le-desc">Network routing rules — how traffic should flow.</td></tr>
+            <tr><td class="le-code">to: default</td><td class="le-desc">This rule applies to all traffic not destined for the local network.</td></tr>
+            <tr><td class="le-code">via: 192.168.31.1</td><td class="le-desc">The default gateway — send all non-local traffic to the backup router at this address.</td></tr>
+            <tr><td class="le-code">nameservers:</td><td class="le-desc">DNS configuration — how to resolve domain names to IP addresses.</td></tr>
+            <tr><td class="le-code">- 8.8.8.8</td><td class="le-desc">Google's primary DNS server. First choice for name resolution.</td></tr>
+            <tr><td class="le-code">- 8.8.4.4</td><td class="le-desc">Google's secondary DNS. Used as fallback if 8.8.8.8 is unreachable.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-netplan">
+        <div class="section-eyebrow">01 — Netplan</div>
+        <div class="section-title">Netplan commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo netplan try</div><div class="cmd-desc">Apply config temporarily. Auto-reverts in 120s if you don't confirm. Always use this before apply.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo netplan apply</div><div class="cmd-desc">Apply config permanently. Use after netplan try confirms it works.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo netplan generate</div><div class="cmd-desc">Generate backend config files without applying. Shows what systemd-networkd will receive.</div></div>
+          <div class="cmd-row"><div class="cmd-code">netplan get</div><div class="cmd-desc">Print the current active Netplan configuration in YAML format.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo netplan --debug apply</div><div class="cmd-desc">Apply with verbose debug output — useful for diagnosing errors.</div></div>
+          <div class="cmd-row"><div class="cmd-code">cat /etc/netplan/01-netcfg.yaml</div><div class="cmd-desc">View the current config file content.</div></div>
+          <div class="cmd-row"><div class="cmd-code">ls /etc/netplan/</div><div class="cmd-desc">List all Netplan config files. Applied alphabetically.</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-network">
+        <div class="section-eyebrow">02 — Network diagnostics</div>
+        <div class="section-title">Network diagnostic commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">ip addr show</div><div class="cmd-desc">Show all interfaces and their assigned IP addresses</div></div>
+          <div class="cmd-row"><div class="cmd-code">ip addr show ethusb0</div><div class="cmd-desc">Show details for the specific ethusb0 interface only</div></div>
+          <div class="cmd-row"><div class="cmd-code">ip route show</div><div class="cmd-desc">Show the routing table — check default gateway is 192.168.31.1</div></div>
+          <div class="cmd-row"><div class="cmd-code">ip link show</div><div class="cmd-desc">Show all network interfaces (including their state — UP or DOWN)</div></div>
+          <div class="cmd-row"><div class="cmd-code">networkctl status</div><div class="cmd-desc">Show status of all network links managed by systemd-networkd</div></div>
+          <div class="cmd-row"><div class="cmd-code">networkctl status ethusb0</div><div class="cmd-desc">Detailed status for ethusb0 — link speed, state, addresses</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 3 192.168.31.1</div><div class="cmd-desc">Ping the router 3 times — test local network connectivity</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 3 8.8.8.8</div><div class="cmd-desc">Ping Google DNS by IP — test internet (no DNS involved)</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 3 google.com</div><div class="cmd-desc">Ping Google by domain — tests DNS resolution is working</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup google.com</div><div class="cmd-desc">DNS lookup — shows which DNS server answered and what IP was returned</div></div>
+          <div class="cmd-row"><div class="cmd-code">dig google.com</div><div class="cmd-desc">Detailed DNS query — shows full DNS response (install: sudo apt install dnsutils)</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl ifconfig.me</div><div class="cmd-desc">Show the public IP address as seen from the internet</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ss -tlnp</div><div class="cmd-desc">Show all open TCP ports and what process is listening</div></div>
+          <div class="cmd-row"><div class="cmd-code">traceroute google.com</div><div class="cmd-desc">Show the network path to a destination — useful for diagnosing routing issues</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">dhclient command not found</div>
+          <div class="bb-body">
+            After setting up the interface, tried to request an IP manually using <code>dhclient ethusb0</code>. Got "command not found". Tried <code>sudo apt install dhclient</code> — package doesn't exist.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Use netplan apply instead</div>
+          <div class="fb-body">
+            Ubuntu 22.04+ removed the old <code>isc-dhcp-client</code> package (which provided dhclient) entirely. It has been replaced by systemd-networkd, which Netplan manages. The correct command is <code>sudo netplan apply</code> — it handles both DHCP and static IP assignment natively. No separate dhclient needed or available.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Interface name in YAML didn't match actual name</div>
+          <div class="bb-body">
+            Initially wrote the YAML with a guessed interface name before confirming the actual name with <code>ip link show</code>. The mismatch meant the config applied but had no effect on the actual interface.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Always confirm interface name first</div>
+          <div class="fb-body">
+            Run <code>ip link show</code> first, find the actual interface name, then write the YAML. After the udev rename (separate guide), the name became <code>ethusb0</code> — which is what the YAML uses. The udev rename must be done and a reboot completed before writing the Netplan config.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Lost SSH access after applying Netplan</div>
+          <div class="ts-body">A YAML indentation error caused networking to fail. You can no longer reach the server over SSH. Options: (1) Use Tailscale if it was already installed — connect via Tailscale IP. (2) Physically connect a keyboard and monitor. Once on the server: check the YAML with <code>cat /etc/netplan/01-netcfg.yaml</code>, fix any indentation errors, run <code>sudo netplan try</code>. Prevention: always use <code>netplan try</code> before <code>netplan apply</code>.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">YAML parse error — invalid syntax</div>
+          <div class="ts-body">Running <code>sudo netplan apply</code> returns a YAML error like "mapping values are not allowed here". Cause: tabs used instead of spaces, or wrong indentation level. Fix: open the file with <code>sudo nano /etc/netplan/01-netcfg.yaml</code>, check every indent is exactly 2 spaces, look for any tab characters (shown as wider gaps in nano). Use the copy button in this guide to get a clean version.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">IP assigned but cannot ping router</div>
+          <div class="ts-body">The IP was set but the gateway is wrong. Check <code>ip route show</code> — the default route should show <code>via 192.168.31.1</code>. If it shows a different gateway, update the <code>via</code> line in the YAML and reapply. Also check the ethernet cable is physically connected and the interface is UP: <code>ip link show ethusb0</code> should show <code>state UP</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Internet works but DNS is broken — can ping 8.8.8.8 but not google.com</div>
+          <div class="ts-body">The nameservers in the YAML are not being applied. Check if <code>/etc/resolv.conf</code> contains the right DNS servers. Run <code>cat /etc/resolv.conf</code> — should show <code>nameserver 8.8.8.8</code>. If not, the nameservers section of the YAML may have incorrect indentation. Fix indentation and reapply.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Server gets correct IP but changes after reboot</div>
+          <div class="ts-body">The Netplan config file was saved but <code>netplan apply</code> was never run, so systemd-networkd didn't receive the new config. Or there are multiple Netplan files in <code>/etc/netplan/</code> and one overrides the other. Check: <code>ls /etc/netplan/</code>. Remove any old files, ensure only <code>01-netcfg.yaml</code> exists, run <code>sudo netplan apply</code>, then reboot to confirm.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">networkctl shows "degraded" or "no-carrier"</div>
+          <div class="ts-body">"no-carrier" means the ethernet cable is not connected or the switch/router port is not active. Check the physical cable. "degraded" usually means one interface is up but another has an issue — check which one with <code>networkctl status</code>. If the USB adapter is the issue, unplug and replug it.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section" id="f-scope">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>DHCP reservation on router</b> — as a backup, configure the router to always assign 192.168.31.150 to spserver based on its MAC address. Belt and suspenders approach.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>IPv6 configuration</b> — add IPv6 support to the Netplan config. Many ISPs provide real public IPv6 addresses even with CG-NAT. This could eliminate the need for Tailscale and Cloudflare Tunnel for some use cases.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple network interfaces</b> — configure both the USB ethernet adapter and the built-in WiFi (if available) as a failover. If the ethernet drops, the server stays connected via WiFi.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Network bonding</b> — combine two ethernet adapters into one logical interface for redundancy or increased bandwidth. More relevant with multiple physical adapters.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Cloudflare DNS (1.1.1.1)</b> — switch nameservers from Google DNS (8.8.8.8) to Cloudflare DNS (1.1.1.1) for faster resolution and better privacy. Minor change — update the nameservers section and reapply.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>VLAN configuration</b> — segment network traffic using VLANs in Netplan. Useful if you add more hardware and want to isolate the server traffic from general home network traffic.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

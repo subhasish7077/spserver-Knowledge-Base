@@ -1,0 +1,1746 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ubuntu Server Install — spserver guide</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: #0a0c10;
+      color: #d4d8e2;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      line-height: 1.75;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    :root {
+      --bg: #0a0c10;
+      --bg2: #10131a;
+      --bg3: #161b24;
+      --bg4: #1c2230;
+      --border: rgba(255, 255, 255, 0.06);
+      --border2: rgba(255, 255, 255, 0.12);
+      --text: #d4d8e2;
+      --text2: #a9acb3;
+      --text3: #fbfcfd;
+      --green: #3ddc84;
+      --green2: rgba(61, 220, 132, 0.12);
+      --blue: #5ba3f5;
+      --blue2: rgba(91, 163, 245, 0.12);
+      --amber: #f0a500;
+      --amber2: rgba(240, 165, 0, 0.10);
+      --red: #f06565;
+      --red2: rgba(240, 101, 101, 0.10);
+      --purple: #b57aff;
+      --mono: 'JetBrains Mono', monospace;
+      --display: 'Bebas Neue', sans-serif;
+      --sans: 'DM Sans', sans-serif;
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--bg4);
+      border-radius: 99px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: linear-gradient(rgba(255, 255, 255, 0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* SCROLL BAR */
+    #spbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      z-index: 9999;
+      width: 0%;
+      transition: width .1s;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: rgba(10, 12, 16, 0.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+      gap: 1rem;
+      z-index: 1000;
+    }
+
+    .nav-back {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text2);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      transition: all .2s;
+      font-family: var(--mono);
+    }
+
+    .nav-back:hover {
+      color: var(--text);
+      border-color: var(--border2);
+      background: var(--bg3);
+    }
+
+    .nav-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border2);
+    }
+
+    .nav-title {
+      font-family: var(--display);
+      font-size: 18px;
+      letter-spacing: 0.06em;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .nav-phase {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--bg3);
+      padding: 3px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+    }
+
+    /* LAYOUT */
+    .layout {
+      display: flex;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 2rem 4rem;
+      gap: 2.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 76px;
+      height: fit-content;
+    }
+
+    .sidebar-prog {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 1rem;
+    }
+
+    .sp-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .sp-bar {
+      height: 3px;
+      background: var(--bg4);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .sp-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+      border-radius: 99px;
+      transition: width .8s ease;
+    }
+
+    .sidebar-section {
+      margin-bottom: 1.25rem;
+    }
+
+    .sidebar-section-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+      padding: 0 4px;
+    }
+
+    .sidebar-link {
+      display: block;
+      font-size: 13px;
+      color: var(--text2);
+      padding: 6px 10px;
+      border-radius: 6px;
+      text-decoration: none;
+      border-left: 2px solid transparent;
+      transition: all .15s;
+      margin-bottom: 1px;
+      cursor: pointer;
+    }
+
+    .sidebar-link:hover {
+      color: var(--text);
+      background: var(--bg3);
+    }
+
+    .sidebar-link.active {
+      color: var(--green);
+      border-left-color: var(--green);
+      background: var(--green2);
+    }
+
+    /* MAIN */
+    .main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    /* GUIDE HEADER */
+    .guide-header {
+      margin-bottom: 2.5rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .gh-eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: .75rem;
+    }
+
+    .gh-title {
+      font-family: var(--display);
+      font-size: clamp(36px, 5vw, 56px);
+      letter-spacing: .04em;
+      line-height: 1;
+      margin-bottom: .75rem;
+      color: var(--text);
+    }
+
+    .gh-title span {
+      color: var(--green);
+    }
+
+    .gh-sub {
+      font-size: 16px;
+      color: var(--text2);
+      line-height: 1.7;
+      max-width: 580px;
+    }
+
+    /* TAB BAR */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 10px 18px;
+      cursor: pointer;
+      color: var(--text2);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all .18s;
+      white-space: nowrap;
+      font-family: var(--sans);
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      color: var(--green);
+      border-bottom-color: var(--green);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* SECTIONS */
+    .section {
+      margin-bottom: 2.5rem;
+      scroll-margin-top: 76px;
+    }
+
+    .section-eyebrow {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 4px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: .5rem;
+    }
+
+    .section-body {
+      font-size: 15px;
+      color: var(--text2);
+      line-height: 1.8;
+      margin-bottom: .75rem;
+    }
+
+    .section-body b {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .section-body code {
+      font-family: var(--mono);
+      font-size: 13px;
+      background: var(--bg3);
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: var(--blue);
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 2rem 0;
+    }
+
+    /* CODE BLOCK */
+    .code-block {
+      background: #080b10;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: .75rem 0;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-dots {
+      display: flex;
+      gap: 5px;
+    }
+
+    .code-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .cd-r {
+      background: #ff5f57;
+    }
+
+    .cd-y {
+      background: #febc2e;
+    }
+
+    .cd-g {
+      background: #28c840;
+    }
+
+    .code-filename {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+    }
+
+    .code-copy {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 3px 10px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .code-copy:hover {
+      color: var(--green);
+      border-color: var(--green);
+    }
+
+    pre {
+      padding: 1rem 1.25rem;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.85;
+      overflow-x: auto;
+      color: var(--text);
+    }
+
+    .kw {
+      color: #c084fc;
+    }
+
+    .str {
+      color: #86efac;
+    }
+
+    .cm {
+      color: #374151;
+      font-style: italic;
+    }
+
+    .nm {
+      color: #60a5fa;
+    }
+
+    .op {
+      color: var(--amber);
+    }
+
+    /* DIAGRAM */
+    .diagram {
+      background: #080b10;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin: .75rem 0;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 2.1;
+      overflow-x: auto;
+    }
+
+    .dg {
+      color: var(--green);
+    }
+
+    .db {
+      color: var(--blue);
+    }
+
+    .da {
+      color: var(--amber);
+    }
+
+    .dr {
+      color: var(--red);
+    }
+
+    .dm {
+      color: var(--text3);
+    }
+
+    /* ALERT */
+    .alert {
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: .75rem 0;
+      font-size: 14px;
+      line-height: 1.7;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .alert-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .alert.info {
+      background: rgba(91, 163, 245, 0.08);
+      border: 1px solid rgba(91, 163, 245, 0.2);
+      color: #93c5fd;
+    }
+
+    .alert.success {
+      background: rgba(61, 220, 132, 0.08);
+      border: 1px solid rgba(61, 220, 132, 0.2);
+      color: #6ee7a0;
+    }
+
+    .alert.warn {
+      background: rgba(240, 165, 0, 0.08);
+      border: 1px solid rgba(240, 165, 0, 0.2);
+      color: #fcd34d;
+    }
+
+    .alert.danger {
+      background: rgba(240, 101, 101, 0.08);
+      border: 1px solid rgba(240, 101, 101, 0.2);
+      color: #fca5a5;
+    }
+
+    /* TWO COL */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: .75rem 0;
+    }
+
+    .info-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+    }
+
+    .ic-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: .4rem;
+    }
+
+    .ic-body {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    .ic-body code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--bg3);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--blue);
+    }
+
+    /* KEY-VALUE TABLE */
+    .kv-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: .75rem 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    .kv-table th {
+      background: var(--bg3);
+      color: var(--text3);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 8px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      font-weight: 500;
+    }
+
+    .kv-table td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .kv-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .kv-table tr:hover td {
+      background: var(--bg3);
+    }
+
+    .kv-table .key {
+      color: var(--text2);
+      font-weight: 500;
+      width: 35%;
+    }
+
+    .kv-table .val {
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .kv-table .val.green {
+      color: var(--green);
+    }
+
+    .kv-table .val.blue {
+      color: var(--blue);
+    }
+
+    .kv-table .val.amber {
+      color: var(--amber);
+    }
+
+    .kv-table .desc {
+      color: var(--text2);
+      font-size: 13px;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-weight: 600;
+      margin-left: 5px;
+      font-family: var(--mono);
+    }
+
+    .tag-g {
+      background: rgba(61, 220, 132, 0.15);
+      color: var(--green);
+    }
+
+    .tag-b {
+      background: rgba(91, 163, 245, 0.15);
+      color: var(--blue);
+    }
+
+    .tag-a {
+      background: rgba(240, 165, 0, 0.15);
+      color: var(--amber);
+    }
+
+    .tag-r {
+      background: rgba(240, 101, 101, 0.15);
+      color: var(--red);
+    }
+
+    /* STEP CARDS */
+    .step-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: .75rem;
+    }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 16px;
+      cursor: pointer;
+      transition: background .15s;
+      user-select: none;
+    }
+
+    .step-header:hover {
+      background: var(--bg3);
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-family: var(--mono);
+      font-weight: 700;
+      color: var(--green);
+      flex-shrink: 0;
+    }
+
+    .step-num.done {
+      background: rgba(61, 220, 132, 0.12);
+      border-color: var(--green);
+    }
+
+    .step-title {
+      font-size: 15px;
+      font-weight: 500;
+      flex: 1;
+      color: var(--text);
+    }
+
+    .step-toggle {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text3);
+      transition: transform .2s;
+    }
+
+    .step-toggle.open {
+      transform: rotate(180deg);
+    }
+
+    .step-body {
+      display: none;
+      padding: 0 16px 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .step-body.open {
+      display: block;
+    }
+
+    .step-why {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.75;
+      margin: 12px 0 8px;
+    }
+
+    .step-why b {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* CMD LIST */
+    .cmd-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .cmd-row {
+      display: flex;
+      gap: 16px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      transition: border-color .15s;
+    }
+
+    .cmd-row:hover {
+      border-color: var(--border2);
+    }
+
+    .cmd-code {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--blue);
+      min-width: 280px;
+      flex-shrink: 0;
+    }
+
+    .cmd-desc {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    /* TROUBLESHOOT */
+    .ts-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+      margin-bottom: .75rem;
+    }
+
+    .ts-card.danger {
+      border-left: 3px solid var(--red);
+    }
+
+    .ts-card.warn {
+      border-left: 3px solid var(--amber);
+    }
+
+    .ts-card.info {
+      border-left: 3px solid var(--blue);
+    }
+
+    .ts-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: .4rem;
+    }
+
+    .ts-body {
+      font-size: 14px;
+      color: var(--text2);
+      line-height: 1.7;
+    }
+
+    .ts-body code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--bg3);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--blue);
+    }
+
+    /* FUTURE SCOPE */
+    .future-box {
+      background: var(--bg2);
+      border: 1px solid rgba(240, 165, 0, 0.2);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .future-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--amber);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 1rem;
+    }
+
+    .future-item {
+      display: flex;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .future-item:last-child {
+      border-bottom: none;
+    }
+
+    .fi-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+      opacity: .5;
+      flex-shrink: 0;
+      margin-top: 8px;
+    }
+
+    .fi-text {
+      color: var(--text2);
+    }
+
+    .fi-text b {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    @media(max-width:768px) {
+      .layout {
+        flex-direction: column;
+        padding: 76px 1rem 3rem;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .cmd-code {
+        min-width: 0;
+      }
+
+      .cmd-row {
+        flex-direction: column;
+        gap: 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="spbar"></div>
+
+  <nav>
+    <a class="nav-back" href="index.html">← home</a>
+    <div class="nav-divider"></div>
+    <div class="nav-title">Ubuntu Server Install</div>
+    <div class="nav-phase">Phase 1 — Linux Foundations</div>
+  </nav>
+
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-prog">
+        <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+        <div class="sp-bar">
+          <div class="sp-fill" id="sp-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Overview</div>
+        <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what')">What is Ubuntu Server</div>
+        <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-server')">Why Server over Desktop</div>
+        <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-lts')">Why LTS</div>
+        <div class="sidebar-link" onclick="switchTab('overview');scrollToId('headless')">Headless servers</div>
+        <div class="sidebar-link" onclick="switchTab('overview');scrollToId('alternatives')">Alternatives</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Setup</div>
+        <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-what-we-did')">What we did</div>
+        <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-first-boot')">First boot steps</div>
+        <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-identity')">Server identity</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Commands</div>
+        <div class="sidebar-link" onclick="switchTab('commands');scrollToId('c-system')">System commands</div>
+        <div class="sidebar-link" onclick="switchTab('commands');scrollToId('c-apt')">Package management</div>
+        <div class="sidebar-link" onclick="switchTab('commands');scrollToId('c-services')">Services</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Reference</div>
+        <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-issues')">Common issues</div>
+        <div class="sidebar-link" onclick="switchTab('future');scrollToId('f-scope')">Future scope</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+      <div class="guide-header">
+        <div class="gh-eyebrow">Phase 1 · Topic 1 of 14</div>
+        <h1 class="gh-title">Ubuntu <span>Server</span> Install</h1>
+        <p class="gh-sub">Converting a spare laptop into a dedicated headless home server — the foundation everything
+          else is built on.</p>
+      </div>
+
+      <!-- TAB BAR -->
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+        <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+        <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+        <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+      </div>
+
+      <!-- ══ OVERVIEW ══ -->
+      <div class="tab-pane active" id="pane-overview">
+
+        <div class="section" id="what">
+          <div class="section-eyebrow">01 — Concept</div>
+          <div class="section-title">What is Ubuntu Server</div>
+          <p class="section-body">
+            Ubuntu Server is a stripped-down version of Ubuntu Linux — no graphical interface, no desktop apps, just the
+            operating system and a terminal. It is designed to run continuously in the background, serving requests,
+            managing files, and running services without anyone sitting at a screen.
+          </p>
+          <p class="section-body">
+            It is the same Ubuntu you may have used on a desktop, but with everything visual removed. You control it
+            entirely through a terminal — either physically connected or, more commonly, over SSH from another machine.
+          </p>
+          <div class="alert info">
+            <span class="alert-icon">ℹ</span>
+            <span>Ubuntu Server powers millions of web servers, cloud instances, home labs, and production systems
+              worldwide. Learning it here on a spare laptop gives you the same skills used in real DevOps work.</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="why-server">
+          <div class="section-eyebrow">02 — Decision</div>
+          <div class="section-title">Why Server edition over Desktop</div>
+          <p class="section-body">
+            This is the first decision made in the project. The spare laptop could have run Ubuntu Desktop — but Server
+            was the right choice for several concrete reasons.
+          </p>
+          <div class="two-col">
+            <div class="info-card">
+              <div class="ic-title" style="color:var(--red)">Ubuntu Desktop — not used</div>
+              <div class="ic-body">Runs a full graphical interface (GNOME). Uses ~1-2GB RAM just for the display.
+                Includes apps like a file manager, browser, office suite. All of this consumes resources that should go
+                to your actual services. It was built for humans sitting at a screen, not for a machine running
+                unattended.</div>
+            </div>
+            <div class="info-card">
+              <div class="ic-title" style="color:var(--green)">Ubuntu Server — chosen</div>
+              <div class="ic-body">No GUI at all. Uses ~300MB RAM at idle. Every resource goes toward your services —
+                SSH, Nginx, Docker, Samba. Terminal-only means less attack surface, less to break, and faster boot. This
+                is how every real production server works.</div>
+            </div>
+          </div>
+          <div class="diagram">
+            <span class="dm">Ubuntu Desktop idle:</span> <span class="dr">~1.5GB RAM used</span> <span class="dm">← GUI,
+              apps, display server</span>
+            <span class="dm">Ubuntu Server idle:</span> <span class="dg">~300MB RAM used</span> <span class="dm">← just
+              the OS and your services</span>
+
+            <span class="dm">That's 1.2GB freed up for Docker containers, databases, and apps</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="why-lts">
+          <div class="section-eyebrow">03 — Decision</div>
+          <div class="section-title">Why 24.04 LTS specifically</div>
+          <p class="section-body">
+            Ubuntu releases two types of versions. <b>LTS (Long Term Support)</b> versions are released every two years
+            and receive security updates for 5 years. <b>Non-LTS</b> versions are released every 6 months and supported
+            for only 9 months.
+          </p>
+          <p class="section-body">
+            For a server you set up once and leave running, this matters enormously. A non-LTS version forces you to
+            upgrade the OS every 9 months. An LTS version lets you set it up and forget it until 2029.
+          </p>
+          <table class="kv-table">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Type</th>
+                <th>Supported until</th>
+                <th>Best for</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="key">24.04 LTS <span class="tag tag-g">chosen</span></td>
+                <td class="val">LTS</td>
+                <td class="val green">April 2029</td>
+                <td class="desc">Servers, production systems, anything long-running</td>
+              </tr>
+              <tr>
+                <td class="key">24.10</td>
+                <td class="val">Non-LTS</td>
+                <td class="val amber">July 2025</td>
+                <td class="desc">Cutting-edge desktop users who want latest features</td>
+              </tr>
+              <tr>
+                <td class="key">22.04 LTS</td>
+                <td class="val">LTS</td>
+                <td class="val">April 2027</td>
+                <td class="desc">Still valid — older but stable alternative</td>
+              </tr>
+              <tr>
+                <td class="key">20.04 LTS</td>
+                <td class="val">LTS</td>
+                <td class="val">April 2025</td>
+                <td class="desc">End of life — avoid for new installs</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="headless">
+          <div class="section-eyebrow">04 — Concept</div>
+          <div class="section-title">What is a headless server</div>
+          <p class="section-body">
+            A <b>headless server</b> is a machine that runs without a monitor, keyboard, or mouse permanently attached.
+            You control it entirely over the network — via SSH from your PC, or via a browser terminal like ttyd.
+          </p>
+          <div class="diagram">
+            <span class="dm">Traditional setup:</span>
+            <span class="db">Monitor + Keyboard + Mouse</span> <span class="dm">──── physically connected ────</span>
+            <span class="dg">Server</span>
+
+            <span class="dm">Headless setup (what we have):</span>
+            <span class="db">Your PC anywhere</span> <span class="dm">──── SSH over network ────</span> <span
+              class="dg">spserver</span>
+            <span class="dm"> ──── browser terminal ──</span> <span class="dg">spserver</span>
+
+            <span class="dg">spserver sits on a shelf with only power + ethernet. No screen ever needed.</span>
+          </div>
+          <div class="alert success">
+            <span class="alert-icon">✓</span>
+            <span>Once SSH is set up (next guide), you never need to physically touch spserver again. Everything is done
+              remotely from your Windows PC or phone.</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="alternatives">
+          <div class="section-eyebrow">05 — Alternatives</div>
+          <div class="section-title">Other OS options considered</div>
+          <table class="kv-table">
+            <thead>
+              <tr>
+                <th>OS</th>
+                <th>Why not chosen</th>
+                <th>Worth trying later?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="key">Debian</td>
+                <td class="desc">More stable, slightly lighter, even less bloat. Ubuntu is based on Debian — nearly
+                  identical. Fewer tutorials available for beginners. Perfectly valid alternative.</td>
+                <td class="val green">Yes</td>
+              </tr>
+              <tr>
+                <td class="key">Arch Linux</td>
+                <td class="desc">Highly customisable, rolling updates, powerful. Very steep learning curve — you build
+                  everything from scratch. Better after you know Linux well.</td>
+                <td class="val green">Yes — later</td>
+              </tr>
+              <tr>
+                <td class="key">Proxmox VE</td>
+                <td class="desc">A hypervisor OS that lets you run multiple VMs on one server. Overkill for now but
+                  excellent next-level project after Kubernetes. Runs on bare metal.</td>
+                <td class="val green">Yes — Phase 4+</td>
+              </tr>
+              <tr>
+                <td class="key">Windows Server</td>
+                <td class="desc">Expensive licensing, heavy resource use. Not suited for web services, Docker, or
+                  open-source tooling. Linux is the industry standard for servers.</td>
+                <td class="val">No</td>
+              </tr>
+              <tr>
+                <td class="key">Raspberry Pi OS</td>
+                <td class="desc">Only relevant for Raspberry Pi hardware (ARM). We are on an x86 laptop. Not applicable
+                  here.</td>
+                <td class="val">No</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div><!-- end overview -->
+
+      <!-- ══ SETUP ══ -->
+      <div class="tab-pane" id="pane-setup">
+
+        <div class="section" id="s-what-we-did">
+          <div class="section-eyebrow">01 — What we did</div>
+          <div class="section-title">The setup in summary</div>
+          <p class="section-body">
+            A spare laptop was repurposed as a dedicated server. Ubuntu Server 24.04 LTS was installed on it directly —
+            wiping whatever was previously on the laptop. After install, the machine was configured with a hostname,
+            user account, and basic system settings. From that point forward, all interaction happens over SSH — the
+            laptop is closed and sits somewhere with power and ethernet.
+          </p>
+          <div class="alert info">
+            <span class="alert-icon">ℹ</span>
+            <span>The Ubuntu Server installer is straightforward — download the ISO, flash to a USB drive using Rufus or
+              Balena Etcher, boot from USB, follow the prompts. During install you set the hostname (spserver) and the
+              first user account (sipu).</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="s-first-boot">
+          <div class="section-eyebrow">02 — First boot</div>
+          <div class="section-title">Steps after first login</div>
+
+          <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">
+              <div class="step-num done">1</div>
+              <div class="step-title">Update the system</div>
+              <div class="step-toggle">▼</div>
+            </div>
+            <div class="step-body">
+              <p class="step-why">The first thing to do on any fresh Ubuntu install is update. The ISO image you
+                downloaded may be weeks or months old — there will be security patches and software updates waiting.</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-dots">
+                    <div class="code-dot cd-r"></div>
+                    <div class="code-dot cd-y"></div>
+                    <div class="code-dot cd-g"></div>
+                  </div>
+                  <div class="code-filename">bash</div>
+                  <button class="code-copy" onclick="copyCode(this)">copy</button>
+                </div>
+                <pre><span class="cm"># Refresh the list of available packages from Ubuntu's servers</span>
+<span class="nm">sudo apt update</span>
+
+<span class="cm"># Download and install all available updates (-y = yes to all prompts)</span>
+<span class="nm">sudo apt upgrade -y</span>
+
+<span class="cm"># Remove packages that were installed as dependencies but no longer needed</span>
+<span class="nm">sudo apt autoremove -y</span></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">
+              <div class="step-num done">2</div>
+              <div class="step-title">Verify hostname and user</div>
+              <div class="step-toggle">▼</div>
+            </div>
+            <div class="step-body">
+              <p class="step-why">Confirm the hostname and username were set correctly during install. These matter —
+                the hostname appears in your terminal prompt and SSH connections, and the username is what you log in
+                with everywhere.</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-dots">
+                    <div class="code-dot cd-r"></div>
+                    <div class="code-dot cd-y"></div>
+                    <div class="code-dot cd-g"></div>
+                  </div>
+                  <div class="code-filename">bash</div>
+                  <button class="code-copy" onclick="copyCode(this)">copy</button>
+                </div>
+                <pre><span class="nm">hostname</span>           <span class="cm"># should print: spserver</span>
+<span class="nm">whoami</span>             <span class="cm"># should print: sipu</span>
+<span class="nm">lsb_release -a</span>     <span class="cm"># confirms: Ubuntu 24.04 LTS</span>
+<span class="nm">uname -r</span>           <span class="cm"># shows current Linux kernel version</span></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">
+              <div class="step-num done">3</div>
+              <div class="step-title">Check system resources</div>
+              <div class="step-toggle">▼</div>
+            </div>
+            <div class="step-body">
+              <p class="step-why">Good to know your baseline — how much RAM, disk, and CPU you have available before
+                adding any services.</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-dots">
+                    <div class="code-dot cd-r"></div>
+                    <div class="code-dot cd-y"></div>
+                    <div class="code-dot cd-g"></div>
+                  </div>
+                  <div class="code-filename">bash</div>
+                  <button class="code-copy" onclick="copyCode(this)">copy</button>
+                </div>
+                <pre><span class="nm">free -h</span>            <span class="cm"># RAM — total, used, available</span>
+<span class="nm">df -h</span>              <span class="cm"># Disk — total, used, free per partition</span>
+<span class="nm">nproc</span>              <span class="cm"># Number of CPU cores</span>
+<span class="nm">lscpu</span>              <span class="cm"># Detailed CPU info</span>
+<span class="nm">htop</span>               <span class="cm"># Interactive real-time resource monitor (install if not present)</span></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">
+              <div class="step-num done">4</div>
+              <div class="step-title">Install essential tools</div>
+              <div class="step-toggle">▼</div>
+            </div>
+            <div class="step-body">
+              <p class="step-why">A fresh Ubuntu Server install is minimal — some useful tools are not included by
+                default. These are safe to install immediately and make everything easier going forward.</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-dots">
+                    <div class="code-dot cd-r"></div>
+                    <div class="code-dot cd-y"></div>
+                    <div class="code-dot cd-g"></div>
+                  </div>
+                  <div class="code-filename">bash</div>
+                  <button class="code-copy" onclick="copyCode(this)">copy</button>
+                </div>
+                <pre><span class="nm">sudo apt install -y</span> \
+  htop \            <span class="cm"># interactive process monitor</span>
+  curl \            <span class="cm"># transfer data from URLs (used constantly)</span>
+  wget \            <span class="cm"># download files from internet</span>
+  git \             <span class="cm"># version control</span>
+  nano \            <span class="cm"># simple terminal text editor</span>
+  net-tools \       <span class="cm"># includes ifconfig, netstat</span>
+  unzip             <span class="cm"># extract zip archives</span></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-header" onclick="toggleStep(this)">
+              <div class="step-num done">5</div>
+              <div class="step-title">Enable automatic security updates</div>
+              <div class="step-toggle">▼</div>
+            </div>
+            <div class="step-body">
+              <p class="step-why">Since this server runs 24/7 and is exposed to the internet via Cloudflare Tunnel,
+                keeping it patched matters. Ubuntu's unattended-upgrades package applies security patches automatically
+                without you having to manually update.</p>
+              <div class="code-block">
+                <div class="code-header">
+                  <div class="code-dots">
+                    <div class="code-dot cd-r"></div>
+                    <div class="code-dot cd-y"></div>
+                    <div class="code-dot cd-g"></div>
+                  </div>
+                  <div class="code-filename">bash</div>
+                  <button class="code-copy" onclick="copyCode(this)">copy</button>
+                </div>
+                <pre><span class="nm">sudo apt install unattended-upgrades -y</span>
+<span class="nm">sudo dpkg-reconfigure --priority=low unattended-upgrades</span>
+<span class="cm"># Select "Yes" when prompted</span></pre>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="s-identity">
+          <div class="section-eyebrow">03 — Reference</div>
+          <div class="section-title">Server identity — quick reference</div>
+          <table class="kv-table">
+            <thead>
+              <tr>
+                <th>Setting</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="key">Hostname</td>
+                <td class="val green">spserver</td>
+              </tr>
+              <tr>
+                <td class="key">Username</td>
+                <td class="val">sipu</td>
+              </tr>
+              <tr>
+                <td class="key">OS</td>
+                <td class="val">Ubuntu Server 24.04 LTS</td>
+              </tr>
+              <tr>
+                <td class="key">Hardware</td>
+                <td class="val">Repurposed spare laptop</td>
+              </tr>
+              <tr>
+                <td class="key">Network interface</td>
+                <td class="val">ethusb0 (USB ethernet adapter, renamed via udev)</td>
+              </tr>
+              <tr>
+                <td class="key">Static IP</td>
+                <td class="val green">192.168.31.150</td>
+              </tr>
+              <tr>
+                <td class="key">Router</td>
+                <td class="val">192.168.31.1</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="alert success">
+            <span class="alert-icon">✓</span>
+            <span>After completing setup, spserver boots automatically when powered on, all services start without any
+              manual intervention, and SSH is ready immediately on 192.168.31.150.</span>
+          </div>
+        </div>
+
+      </div><!-- end setup -->
+
+      <!-- ══ COMMANDS ══ -->
+      <div class="tab-pane" id="pane-commands">
+
+        <div class="section" id="c-system">
+          <div class="section-eyebrow">01 — System</div>
+          <div class="section-title">System commands</div>
+          <div class="cmd-list">
+            <div class="cmd-row">
+              <div class="cmd-code">hostname</div>
+              <div class="cmd-desc">Print the server's hostname — should return spserver</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">whoami</div>
+              <div class="cmd-desc">Print the current logged-in user</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">lsb_release -a</div>
+              <div class="cmd-desc">Show Ubuntu version details</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">uname -r</div>
+              <div class="cmd-desc">Show the running Linux kernel version</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">uptime</div>
+              <div class="cmd-desc">How long the server has been running since last boot</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">free -h</div>
+              <div class="cmd-desc">RAM usage — total, used, free, available</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">df -h</div>
+              <div class="cmd-desc">Disk space usage per partition in human-readable format</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">nproc</div>
+              <div class="cmd-desc">Number of CPU cores available</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">htop</div>
+              <div class="cmd-desc">Interactive real-time view of CPU, RAM, and running processes</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">top</div>
+              <div class="cmd-desc">Similar to htop but built-in (q to quit)</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">who</div>
+              <div class="cmd-desc">Show who is currently logged in (including SSH sessions)</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">last</div>
+              <div class="cmd-desc">Show history of recent logins</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo reboot</div>
+              <div class="cmd-desc">Reboot the server</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo shutdown now</div>
+              <div class="cmd-desc">Shut down immediately</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo shutdown -r +5</div>
+              <div class="cmd-desc">Reboot in 5 minutes (gives time to warn users)</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="c-apt">
+          <div class="section-eyebrow">02 — Package management</div>
+          <div class="section-title">apt commands</div>
+          <div class="cmd-list">
+            <div class="cmd-row">
+              <div class="cmd-code">sudo apt update</div>
+              <div class="cmd-desc">Refresh package list from Ubuntu repositories — always run before installing</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo apt upgrade -y</div>
+              <div class="cmd-desc">Install all available updates for installed packages</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo apt install PACKAGE -y</div>
+              <div class="cmd-desc">Install a package. Replace PACKAGE with the name (e.g. nginx, git, curl)</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo apt remove PACKAGE</div>
+              <div class="cmd-desc">Remove a package (keeps config files)</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo apt purge PACKAGE</div>
+              <div class="cmd-desc">Remove a package and its config files</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo apt autoremove -y</div>
+              <div class="cmd-desc">Remove packages installed as dependencies that are no longer needed</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">apt list --installed</div>
+              <div class="cmd-desc">List all installed packages</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">apt search KEYWORD</div>
+              <div class="cmd-desc">Search for packages by name or description</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">apt show PACKAGE</div>
+              <div class="cmd-desc">Show details about a package before installing</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section" id="c-services">
+          <div class="section-eyebrow">03 — Service management</div>
+          <div class="section-title">systemctl commands</div>
+          <p class="section-body">systemctl manages all background services (daemons) on Ubuntu. Services you add — SSH,
+            Nginx, Docker, ttyd, Filebrowser, cloudflared — are all managed through systemctl.</p>
+          <div class="cmd-list">
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl status SERVICE</div>
+              <div class="cmd-desc">Check if a service is running — green active = good</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl start SERVICE</div>
+              <div class="cmd-desc">Start a service now</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl stop SERVICE</div>
+              <div class="cmd-desc">Stop a running service</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl restart SERVICE</div>
+              <div class="cmd-desc">Stop then start a service — use after config changes</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl reload SERVICE</div>
+              <div class="cmd-desc">Reload config without restarting (Nginx supports this)</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl enable SERVICE</div>
+              <div class="cmd-desc">Mark service to auto-start on every boot</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl disable SERVICE</div>
+              <div class="cmd-desc">Stop service from auto-starting on boot</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo systemctl list-units --type=service</div>
+              <div class="cmd-desc">List all currently active services</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo journalctl -u SERVICE -f</div>
+              <div class="cmd-desc">Follow live logs for a specific service</div>
+            </div>
+            <div class="cmd-row">
+              <div class="cmd-code">sudo journalctl -xe</div>
+              <div class="cmd-desc">View recent system logs including errors</div>
+            </div>
+          </div>
+          <div class="alert info">
+            <span class="alert-icon">ℹ</span>
+            <span>The d at the end of service names stands for daemon — a background process. sshd = SSH daemon, nginx =
+              Nginx web server, dockerd = Docker daemon. <b>Enable</b> makes them start at boot. <b>Start</b> starts
+              them right now. Always do both.</span>
+          </div>
+        </div>
+
+      </div><!-- end commands -->
+
+      <!-- ══ TROUBLESHOOT ══ -->
+      <div class="tab-pane" id="pane-troubleshoot">
+
+        <div class="section" id="t-issues">
+          <div class="section-eyebrow">01 — Issues</div>
+          <div class="section-title">Common problems and fixes</div>
+
+          <div class="ts-card danger">
+            <div class="ts-title">apt update fails — cannot reach repository</div>
+            <div class="ts-body">Network not configured yet, or DNS not working. Check internet:
+              <code>ping 8.8.8.8</code>. If ping works but apt fails, DNS issue — check <code>/etc/resolv.conf</code>.
+              If ping fails, network is not up — see the Netplan guide for static IP setup.
+            </div>
+          </div>
+
+          <div class="ts-card danger">
+            <div class="ts-title">Cannot sudo — sipu is not in the sudoers file</div>
+            <div class="ts-body">During install you may have created a user without sudo rights. Boot into recovery
+              mode, mount filesystem read-write, and run <code>usermod -aG sudo sipu</code>. Reboot normally.
+              Alternatively reinstall — it is faster on a fresh machine.</div>
+          </div>
+
+          <div class="ts-card warn">
+            <div class="ts-title">hostname shows localhost instead of spserver</div>
+            <div class="ts-body">The hostname was not set during install. Fix it now:
+              <code>sudo hostnamectl set-hostname spserver</code>. Also update <code>/etc/hosts</code> — replace the old
+              name with spserver on the 127.0.1.1 line. Takes effect immediately.
+            </div>
+          </div>
+
+          <div class="ts-card warn">
+            <div class="ts-title">Server does not boot after install — stuck at GRUB or blank screen</div>
+            <div class="ts-body">Likely a UEFI/BIOS boot order issue. Enter BIOS (usually F2, F12, or Del at startup),
+              find boot order, and set the internal drive (not USB) as first. Also check if Secure Boot is enabled —
+              some older Ubuntu versions need it disabled.</div>
+          </div>
+
+          <div class="ts-card info">
+            <div class="ts-title">Terminal shows weird characters or garbled text over SSH</div>
+            <div class="ts-body">Terminal encoding mismatch. Set locale: <code>sudo locale-gen en_US.UTF-8</code> then
+              <code>sudo update-locale LANG=en_US.UTF-8</code>. Logout and SSH back in. Also make sure your SSH client
+              (Windows Terminal, PuTTY) is set to UTF-8.
+            </div>
+          </div>
+
+          <div class="ts-card info">
+            <div class="ts-title">apt upgrade asks about config files — what to choose?</div>
+            <div class="ts-body">When upgrading, if a config file was modified by you and a new version exists, Ubuntu
+              asks what to do. On a fresh install — choose <b>Y</b> (keep the package maintainer's version). On an
+              existing configured server — choose <b>N</b> (keep your version). Read the diff shown before deciding.
+            </div>
+          </div>
+
+        </div>
+      </div><!-- end troubleshoot -->
+
+      <!-- ══ FUTURE ══ -->
+      <div class="tab-pane" id="pane-future">
+        <div class="section" id="f-scope">
+          <div class="section-eyebrow">01 — What's next</div>
+          <div class="section-title">Future scope</div>
+          <div class="future-box">
+            <div class="future-label">⟶ Things to explore from here</div>
+            <div class="future-item">
+              <div class="fi-dot"></div>
+              <div class="fi-text"><b>Proxmox VE</b> — install Proxmox on spserver to run multiple isolated virtual
+                machines on the same hardware. Great Phase 4+ project.</div>
+            </div>
+            <div class="future-item">
+              <div class="fi-dot"></div>
+              <div class="fi-text"><b>Ansible</b> — automate the entire server setup with Ansible playbooks. Run one
+                command and get a fresh Ubuntu install fully configured. Eliminates manual steps.</div>
+            </div>
+            <div class="future-item">
+              <div class="fi-dot"></div>
+              <div class="fi-text"><b>Cloud-init</b> — auto-configure a server on first boot using a YAML file. Used by
+                every major cloud provider (AWS, GCP, Azure) for provisioning instances. Same concept as Ansible but at
+                boot time.</div>
+            </div>
+            <div class="future-item">
+              <div class="fi-dot"></div>
+              <div class="fi-text"><b>Automated OS upgrades</b> — set up fully unattended upgrades including kernel
+                updates. Requires careful testing but keeps the server secure without manual intervention.</div>
+            </div>
+            <div class="future-item">
+              <div class="fi-dot"></div>
+              <div class="fi-text"><b>Monitoring</b> — install Prometheus + Grafana to monitor CPU, RAM, disk, and
+                network usage over time. Visualise your server's health on a dashboard at a subdomain.</div>
+            </div>
+            <div class="future-item">
+              <div class="fi-dot"></div>
+              <div class="fi-text"><b>Second server</b> — repurpose another spare machine and set up high availability,
+                failover, or distributed services between the two.</div>
+            </div>
+          </div>
+        </div>
+      </div><!-- end future -->
+
+    </main>
+  </div>
+
+  <script>
+    /* TAB SWITCHING */
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick').includes(`'${name}'`));
+      if (btn) btn.classList.add('active');
+      const pane = document.getElementById('pane-' + name);
+      if (pane) pane.classList.add('active');
+      updateProgress();
+    }
+
+    /* STEP CARDS */
+    function toggleStep(header) {
+      const body = header.nextElementSibling;
+      const toggle = header.querySelector('.step-toggle');
+      body.classList.toggle('open');
+      toggle.classList.toggle('open');
+    }
+
+    /* COPY CODE */
+    function copyCode(btn) {
+      const pre = btn.closest('.code-block').querySelector('pre');
+      navigator.clipboard.writeText(pre.innerText).then(() => {
+        btn.textContent = 'copied!';
+        btn.style.color = 'var(--green)';
+        setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+      });
+    }
+
+    /* SMOOTH SCROLL */
+    function scrollToId(id) {
+      const el = document.getElementById(id);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+    }
+
+    /* SCROLL PROGRESS */
+    window.addEventListener('scroll', () => {
+      const h = document.documentElement;
+      const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+      document.getElementById('spbar').style.width = pct + '%';
+    });
+
+    /* SIDEBAR ACTIVE ON SCROLL */
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    document.querySelectorAll('.section[id]').forEach(el => observer.observe(el));
+
+    /* PROGRESS */
+    const tabOrder = ['overview', 'setup', 'commands', 'troubleshoot', 'future'];
+    let visited = new Set(['overview']);
+    function updateProgress() {
+      const pct = Math.round((visited.size / tabOrder.length) * 100);
+      document.getElementById('sp-fill').style.width = pct + '%';
+      document.getElementById('sp-pct').textContent = pct + '%';
+    }
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.getAttribute('onclick').match(/'(\w+)'/)[1];
+        visited.add(name);
+        updateProgress();
+      });
+    });
+
+    /* INIT */
+    setTimeout(() => {
+      document.getElementById('sp-fill').style.width = '20%';
+      document.getElementById('sp-pct').textContent = '20%';
+    }, 300);
+  </script>
+</body>
+
+</html>

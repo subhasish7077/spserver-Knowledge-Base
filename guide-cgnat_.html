@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CG-NAT & Tailscale — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+
+.main{flex:1;min-width:0;}
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:28%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;width:18%;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.amber{color:var(--amber);}
+.kv-table .val.red{color:var(--red);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:260px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+
+/* solution comparison cards */
+.solution-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:.75rem 0;}
+.sol-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;}
+.sol-card.chosen{border-color:rgba(61,220,132,0.3);background:rgba(61,220,132,0.04);}
+.sol-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:.3rem;display:flex;align-items:center;gap:6px;}
+.sol-tag{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:3px;font-weight:600;}
+.tag-chosen{background:rgba(61,220,132,0.15);color:var(--green);}
+.tag-paid{background:rgba(240,165,0,0.12);color:var(--amber);}
+.tag-free{background:rgba(91,163,245,0.12);color:var(--blue);}
+.sol-body{font-size:13px;color:var(--text2);line-height:1.65;}
+
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+  .solution-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">CG-NAT + Tailscale</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Concepts</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-nat')">What is NAT</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-cgnat')">What is CG-NAT</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('why-broken')">Why port forwarding fails</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('confirm-cgnat')">How we confirmed it</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('double-nat')">Double NAT discovery</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('solutions')">Solutions compared</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Tailscale</div>
+      <div class="sidebar-link" onclick="switchTab('tailscale');scrollToId('ts-how')">How Tailscale works</div>
+      <div class="sidebar-link" onclick="switchTab('tailscale');scrollToId('ts-setup')">Install and connect</div>
+      <div class="sidebar-link" onclick="switchTab('tailscale');scrollToId('ts-verify')">Verify and SSH</div>
+      <div class="sidebar-link" onclick="switchTab('tailscale');scrollToId('ts-backup')">As emergency backup</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-tailscale')">Tailscale commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-diagnose')">Diagnose commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 7 of 14</div>
+      <h1 class="gh-title">CG-NAT &amp; <span>Tailscale</span></h1>
+      <p class="gh-sub">Understanding why Airtel makes port forwarding impossible — and how Tailscale bypasses it entirely to give SSH access from anywhere in the world.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('tailscale')">Tailscale setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-nat">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is NAT</div>
+        <p class="section-body">
+          NAT stands for <b>Network Address Translation</b>. It solves a fundamental problem — IPv4 addresses are limited to about 4 billion, but the world has far more than 4 billion internet-connected devices. NAT lets multiple devices share a single public IP address.
+        </p>
+        <p class="section-body">
+          Your home router performs NAT. Every device on your network (PC, phone, spserver) has a private IP (192.168.31.x). When any of them make an outgoing request, the router translates the private IP to the single public IP it was given by Airtel, sends the request, then when the response arrives, translates it back and sends it to the right device.
+        </p>
+        <div class="diagram">
+<span class="db">Your PC (192.168.31.7)</span>   <span class="dm">─── wants to visit google.com ───►</span>
+<span class="dm">                                                              │</span>
+<span class="da">Router (192.168.31.1)</span>        <span class="dm">translates source IP ──────────►</span>
+<span class="da">  NAT table:</span>                  <span class="dm">192.168.31.7 → 106.215.x.x</span>
+<span class="da">  192.168.31.7 ↔ port 54321</span>
+<span class="da">  192.168.31.150 ↔ port 54322</span>
+<span class="dm">                                                              │</span>
+<span class="dg">Google sees request from:</span>    <span class="dg">106.215.x.x (router's public IP)</span>
+<span class="dg">Google responds to:</span>           <span class="dg">106.215.x.x</span>
+<span class="dm">                                                              │</span>
+<span class="da">Router receives response ──►  looks up NAT table ──►</span>  <span class="db">sends to 192.168.31.7</span>
+        </div>
+        <p class="section-body">
+          This works perfectly for outgoing connections. The problem arises with <b>incoming connections</b>. If someone on the internet wants to connect to spserver directly, they only know the public IP (106.215.x.x). When the packet arrives at the router, the router has no entry in its NAT table for this unsolicited connection — so it doesn't know which device to forward it to. Port forwarding is the solution to this — you tell the router "any incoming packet on port 22 goes to 192.168.31.150". But this only works if you actually control the router that holds the public IP.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-cgnat">
+        <div class="section-eyebrow">02 — The problem</div>
+        <div class="section-title">What is CG-NAT and why Airtel uses it</div>
+        <p class="section-body">
+          CG-NAT stands for <b>Carrier Grade NAT</b>. It is NAT performed by the ISP itself — before traffic even reaches your router. Airtel runs a massive NAT layer on their network infrastructure, sharing a single real public IP among potentially hundreds of customers.
+        </p>
+        <p class="section-body">
+          The result: your router's WAN IP (the IP it sees on its internet-facing side) is not a real public IP. It is an address in the <b>100.64.0.0/10 range</b> — a range specifically reserved by IANA (Internet Assigned Numbers Authority) for carrier-grade NAT. This is Airtel's internal network address space, not the public internet.
+        </p>
+        <div class="diagram">
+<span class="dm">Normal NAT (what you expect):</span>
+<span class="db">Internet</span> <span class="dm">──►</span> <span class="dg">106.215.x.x (YOUR router's public IP)</span> <span class="dm">──►</span> <span class="dg">192.168.31.150 (spserver)</span>
+<span class="dm">          You control this router ↑              You control this ↑</span>
+<span class="dm">          Port forwarding works here</span>
+
+<span class="dm">CG-NAT (what Airtel actually gives you):</span>
+<span class="db">Internet</span> <span class="dm">──►</span> <span class="dr">106.215.x.x (AIRTEL's servers)</span> <span class="dm">──►</span> <span class="da">100.220.x.x (your router's WAN)</span> <span class="dm">──►</span> <span class="dg">192.168.31.150</span>
+<span class="dm">          Airtel controls this ↑                You control this ↑</span>
+<span class="dr">          Port forwarding impossible here        Port forwarding set here (useless)</span>
+        </div>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span>When your router's WAN IP starts with <b>100.x.x.x</b>, you have CG-NAT. No amount of port forwarding configuration on your router will fix this — you do not own the first NAT layer. The traffic never reaches your router from the internet.</span>
+        </div>
+        <p class="section-body">
+          Why do ISPs use CG-NAT? IPv4 addresses are a finite resource and they ran out years ago. Rather than forcing everyone to IPv6 (which would solve this), ISPs like Airtel use CG-NAT to stretch their IPv4 address pool by sharing addresses across customers. It reduces costs. The downside is that customers cannot host services or accept incoming connections.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="why-broken">
+        <div class="section-eyebrow">03 — Why it fails</div>
+        <div class="section-title">Why port forwarding is impossible with CG-NAT</div>
+        <p class="section-body">
+          Port forwarding works by telling your router: "when a packet arrives on port 22, forward it to 192.168.31.150". This requires the packet to reach your router first. With CG-NAT, the packet arrives at Airtel's servers, not your router. Airtel's NAT layer has no idea which of their hundreds of customers the packet is meant for — so it drops it.
+        </p>
+        <div class="diagram">
+<span class="dm">Someone tries to SSH into spserver from outside:</span>
+
+<span class="db">Attacker/User PC</span> <span class="dm">──► sends packet to ──►</span> <span class="dr">106.215.x.x:22</span>
+                                              <span class="dm">↓</span>
+                              <span class="dr">Arrives at Airtel's CG-NAT servers</span>
+                              <span class="dr">Airtel has NO mapping for this</span>
+                              <span class="dr">Packet dropped silently</span>
+                                              <span class="dm">↓</span>
+<span class="da">Your backup router (192.168.31.1)</span>          <span class="dm">← never reached</span>
+<span class="da">  Port 22 → 192.168.31.150 ✓</span>              <span class="dm">← this rule is set but useless</span>
+                                              <span class="dm">↓</span>
+<span class="dg">spserver (192.168.31.150)</span>                  <span class="dm">← never reached</span>
+<span class="dg">  sshd listening on port 22 ✓</span>              <span class="dm">← SSH is ready but unreachable</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="confirm-cgnat">
+        <div class="section-eyebrow">04 — Investigation</div>
+        <div class="section-title">How we confirmed CG-NAT on Airtel</div>
+        <p class="section-body">
+          After SSH timed out from a mobile hotspot even with port forwarding configured, we investigated the actual network topology. Two checks confirmed CG-NAT:
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Check 1: What IP does the internet see?</span>
+<span class="nm">curl ifconfig.me</span>
+<span class="cm"># Returned: 106.215.x.x  ← This is Airtel's real public IP</span>
+
+<span class="cm"># Check 2: What IP does the router show as its WAN IP?</span>
+<span class="cm"># (Checked in router admin panel at 192.168.31.1)</span>
+<span class="cm"># Router WAN IP: 100.220.x.x  ← 100.x.x.x = CG-NAT range confirmed</span>
+
+<span class="cm"># These two IPs being different AND the WAN being 100.x.x.x</span>
+<span class="cm"># = definitive CG-NAT confirmation</span></pre>
+        </div>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">curl ifconfig.me → 106.215.x.x</div>
+            <div class="ic-body">This is what the internet sees when spserver makes outgoing connections. It is Airtel's shared public IP — used by many customers simultaneously.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Router WAN → 100.220.x.x</div>
+            <div class="ic-body">The 100.64.0.0/10 range (100.64.x.x to 100.127.x.x) is IANA-reserved exclusively for CG-NAT. Seeing this on your router WAN is definitive confirmation.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="double-nat">
+        <div class="section-eyebrow">05 — Discovery</div>
+        <div class="section-title">Double NAT — the network we actually have</div>
+        <p class="section-body">
+          During the investigation we also discovered the home network has two routers stacked — meaning there are actually <b>three NAT layers</b> between spserver and the internet. This was discovered after port forwarding on the backup router did nothing.
+        </p>
+        <div class="diagram">
+<span class="db">Internet</span>
+   <span class="dm">↕</span>
+<span class="dr">Airtel CG-NAT</span>  <span class="dm">← Layer 1 (Airtel's infrastructure — not your hardware)</span>
+   <span class="dm">↕</span>
+<span class="da">Airtel Modem</span>  <span class="dm">192.168.1.1  ← Layer 2 (your hardware — modem/router combo)</span>
+   <span class="dm">↕</span>
+<span class="da">Backup Router</span>  <span class="dm">192.168.31.1  ← Layer 3 (your hardware — second router)</span>
+   <span class="dm">↕  ↕  ↕</span>
+<span class="dg">spserver</span>       <span class="dm">192.168.31.150</span>
+<span class="db">Your PC</span>        <span class="dm">192.168.31.7</span>
+<span class="dm">Phone, etc.</span>
+
+<span class="dm">Port forwarding on backup router only → traffic still blocked at Airtel modem</span>
+<span class="dm">Port forwarding on both routers → traffic still blocked at Airtel CG-NAT</span>
+<span class="dm">No configuration possible → Airtel CG-NAT is outside your control</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="solutions">
+        <div class="section-eyebrow">06 — Solutions</div>
+        <div class="section-title">All solutions to CG-NAT — compared</div>
+        <div class="solution-grid">
+          <div class="sol-card chosen">
+            <div class="sol-name">Tailscale <span class="sol-tag tag-chosen">chosen — SSH</span></div>
+            <div class="sol-body">Free VPN. Both devices reach OUT to Tailscale servers — outgoing always works behind CG-NAT. Direct encrypted P2P tunnel for SSH. Zero config on routers. 100 devices free.</div>
+          </div>
+          <div class="sol-card chosen">
+            <div class="sol-name">Cloudflare Tunnel <span class="sol-tag tag-chosen">chosen — web</span></div>
+            <div class="sol-body">Free. Server reaches OUT to Cloudflare edge. Public website/services accessible at your domain. No port forwarding needed. Handles SSL. See Cloudflare Tunnel guide.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">ZeroTier <span class="sol-tag tag-free">free</span></div>
+            <div class="sol-body">Similar to Tailscale. Creates a virtual network between devices. Free up to 25 devices. Open source — can self-host the controller. Slightly more complex setup.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">WireGuard VPS <span class="sol-tag tag-paid">paid</span></div>
+            <div class="sol-body">Rent a cheap VPS (~₹200-300/month) with a real public IP. Set up WireGuard tunnel from spserver to VPS. VPS forwards traffic to spserver. More control, more complexity.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">Airtel Static IP <span class="sol-tag tag-paid">paid</span></div>
+            <div class="sol-body">Call Airtel and pay for a dedicated static public IP. Removes CG-NAT entirely. Port forwarding works again. Costs extra monthly. Simplest solution if you want traditional setup.</div>
+          </div>
+          <div class="sol-card">
+            <div class="sol-name">IPv6 <span class="sol-tag tag-free">free</span></div>
+            <div class="sol-body">IPv6 has enough addresses for every device to have a real public IP — no NAT needed. Airtel provides IPv6 in some areas. If available, devices get real public IPv6 addresses and are directly reachable.</div>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>We use <b>Tailscale for SSH</b> (private access) and <b>Cloudflare Tunnel for public services</b> (website, ttyd, Filebrowser). Both are free, both bypass CG-NAT, and together they cover all use cases without paying Airtel extra.</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ TAILSCALE ══ -->
+    <div class="tab-pane" id="pane-tailscale">
+
+      <div class="section" id="ts-how">
+        <div class="section-eyebrow">01 — How it works</div>
+        <div class="section-title">Tailscale's approach to CG-NAT</div>
+        <p class="section-body">
+          The key insight behind Tailscale: <b>outgoing connections always work behind CG-NAT</b>. CG-NAT only blocks unsolicited incoming connections. So instead of waiting for connections to come in, Tailscale has both devices reach OUT simultaneously to its coordination servers. Those servers broker a direct connection between the two devices.
+        </p>
+        <div class="diagram">
+<span class="dm">Step 1: Both devices connect OUT to Tailscale coordination servers</span>
+<span class="db">spserver</span>  <span class="dm">──── outgoing ────►</span>  <span class="dg">Tailscale coordination</span>  <span class="dm">◄──── outgoing ────</span>  <span class="db">Your PC</span>
+<span class="dm">           CG-NAT allows this ↑     (login.tailscale.com)    CG-NAT allows this ↑</span>
+
+<span class="dm">Step 2: Tailscale brokers direct connection using DERP/STUN</span>
+<span class="db">spserver</span>  <span class="dg">◄════════════ direct encrypted WireGuard tunnel ════════════►</span>  <span class="db">Your PC</span>
+<span class="dm">           Each device gets a stable Tailscale IP (100.x.x.x)</span>
+<span class="dm">           P2P when possible, relayed through DERP servers otherwise</span>
+        </div>
+        <p class="section-body">
+          Tailscale is built on <b>WireGuard</b> — a modern, fast, lightweight VPN protocol built into the Linux kernel. Tailscale takes WireGuard and adds automatic key exchange, NAT traversal, and a coordination layer so you never have to manage keys or configure peers manually.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">WireGuard (underneath)</div>
+            <div class="ic-body">The actual VPN protocol. Extremely fast — ~2x faster than OpenVPN. Built into Linux kernel since 5.6. Tailscale handles all WireGuard configuration automatically.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Tailscale (on top)</div>
+            <div class="ic-body">Handles key distribution, NAT traversal, peer discovery. You login once — devices find each other automatically. Free for up to 100 devices with unlimited bandwidth.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ts-setup">
+        <div class="section-eyebrow">02 — Install</div>
+        <div class="section-title">Install Tailscale on spserver</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install Tailscale on spserver</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Tailscale provides a one-line install script that detects your Linux distribution and installs the correct package. It sets up the Tailscale service to auto-start on boot.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># One-line install script from Tailscale</span>
+<span class="nm">curl -fsSL https://tailscale.com/install.sh | sh</span>
+
+<span class="cm"># Verify installation</span>
+<span class="nm">tailscale version</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Connect spserver to your Tailscale account</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Running <code>tailscale up</code> connects the device to Tailscale and gives you a URL to authenticate in the browser. Login with your Tailscale account (Google, GitHub, or email). After authenticating, spserver joins your Tailscale network.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Connect to Tailscale — opens a URL in output</span>
+<span class="nm">sudo tailscale up</span>
+
+<span class="cm"># Copy the URL shown, open it in your browser</span>
+<span class="cm"># Login with your Tailscale account</span>
+<span class="cm"># Click "Connect" — spserver is now in your network</span>
+
+<span class="cm"># Get spserver's Tailscale IP</span>
+<span class="nm">tailscale ip</span>
+<span class="cm"># Returns something like: 100.78.211.x</span>
+<span class="cm"># This IP is stable — it never changes for this device</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Install Tailscale on your Windows PC</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Both devices must be on the same Tailscale account to talk to each other. Download and install the Windows app, login with the same account, and both devices appear in your Tailscale admin panel.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Download Tailscale for Windows from:</span>
+<span class="cm"># https://tailscale.com/download/windows</span>
+
+<span class="cm"># Install → login with same account as spserver</span>
+<span class="cm"># Both devices now appear in Tailscale admin at:</span>
+<span class="cm"># https://login.tailscale.com/admin/machines</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Ensure Tailscale starts on boot</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">If spserver reboots and Tailscale doesn't start, you lose the ability to SSH in remotely. Verify it is enabled as a systemd service.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Check Tailscale service status</span>
+<span class="nm">sudo systemctl status tailscaled</span>
+
+<span class="cm"># Enable if not already (usually done automatically by install script)</span>
+<span class="nm">sudo systemctl enable tailscaled</span>
+
+<span class="cm"># Verify Tailscale is connected after reboot</span>
+<span class="nm">tailscale status</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ts-verify">
+        <div class="section-eyebrow">03 — Verify</div>
+        <div class="section-title">Test SSH via Tailscale from anywhere</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows Terminal / PowerShell — from any network</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># SSH using Tailscale IP (works from any network — mobile, work, cafe)</span>
+<span class="nm">ssh</span> sipu@100.x.x.x   <span class="cm"># replace with spserver's actual Tailscale IP</span>
+
+<span class="cm"># Or add to ~/.ssh/config on Windows for a shortcut:</span>
+<span class="kw">Host</span> <span class="str">spserver-remote</span>
+    <span class="nm">HostName</span> <span class="str">100.x.x.x</span>
+    <span class="nm">User</span>     <span class="str">sipu</span>
+
+<span class="cm"># Then just:</span>
+<span class="nm">ssh</span> spserver-remote</pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>Once both devices are on Tailscale, SSH just works — from mobile data, work WiFi, a hotel, anywhere. No VPN to connect, no configuration to manage. It is always on in the background.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ts-backup">
+        <div class="section-eyebrow">04 — Emergency backup</div>
+        <div class="section-title">Tailscale as the emergency recovery tool</div>
+        <p class="section-body">
+          Tailscale serves a critical secondary purpose — it is the <b>emergency backup access method</b> if everything else breaks. If cloudflared goes down, if Nginx fails, if you misconfigure UFW and lock yourself out via normal SSH — Tailscale is how you get back in.
+        </p>
+        <div class="diagram">
+<span class="dm">Normal operation:</span>
+<span class="db">Public users</span>    <span class="dm">──►</span>  <span class="dg">Cloudflare Tunnel → spserver</span>
+<span class="db">Your SSH</span>        <span class="dm">──►</span>  <span class="dg">192.168.31.150 (local) or Tailscale (remote)</span>
+
+<span class="dm">Emergency — something broke:</span>
+<span class="db">Cloudflare down?</span>  <span class="dm">→</span>  <span class="dg">SSH in via Tailscale → fix cloudflared</span>
+<span class="db">UFW locked SSH?</span>   <span class="dm">→</span>  <span class="dg">SSH in via Tailscale → fix UFW rules</span>
+<span class="db">Nginx broken?</span>     <span class="dm">→</span>  <span class="dg">SSH in via Tailscale → fix Nginx config</span>
+<span class="db">Can't reach 150?</span>  <span class="dm">→</span>  <span class="dg">SSH in via Tailscale → check network config</span>
+
+<span class="dm">Tailscale works independently of all other services on spserver</span>
+<span class="dm">As long as spserver has power and internet — Tailscale works</span>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Never remove or disable Tailscale from spserver. Even if you add other remote access methods — keep Tailscale running as the last-resort recovery tool. It has saved the session more than once.</span>
+        </div>
+      </div>
+
+    </div><!-- end tailscale -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-tailscale">
+        <div class="section-eyebrow">01 — Tailscale</div>
+        <div class="section-title">Tailscale commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo tailscale up</div><div class="cmd-desc">Connect to Tailscale — opens auth URL on first run</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tailscale down</div><div class="cmd-desc">Disconnect from Tailscale (device stays registered)</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale ip</div><div class="cmd-desc">Show this device's Tailscale IP address (100.x.x.x)</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale status</div><div class="cmd-desc">List all devices in your Tailscale network and their status</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale ping 100.x.x.x</div><div class="cmd-desc">Test connectivity to another Tailscale device</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale netcheck</div><div class="cmd-desc">Check network connectivity — shows latency to DERP relay servers, NAT type, UDP status</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale version</div><div class="cmd-desc">Show installed Tailscale version</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status tailscaled</div><div class="cmd-desc">Check Tailscale daemon status — should show active (running)</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart tailscaled</div><div class="cmd-desc">Restart Tailscale daemon — use if connection drops</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tailscale up --reset</div><div class="cmd-desc">Re-authenticate Tailscale — opens a new auth URL</div></div>
+          <div class="cmd-row"><div class="cmd-code">tailscale logout</div><div class="cmd-desc">Log out and remove device from Tailscale network</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-diagnose">
+        <div class="section-eyebrow">02 — Network diagnostics</div>
+        <div class="section-title">Commands to diagnose CG-NAT and network issues</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">curl ifconfig.me</div><div class="cmd-desc">Show public IP as seen from the internet — if different from router WAN IP, you have CG-NAT</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -4 ifconfig.me</div><div class="cmd-desc">Force IPv4 public IP check</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -6 ifconfig.me</div><div class="cmd-desc">Force IPv6 public IP check — if you get an address, IPv6 is available</div></div>
+          <div class="cmd-row"><div class="cmd-code">ip route show</div><div class="cmd-desc">Show routing table — check default gateway (your router IP)</div></div>
+          <div class="cmd-row"><div class="cmd-code">traceroute 8.8.8.8</div><div class="cmd-desc">Show network path to Google DNS — first hop should be 192.168.31.1 (router), then Airtel hops</div></div>
+          <div class="cmd-row"><div class="cmd-code">nslookup dustyserver.co.in</div><div class="cmd-desc">Verify DNS resolves correctly — should return Cloudflare IPs</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 4 192.168.31.1</div><div class="cmd-desc">Ping router — test local connectivity</div></div>
+          <div class="cmd-row"><div class="cmd-code">ping -c 4 8.8.8.8</div><div class="cmd-desc">Ping internet — test internet connectivity (no DNS)</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">The full investigation story</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">SSH timed out from mobile hotspot — port forwarding set but not working</div>
+          <div class="bb-body">
+            SSH worked perfectly on the local network (192.168.31.150). Tried from a mobile hotspot using the public IP returned by <code>curl ifconfig.me</code>. Got "Connection timed out". Port 22 forwarding had been configured on the backup router (192.168.31.1). Connection still timed out.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">→ Investigation step 1</div>
+          <div class="fb-title">Discovered Double NAT — port forwarding on wrong router</div>
+          <div class="fb-body">
+            Realised the backup router (192.168.31.1) gets its internet from the Airtel modem (192.168.1.1). Traffic from the internet hits the Airtel modem first. Modem had no port forwarding rule — dropped all traffic before it reached the backup router. Configured port forwarding on both routers. Still timed out.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Port forwarding on both routers — still timed out</div>
+          <div class="bb-body">
+            Port 22 forwarding configured on Airtel modem (192.168.1.1) AND backup router (192.168.31.1). SSH still timed out from outside. Checked router WAN IP in the modem admin panel — showed <code>100.220.x.x</code>.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">→ Root cause found</div>
+          <div class="fb-title">CG-NAT confirmed — Airtel never gave a real public IP</div>
+          <div class="fb-body">
+            The 100.220.x.x WAN IP confirmed CG-NAT. This is Airtel's internal IP — not a real public IP. The traffic never leaves Airtel's network to reach the modem. Port forwarding on our hardware is irrelevant because Airtel's CG-NAT is the first barrier. No configuration on our equipment can fix this — it is Airtel's infrastructure.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Port forwarding rules removed — now lost remote access entirely</div>
+          <div class="bb-body">
+            After confirming CG-NAT makes port forwarding useless, all port forwarding rules were removed from both routers. Before Tailscale was set up, this briefly meant there was no way to SSH into spserver from outside the home network at all.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Tailscale installed — SSH from anywhere immediately</div>
+          <div class="fb-body">
+            Installed Tailscale on spserver with <code>curl -fsSL https://tailscale.com/install.sh | sh</code> and <code>sudo tailscale up</code>. Installed on Windows PC. Both devices appeared in Tailscale admin. Immediately SSHed from mobile hotspot using the Tailscale IP. Worked instantly — no router configuration, no port forwarding, no ISP cooperation needed.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Tailscale and CG-NAT issues</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Cannot SSH via Tailscale IP — connection refused or timed out</div>
+          <div class="ts-body">
+            Check in order: (1) Is Tailscale running on spserver? <code>sudo systemctl status tailscaled</code> — if not active, start it: <code>sudo systemctl start tailscaled</code>. (2) Is spserver online in Tailscale? Run <code>tailscale status</code> on your PC — spserver should show as connected. (3) Is sshd running on spserver? It needs to be — Tailscale just provides the network path. (4) Is UFW allowing port 22? Check: <code>sudo ufw status</code>. Note: Tailscale traffic on the local Tailscale interface (tailscale0) is usually not subject to UFW rules, but verify if UFW logging shows blocks.
+          </div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Tailscale shows device as offline / disconnected</div>
+          <div class="ts-body">
+            spserver may have rebooted and Tailscale didn't reconnect. Solutions: (1) If you can reach spserver locally — run <code>sudo tailscale up</code>. (2) Restart the daemon: <code>sudo systemctl restart tailscaled</code>. (3) Check internet connectivity on spserver: <code>ping 8.8.8.8</code>. Tailscale needs outgoing internet to reach its coordination servers. (4) Check if auth expired — keys expire after 180 days by default. Re-authenticate with <code>sudo tailscale up --reset</code>.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Tailscale connection is slow or high latency</div>
+          <div class="ts-body">
+            Tailscale uses direct P2P connection when possible but falls back to DERP relay servers if NAT traversal fails. Run <code>tailscale netcheck</code> to see connection type. "Direct" means P2P (fast). "Relay" means going through a DERP server (adds latency). With CG-NAT, sometimes only relay is possible. This is expected — usually still fast enough for SSH.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">How do I check if my ISP uses CG-NAT?</div>
+          <div class="ts-body">
+            Run <code>curl ifconfig.me</code> on your server — note the public IP. Then check your router admin panel for the WAN IP. If they are different AND the router WAN shows an IP in the 100.64.0.0/10 range (100.64.x.x to 100.127.x.x), you have CG-NAT. Also: try to ping your public IP from your mobile hotspot — if it doesn't respond or times out, likely CG-NAT.
+          </div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Tailscale works but I want a custom domain for SSH (ssh.dustyserver.co.in)</div>
+          <div class="ts-body">
+            This requires Cloudflare Tunnel SSH configuration. Add an ingress rule to config.yml pointing to <code>ssh://localhost:22</code> and create a DNS record for ssh.dustyserver.co.in. Clients need cloudflared installed locally and a ProxyCommand in their SSH config. More complex than Tailscale — only useful when Tailscale isn't an option on the client device.
+          </div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">tailscale up asks to re-authenticate every time after reboot</div>
+          <div class="ts-body">
+            This means the auth key expired or the session isn't persisting. Fix: in Tailscale admin (login.tailscale.com/admin/machines), find spserver and click "Disable key expiry" — this makes the auth persistent indefinitely. Alternatively, use an auth key: <code>sudo tailscale up --authkey=tskey-...</code> (generate from admin panel → Settings → Keys).
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>WireGuard directly</b> — Tailscale uses WireGuard under the hood. Learning raw WireGuard teaches you how VPNs actually work at the protocol level. Highly relevant for DevOps and network security roles at companies like Zscaler.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Headscale</b> — self-hosted Tailscale coordination server. Open source reimplementation of Tailscale's backend. You run your own server so no data goes through Tailscale's infrastructure. Requires a VPS with a real public IP. Good Phase 4+ project.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Tailscale ACLs</b> — access control lists define which devices can talk to which. In the Tailscale admin panel, write ACL rules to restrict what your phone can access vs what your PC can access on spserver. Relevant for multi-user setups.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Tailscale SSH</b> — Tailscale has a built-in SSH feature that handles authentication via Tailscale identity — no sshd configuration needed, no SSH keys to manage. Enable with <code>sudo tailscale up --ssh</code>. Experimental but interesting.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>ZeroTier as alternative</b> — similar concept to Tailscale, open source, self-hostable controller. Free for up to 25 devices. Worth knowing as an alternative when Tailscale doesn't fit a use case.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>IPv6 investigation</b> — check if Airtel provides IPv6 on your connection. If they do, devices can have real public IPv6 addresses — no NAT, no CG-NAT, direct connections possible. Check with <code>curl -6 ifconfig.me</code>.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>VPS jump host</b> — rent a cheap VPS (Hetzner ~₹300/month). Set up WireGuard tunnel from spserver to VPS. Use VPS as a jump host for SSH and public services. More control than Tailscale/Cloudflare, more cost, better for learning.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+
+const tabOrder = ['overview','tailscale','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>

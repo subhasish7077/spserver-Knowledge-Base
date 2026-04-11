@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSH Server — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:#0a0c10;color:#d4d8e2;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.75;min-height:100vh;overflow-x:hidden;}
+:root{
+  --bg:#0a0c10;--bg2:#10131a;--bg3:#161b24;--bg4:#1c2230;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --text:#d4d8e2;--text2:#8892a4;--text3:#4a5568;
+  --green:#3ddc84;--green2:rgba(61,220,132,0.12);
+  --blue:#5ba3f5;--blue2:rgba(91,163,245,0.12);
+  --amber:#f0a500;--amber2:rgba(240,165,0,0.10);
+  --red:#f06565;--red2:rgba(240,101,101,0.10);
+  --mono:'JetBrains Mono',monospace;
+  --display:'Bebas Neue',sans-serif;
+  --sans:'DM Sans',sans-serif;
+}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:99px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+#spbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--green),var(--blue));z-index:9999;width:0%;transition:width .1s;}
+
+nav{position:fixed;top:0;left:0;right:0;height:56px;background:rgba(10,12,16,0.94);border-bottom:1px solid var(--border);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 2rem;gap:1rem;z-index:1000;}
+.nav-back{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);text-decoration:none;padding:5px 10px;border-radius:6px;border:1px solid var(--border);transition:all .2s;font-family:var(--mono);}
+.nav-back:hover{color:var(--text);border-color:var(--border2);background:var(--bg3);}
+.nav-divider{width:1px;height:20px;background:var(--border2);}
+.nav-title{font-family:var(--display);font-size:18px;letter-spacing:0.06em;color:var(--text);flex:1;}
+.nav-phase{font-family:var(--mono);font-size:11px;color:var(--text3);background:var(--bg3);padding:3px 10px;border-radius:99px;border:1px solid var(--border);}
+
+.layout{display:flex;max-width:1100px;margin:0 auto;padding:80px 2rem 4rem;gap:2.5rem;position:relative;z-index:1;}
+
+.sidebar{width:220px;flex-shrink:0;position:sticky;top:76px;height:fit-content;}
+.sidebar-prog{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:1rem;}
+.sp-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;display:flex;justify-content:space-between;margin-bottom:6px;}
+.sp-bar{height:3px;background:var(--bg4);border-radius:99px;overflow:hidden;}
+.sp-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:99px;transition:width .8s ease;}
+.sidebar-section{margin-bottom:1.25rem;}
+.sidebar-section-label{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;padding:0 4px;}
+.sidebar-link{display:block;font-size:13px;color:var(--text2);padding:6px 10px;border-radius:6px;text-decoration:none;border-left:2px solid transparent;transition:all .15s;margin-bottom:1px;cursor:pointer;}
+.sidebar-link:hover{color:var(--text);background:var(--bg3);}
+.sidebar-link.active{color:var(--green);border-left-color:var(--green);background:var(--green2);}
+
+.main{flex:1;min-width:0;}
+
+.guide-header{margin-bottom:2.5rem;padding-bottom:2rem;border-bottom:1px solid var(--border);}
+.gh-eyebrow{font-family:var(--mono);font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem;}
+.gh-title{font-family:var(--display);font-size:clamp(36px,5vw,56px);letter-spacing:.04em;line-height:1;margin-bottom:.75rem;color:var(--text);}
+.gh-title span{color:var(--green);}
+.gh-sub{font-size:16px;color:var(--text2);line-height:1.7;max-width:580px;}
+
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:2rem;overflow-x:auto;}
+.tab-btn{font-size:13px;font-weight:500;padding:10px 18px;cursor:pointer;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .18s;white-space:nowrap;font-family:var(--sans);}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+
+.section{margin-bottom:2.5rem;scroll-margin-top:76px;}
+.section-eyebrow{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;}
+.section-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:.5rem;}
+.section-body{font-size:15px;color:var(--text2);line-height:1.8;margin-bottom:.75rem;}
+.section-body b{color:var(--text);font-weight:500;}
+.section-body code{font-family:var(--mono);font-size:13px;background:var(--bg3);padding:2px 7px;border-radius:4px;color:var(--blue);}
+.divider{height:1px;background:var(--border);margin:2rem 0;}
+
+.code-block{background:#080b10;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:.75rem 0;}
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.code-dots{display:flex;gap:5px;}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd-r{background:#ff5f57;}.cd-y{background:#febc2e;}.cd-g{background:#28c840;}
+.code-filename{font-family:var(--mono);font-size:11px;color:var(--text3);}
+.code-copy{font-family:var(--mono);font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:4px;padding:3px 10px;cursor:pointer;transition:all .2s;}
+.code-copy:hover{color:var(--green);border-color:var(--green);}
+pre{padding:1rem 1.25rem;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto;color:var(--text);}
+.kw{color:#c084fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.nm{color:#60a5fa;}.op{color:var(--amber);}
+
+.diagram{background:#080b10;border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin:.75rem 0;font-family:var(--mono);font-size:13px;line-height:2.1;overflow-x:auto;}
+.dg{color:var(--green);}.db{color:var(--blue);}.da{color:var(--amber);}.dr{color:var(--red);}.dm{color:var(--text3);}
+
+.alert{border-radius:8px;padding:12px 16px;margin:.75rem 0;font-size:14px;line-height:1.7;display:flex;gap:12px;align-items:flex-start;}
+.alert-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.alert.info{background:rgba(91,163,245,0.08);border:1px solid rgba(91,163,245,0.2);color:#93c5fd;}
+.alert.success{background:rgba(61,220,132,0.08);border:1px solid rgba(61,220,132,0.2);color:#6ee7a0;}
+.alert.warn{background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);color:#fcd34d;}
+.alert.danger{background:rgba(240,101,101,0.08);border:1px solid rgba(240,101,101,0.2);color:#fca5a5;}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:.75rem 0;}
+.info-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;}
+.ic-title{font-size:14px;font-weight:600;margin-bottom:.4rem;}
+.ic-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ic-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--blue);}
+
+.kv-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:14px;}
+.kv-table th{background:var(--bg3);color:var(--text3);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);font-weight:500;}
+.kv-table td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.kv-table tr:last-child td{border-bottom:none;}
+.kv-table tr:hover td{background:var(--bg3);}
+.kv-table .key{color:var(--text2);font-weight:500;width:35%;}
+.kv-table .val{color:var(--text);font-family:var(--mono);font-size:13px;}
+.kv-table .val.green{color:var(--green);}
+.kv-table .val.blue{color:var(--blue);}
+.kv-table .val.amber{color:var(--amber);}
+.kv-table .desc{color:var(--text2);font-size:13px;}
+
+.le-table{width:100%;border-collapse:collapse;margin:.75rem 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:13px;}
+.le-table th{background:var(--bg3);color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.06em;padding:7px 14px;text-align:left;border-bottom:1px solid var(--border);font-family:var(--mono);}
+.le-table td{padding:9px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
+.le-table tr:last-child td{border-bottom:none;}
+.le-code{font-family:var(--mono);font-size:12px;color:var(--blue);background:#080b10;white-space:nowrap;width:38%;}
+.le-desc{color:var(--text2);font-size:14px;line-height:1.6;}
+.le-desc b{color:var(--text);font-weight:500;}
+
+.step-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:.75rem;}
+.step-header{display:flex;align-items:center;gap:14px;padding:13px 16px;cursor:pointer;transition:background .15s;user-select:none;}
+.step-header:hover{background:var(--bg3);}
+.step-num{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--mono);font-weight:700;color:var(--green);flex-shrink:0;}
+.step-num.done{background:rgba(61,220,132,0.12);border-color:var(--green);}
+.step-title{font-size:15px;font-weight:500;flex:1;color:var(--text);}
+.step-toggle{font-family:var(--mono);font-size:12px;color:var(--text3);transition:transform .2s;}
+.step-toggle.open{transform:rotate(180deg);}
+.step-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.step-body.open{display:block;}
+.step-why{font-size:14px;color:var(--text2);line-height:1.75;margin:12px 0 8px;}
+.step-why b{color:var(--text);font-weight:500;}
+
+.cmd-list{display:flex;flex-direction:column;gap:6px;}
+.cmd-row{display:flex;gap:16px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;transition:border-color .15s;}
+.cmd-row:hover{border-color:var(--border2);}
+.cmd-code{font-family:var(--mono);font-size:13px;color:var(--blue);min-width:280px;flex-shrink:0;}
+.cmd-desc{font-size:14px;color:var(--text2);line-height:1.6;}
+
+.ts-card{border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.25rem;margin-bottom:.75rem;}
+.ts-card.danger{border-left:3px solid var(--red);}
+.ts-card.warn{border-left:3px solid var(--amber);}
+.ts-card.info{border-left:3px solid var(--blue);}
+.ts-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.ts-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.ts-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.blocker-banner{background:rgba(240,101,101,0.07);border:1px solid rgba(240,101,101,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.bb-label{font-family:var(--mono);font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.bb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.bb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.bb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+.fix-banner{background:rgba(61,220,132,0.07);border:1px solid rgba(61,220,132,0.2);border-radius:10px;padding:1.1rem 1.25rem;margin:.75rem 0;}
+.fb-label{font-family:var(--mono);font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem;}
+.fb-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:.4rem;}
+.fb-body{font-size:14px;color:var(--text2);line-height:1.7;}
+.fb-body code{font-family:var(--mono);font-size:12px;background:var(--bg3);padding:1px 6px;border-radius:3px;color:var(--blue);}
+
+.future-box{background:var(--bg2);border:1px solid rgba(240,165,0,0.2);border-radius:12px;padding:1.5rem;}
+.future-label{font-family:var(--mono);font-size:11px;color:var(--amber);text-transform:uppercase;letter-spacing:.1em;margin-bottom:1rem;}
+.future-item{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.65;}
+.future-item:last-child{border-bottom:none;}
+.fi-dot{width:6px;height:6px;border-radius:50%;background:var(--amber);opacity:.5;flex-shrink:0;margin-top:8px;}
+.fi-text{color:var(--text2);}
+.fi-text b{color:var(--text);font-weight:500;}
+
+/* access method cards */
+.access-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin:.75rem 0;}
+.access-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;}
+.ac-label{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem;}
+.ac-cmd{font-family:var(--mono);font-size:13px;color:var(--blue);margin-bottom:.4rem;word-break:break-all;}
+.ac-desc{font-size:13px;color:var(--text2);line-height:1.6;}
+
+@media(max-width:768px){
+  .layout{flex-direction:column;padding:76px 1rem 3rem;}
+  .sidebar{display:none;}
+  .two-col{grid-template-columns:1fr;}
+  .cmd-code{min-width:0;}
+  .cmd-row{flex-direction:column;gap:4px;}
+  .le-table{display:block;overflow-x:auto;}
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">SSH Server</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-ssh')">What is SSH</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('how-it-works')">How it works</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('auth-methods')">Auth methods</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('access-methods')">Access methods</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-sshd')">What is sshd</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install SSH server</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-ufw')">Open firewall</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify and connect</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-windows-config')">Windows SSH config</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-sshd')">sshd_config explained</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-client')">Client config file</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-keys')">SSH key setup</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-server')">Server commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-client')">Client commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 4 of 14</div>
+      <h1 class="gh-title"><span>SSH</span> Server</h1>
+      <p class="gh-sub">Setting up encrypted remote terminal access — the single most important service on any headless server. Once SSH is running, you never need a physical keyboard or monitor again.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config files</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-ssh">
+        <div class="section-eyebrow">01 — Concept</div>
+        <div class="section-title">What is SSH</div>
+        <p class="section-body">
+          SSH (Secure Shell) is a network protocol that lets you open an <b>encrypted terminal session</b> on a remote machine. Once connected, you get a full interactive shell — exactly as if you were sitting in front of the machine with a keyboard. Every keystroke, every command output is encrypted in transit.
+        </p>
+        <p class="section-body">
+          Without SSH, controlling a headless server requires a physically connected monitor and keyboard. SSH eliminates that requirement entirely — you control spserver from your Windows PC, phone, or any device, over any network.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>SSH is not just for servers. It's used by developers, sysadmins, and DevOps engineers constantly — to deploy code, manage cloud instances, configure databases, debug issues. Learning SSH deeply is one of the most high-value skills in the field.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="how-it-works">
+        <div class="section-eyebrow">02 — How it works</div>
+        <div class="section-title">The SSH connection flow</div>
+        <p class="section-body">
+          SSH uses <b>asymmetric cryptography</b> to establish a secure channel before any data is exchanged. Here is what happens when you run <code>ssh sipu@192.168.31.150</code>:
+        </p>
+        <div class="diagram">
+<span class="db">Your PC</span>                                    <span class="dg">spserver (sshd)</span>
+   <span class="dm">│</span>                                              <span class="dm">│</span>
+   <span class="dm">│── TCP connection to port 22 ──────────────►│</span>
+   <span class="dm">│                                              │</span>
+   <span class="dm">│◄── Server sends its public key (host key) ──│</span>
+   <span class="dm">│                                              │</span>
+   <span class="dm">│── Client verifies host key ─────────────────►│</span>
+   <span class="dm">│   (checks ~/.ssh/known_hosts on your PC)     │</span>
+   <span class="dm">│                                              │</span>
+   <span class="dm">│◄──── Encrypted session established ─────────►│</span>
+   <span class="dm">│                                              │</span>
+   <span class="dm">│── Password or key authentication ───────────►│</span>
+   <span class="dm">│                                              │</span>
+   <span class="dg">│◄──── Full encrypted terminal session ───────►│</span>
+        </div>
+        <p class="section-body">
+          The <b>host key</b> is the server's identity — a unique cryptographic fingerprint. The first time you connect, SSH asks you to verify and save it. Subsequent connections compare against the saved fingerprint — if it changes, SSH warns you (this is the protection against man-in-the-middle attacks).
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="auth-methods">
+        <div class="section-eyebrow">03 — Authentication</div>
+        <div class="section-title">Password vs SSH key authentication</div>
+        <p class="section-body">
+          SSH supports two main authentication methods. We currently use password auth — SSH keys are the recommended next step.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--amber)">Password authentication — current</div>
+            <div class="ic-body">You type your Linux user password. Simple to set up — no extra steps. The downside: automated bots constantly scan the internet for port 22 and try common passwords (brute force attacks). Mitigated by UFW blocking port 22 externally, and Tailscale for remote access.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">SSH key authentication — recommended</div>
+            <div class="ic-body">A cryptographic key pair. Your PC holds a <b>private key</b> (secret, never shared). The server stores your <b>public key</b> (safe to share). No password to guess or brute force. Also more convenient — no typing on trusted machines. See the Config tab for setup.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="access-methods">
+        <div class="section-eyebrow">04 — Access methods</div>
+        <div class="section-title">Three ways to SSH into spserver</div>
+        <div class="access-grid">
+          <div class="access-card">
+            <div class="ac-label" style="color:var(--green)">Local network — fastest</div>
+            <div class="ac-cmd">ssh sipu@192.168.31.150</div>
+            <div class="ac-desc">When your PC is on the same home network (192.168.31.x). Direct connection — no middleman. Fastest option.</div>
+          </div>
+          <div class="access-card">
+            <div class="ac-label" style="color:var(--blue)">Anywhere via Tailscale</div>
+            <div class="ac-cmd">ssh sipu@100.x.x.x</div>
+            <div class="ac-desc">From any network worldwide — mobile data, work WiFi, cafe. Tailscale VPN bypasses CG-NAT. Also the emergency backup if Cloudflare Tunnel goes down.</div>
+          </div>
+          <div class="access-card">
+            <div class="ac-label" style="color:var(--amber)">Browser — no SSH client needed</div>
+            <div class="ac-cmd">terminal.dustyserver.co.in</div>
+            <div class="ac-desc">ttyd runs a terminal in any browser. No SSH client, no Tailscale app needed. Works from phone, tablet, work PC. See the ttyd guide.</div>
+          </div>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>Port 22 is intentionally <b>not</b> exposed to the public internet via Cloudflare Tunnel. External SSH access goes through Tailscale only — encrypted, private, no port exposed.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-sshd">
+        <div class="section-eyebrow">05 — Concept</div>
+        <div class="section-title">What is sshd — the SSH daemon</div>
+        <p class="section-body">
+          When you install <code>openssh-server</code>, it installs a program called <b>sshd</b> (SSH daemon). The <code>d</code> stands for daemon — a background process that runs continuously. sshd listens on port 22, waiting for incoming connections. When you SSH in, sshd handles the handshake, verifies your identity, and opens a session.
+        </p>
+        <div class="diagram">
+<span class="dg">sshd runs on spserver</span>  <span class="dm">← started by systemd at boot</span>
+<span class="dm">   └── listens on port 22</span>
+<span class="dm">   └── waits for connections</span>
+<span class="dm">   └── when connection arrives:</span>
+<span class="dm">        ├── performs key exchange</span>
+<span class="dm">        ├── verifies identity (password or key)</span>
+<span class="dm">        ├── opens a shell session</span>
+<span class="dm">        └── keeps session alive until you exit</span>
+        </div>
+        <p class="section-body">
+          sshd reads its configuration from <code>/etc/ssh/sshd_config</code>. Any changes to that file require restarting sshd to take effect.
+        </p>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Install and start the SSH server</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install openssh-server</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The <code>openssh-server</code> package installs sshd — the server-side daemon. The client-side tools (the <code>ssh</code> command you type) come with Ubuntu by default. You only need to install the server package on spserver.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt install openssh-server -y</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Enable and start the service</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why"><b>enable</b> makes sshd start automatically on every boot. <b>start</b> starts it right now without rebooting. You need both — enable alone means it only starts next boot, start alone means it stops after the next reboot.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Auto-start on every boot</span>
+<span class="nm">sudo systemctl enable ssh</span>
+
+<span class="cm"># Start right now</span>
+<span class="nm">sudo systemctl start ssh</span>
+
+<span class="cm"># Verify it is running — look for: Active: active (running)</span>
+<span class="nm">sudo systemctl status ssh</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Confirm SSH is listening on port 22</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">This confirms sshd is actually listening for connections. If this shows nothing, sshd is not running or is listening on a different port.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo ss -tlnp | grep ssh</span>
+<span class="cm"># Expected output: something like</span>
+<span class="cm"># LISTEN 0  128  0.0.0.0:22  0.0.0.0:*  users:(("sshd",pid=...))</span>
+<span class="cm"># 0.0.0.0:22 means it's listening on ALL interfaces on port 22</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-ufw">
+        <div class="section-eyebrow">02 — Firewall</div>
+        <div class="section-title">Open port 22 in UFW</div>
+        <p class="section-body">
+          UFW (Uncomplicated Firewall) blocks all incoming connections by default. Even though sshd is running, connections will be refused until UFW is told to allow port 22.
+        </p>
+        <div class="alert danger">
+          <span class="alert-icon">✗</span>
+          <span><b>Critical order warning:</b> Always open port 22 in UFW BEFORE enabling UFW. If you enable UFW with no rules and you are connected via SSH, your session will be immediately cut off and you'll be locked out.</span>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Allow SSH through UFW</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Open port 22 for SSH BEFORE enabling UFW</span>
+<span class="nm">sudo ufw allow 22/tcp</span>
+
+<span class="cm"># Now enable the firewall</span>
+<span class="nm">sudo ufw enable</span>
+
+<span class="cm"># Verify the rule is in place</span>
+<span class="nm">sudo ufw status</span>
+<span class="cm"># Should show: 22/tcp  ALLOW  Anywhere</span></pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>UFW only controls traffic at the server level. Port 22 is still not reachable from the public internet because Airtel CG-NAT blocks all incoming connections. Tailscale is how you reach it remotely.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">03 — Connect</div>
+        <div class="section-title">Test the connection</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">SSH from your Windows PC (local network)</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Windows 10/11 has a built-in SSH client. Open Windows Terminal, PowerShell, or Command Prompt and connect directly — no third-party software needed.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows Terminal / PowerShell</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Basic connection — enter password when prompted</span>
+<span class="nm">ssh</span> sipu@192.168.31.150
+
+<span class="cm"># Verbose output — shows each step of the handshake</span>
+<span class="cm"># Useful for debugging connection issues</span>
+<span class="nm">ssh</span> -v sipu@192.168.31.150
+
+<span class="cm"># Specify port explicitly (useful if port is not 22)</span>
+<span class="nm">ssh</span> -p 22 sipu@192.168.31.150</pre>
+            </div>
+            <p class="step-why">First connection will show a fingerprint warning — this is normal. Type <code>yes</code> to save the server's fingerprint to <code>~/.ssh/known_hosts</code> on your Windows PC. Subsequent connections skip this step.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">SSH from anywhere via Tailscale</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Once Tailscale is installed on both devices (see Tailscale guide), you can SSH from any network using the Tailscale IP. Same command, different IP address.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash / PowerShell — from anywhere</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Get spserver's Tailscale IP first (run on spserver)</span>
+<span class="nm">tailscale ip</span>
+
+<span class="cm"># SSH using Tailscale IP from any device anywhere</span>
+<span class="nm">ssh</span> sipu@100.x.x.x   <span class="cm"># replace with actual Tailscale IP</span></pre>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-windows-config">
+        <div class="section-eyebrow">04 — Convenience</div>
+        <div class="section-title">SSH config file on Windows — shortcuts</div>
+        <p class="section-body">
+          Instead of typing the full command every time, create an SSH config file on your Windows PC. This lets you type a short alias instead of the full IP address.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">C:\Users\subha\.ssh\config — create this file</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Local network connection</span>
+<span class="kw">Host</span> <span class="str">spserver</span>
+    <span class="nm">HostName</span> <span class="str">192.168.31.150</span>
+    <span class="nm">User</span>     <span class="str">sipu</span>
+    <span class="nm">Port</span>     <span class="str">22</span>
+
+<span class="cm"># Remote connection via Tailscale</span>
+<span class="kw">Host</span> <span class="str">spserver-remote</span>
+    <span class="nm">HostName</span> <span class="str">100.x.x.x</span>    <span class="cm"># your Tailscale IP</span>
+    <span class="nm">User</span>     <span class="str">sipu</span>
+    <span class="nm">Port</span>     <span class="str">22</span></pre>
+        </div>
+        <p class="section-body">After saving, connect with just:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows Terminal</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">ssh</span> spserver           <span class="cm"># local — instead of ssh sipu@192.168.31.150</span>
+<span class="nm">ssh</span> spserver-remote    <span class="cm"># remote via Tailscale</span></pre>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-sshd">
+        <div class="section-eyebrow">01 — Server config</div>
+        <div class="section-title">sshd_config — server-side configuration</div>
+        <p class="section-body">
+          The SSH server's main config file lives at <code>/etc/ssh/sshd_config</code>. The defaults are secure enough for getting started — you should only change these settings when you have a specific reason. Always restart sshd after any change.
+        </p>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Never lock yourself out of SSH while editing this file. Keep your current session open, make changes in a second session, test the new session works, then close the original. If you close the only session and have a broken config — you need physical access.</span>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:35%">Setting</th><th>What it controls</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">Port 22</td><td class="le-desc">Which port sshd listens on. Default is 22. Some guides suggest changing to a high port (e.g. 2222) to reduce bot noise — minor security benefit but more inconvenient. We keep 22.</td></tr>
+            <tr><td class="le-code">PermitRootLogin no</td><td class="le-desc"><b>Important.</b> Disables direct login as root. Always leave this as <code>no</code> — login as sipu and use sudo instead. Default on Ubuntu is <code>prohibit-password</code> which also disallows root password login.</td></tr>
+            <tr><td class="le-code">PasswordAuthentication yes</td><td class="le-desc">Allows password-based login. Currently set to yes. When SSH keys are set up, change to <code>no</code> to disable password login entirely — much more secure.</td></tr>
+            <tr><td class="le-code">PubkeyAuthentication yes</td><td class="le-desc">Allows key-based authentication. Default yes — keep this enabled.</td></tr>
+            <tr><td class="le-code">AuthorizedKeysFile</td><td class="le-desc">Where to look for authorised public keys. Default: <code>~/.ssh/authorized_keys</code>. No need to change.</td></tr>
+            <tr><td class="le-code">MaxAuthTries 6</td><td class="le-desc">Max password attempts before connection is dropped. Reduce to 3 for slightly better security.</td></tr>
+            <tr><td class="le-code">ClientAliveInterval 300</td><td class="le-desc">Send keepalive packets every 300 seconds to prevent idle sessions from dropping.</td></tr>
+            <tr><td class="le-code">X11Forwarding no</td><td class="le-desc">Disable X11 GUI forwarding — not needed on a server.</td></tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — after editing sshd_config</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Test config for syntax errors before restarting</span>
+<span class="nm">sudo sshd -t</span>
+
+<span class="cm"># Restart sshd to apply changes</span>
+<span class="nm">sudo systemctl restart ssh</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-client">
+        <div class="section-eyebrow">02 — Client config</div>
+        <div class="section-title">SSH client config file</div>
+        <p class="section-body">
+          The SSH client config on your <b>Windows PC</b> stores connection shortcuts and settings per host. This is separate from sshd_config — it lives on your Windows machine, not on spserver.
+        </p>
+        <table class="le-table">
+          <thead><tr><th style="width:35%">Option</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">Host NAME</td><td class="le-desc">Alias you type — <code>ssh NAME</code>. Can be anything.</td></tr>
+            <tr><td class="le-code">HostName IP</td><td class="le-desc">Actual IP or domain to connect to.</td></tr>
+            <tr><td class="le-code">User sipu</td><td class="le-desc">Username to login as — saves typing <code>sipu@</code> every time.</td></tr>
+            <tr><td class="le-code">Port 22</td><td class="le-desc">Port to connect on. Can omit if it's 22 (default).</td></tr>
+            <tr><td class="le-code">IdentityFile PATH</td><td class="le-desc">Path to your private key file — needed when using SSH key auth.</td></tr>
+            <tr><td class="le-code">ServerAliveInterval 60</td><td class="le-desc">Send keepalive every 60s to prevent idle disconnection.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-keys">
+        <div class="section-eyebrow">03 — SSH keys (next step)</div>
+        <div class="section-title">Setting up SSH key authentication</div>
+        <p class="section-body">
+          SSH keys are more secure and more convenient than passwords. A key pair consists of a <b>private key</b> (stays on your PC, never shared) and a <b>public key</b> (copied to spserver). The server verifies you hold the private key without you ever sending it.
+        </p>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num">1</div>
+            <div class="step-title">Generate key pair on Windows PC</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows Terminal / PowerShell</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Generate an Ed25519 key pair (modern, recommended)</span>
+<span class="nm">ssh-keygen -t ed25519 -C</span> <span class="str">"sipu@spserver"</span>
+
+<span class="cm"># Accept default location: C:\Users\subha\.ssh\id_ed25519</span>
+<span class="cm"># Set a passphrase (optional but recommended for extra security)</span>
+
+<span class="cm"># Two files are created:</span>
+<span class="cm"># id_ed25519     ← private key (NEVER share this)</span>
+<span class="cm"># id_ed25519.pub ← public key (copy this to server)</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num">2</div>
+            <div class="step-title">Copy public key to spserver</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">Windows Terminal</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Windows ssh-copy-id equivalent</span>
+<span class="nm">type</span> $env:USERPROFILE\.ssh\id_ed25519.pub | <span class="nm">ssh</span> sipu@192.168.31.150 <span class="str">"mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"</span></pre>
+            </div>
+            <p class="step-why">Or manually: copy the contents of <code>id_ed25519.pub</code>, SSH into spserver, and paste into <code>~/.ssh/authorized_keys</code>.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num">3</div>
+            <div class="step-title">Test and disable password login</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — test key auth works first</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># From Windows — should login without password prompt</span>
+<span class="nm">ssh</span> sipu@192.168.31.150
+
+<span class="cm"># Only after confirming key auth works — disable password login on server</span>
+<span class="nm">sudo nano</span> /etc/ssh/sshd_config
+<span class="cm"># Change: PasswordAuthentication yes → PasswordAuthentication no</span>
+<span class="nm">sudo systemctl restart ssh</span></pre>
+            </div>
+            <div class="alert danger">
+              <span class="alert-icon">✗</span>
+              <span>Never disable password auth without first confirming key auth works. If keys don't work and you disable passwords — you are permanently locked out (no physical access = bricked server).</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-server">
+        <div class="section-eyebrow">01 — Server side</div>
+        <div class="section-title">SSH server management commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status ssh</div><div class="cmd-desc">Check if sshd is running — green active means it's listening</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl start ssh</div><div class="cmd-desc">Start sshd if it's not running</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl stop ssh</div><div class="cmd-desc">Stop sshd — disconnects all active SSH sessions</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart ssh</div><div class="cmd-desc">Restart sshd — use after changing sshd_config</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable ssh</div><div class="cmd-desc">Auto-start sshd on boot</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo sshd -t</div><div class="cmd-desc">Test sshd_config for syntax errors without restarting</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ss -tlnp | grep ssh</div><div class="cmd-desc">Show which port sshd is listening on</div></div>
+          <div class="cmd-row"><div class="cmd-code">who</div><div class="cmd-desc">Show who is currently logged in via SSH</div></div>
+          <div class="cmd-row"><div class="cmd-code">last</div><div class="cmd-desc">Show history of recent SSH logins and logouts</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo cat /var/log/auth.log | grep sshd</div><div class="cmd-desc">View SSH login attempts — shows failed attempts too</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u ssh -f</div><div class="cmd-desc">Follow SSH logs live — useful for debugging connection issues</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo nano /etc/ssh/sshd_config</div><div class="cmd-desc">Edit the SSH server configuration</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-client">
+        <div class="section-eyebrow">02 — Client side</div>
+        <div class="section-title">SSH client commands (run from your PC)</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">ssh sipu@192.168.31.150</div><div class="cmd-desc">Connect to spserver on local network</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh sipu@100.x.x.x</div><div class="cmd-desc">Connect via Tailscale from anywhere</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh -v sipu@192.168.31.150</div><div class="cmd-desc">Verbose — shows full connection handshake, useful for debugging</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh -p 2222 sipu@192.168.31.150</div><div class="cmd-desc">Connect on a non-default port</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh -i ~/.ssh/id_ed25519 sipu@192.168.31.150</div><div class="cmd-desc">Connect using a specific private key file</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh-keygen -t ed25519 -C "label"</div><div class="cmd-desc">Generate a new SSH key pair</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh-keygen -R 192.168.31.150</div><div class="cmd-desc">Remove server fingerprint from known_hosts — run when fingerprint changes</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh sipu@192.168.31.150 "command"</div><div class="cmd-desc">Run a single command over SSH without opening a full session</div></div>
+          <div class="cmd-row"><div class="cmd-code">scp file.txt sipu@192.168.31.150:~/</div><div class="cmd-desc">Copy a file to spserver home directory over SSH</div></div>
+          <div class="cmd-row"><div class="cmd-code">scp sipu@192.168.31.150:~/file.txt .</div><div class="cmd-desc">Copy a file from spserver to current directory on your PC</div></div>
+          <div class="cmd-row"><div class="cmd-code">ssh -L 8080:localhost:80 sipu@192.168.31.150</div><div class="cmd-desc">SSH tunnel — forward local port 8080 to spserver port 80</div></div>
+          <div class="cmd-row"><div class="cmd-code">sftp sipu@192.168.31.150</div><div class="cmd-desc">Open an SFTP session for interactive file transfer</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">SSH timed out from public IP — port forwarding set but not working</div>
+          <div class="bb-body">
+            SSH worked fine on the local network. Tried connecting from a mobile hotspot using the public IP — got "Connection timed out". Port forwarding had been configured on the backup router (192.168.31.1) but the connection still timed out from outside.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Root cause</div>
+          <div class="fb-title">Double NAT — port forwarding only set on one router</div>
+          <div class="fb-body">
+            The network has two routers stacked: Airtel modem (192.168.1.1) and backup router (192.168.31.1). Traffic from the internet hits the Airtel modem first — which had no forwarding rule — and dropped the connection before it reached the backup router. Port forwarding must be set on both. This led to discovering CG-NAT (see next blocker).
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">CG-NAT confirmed — port forwarding impossible regardless of configuration</div>
+          <div class="bb-body">
+            After setting forwarding on both routers, SSH still failed from outside. Checked the Airtel modem WAN IP — showed <code>100.220.x.x</code>. The 100.x.x.x range is IANA-reserved for Carrier Grade NAT. Airtel does not give spserver a real public IP — hundreds of customers share one real IP through Airtel's own NAT layer.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Tailscale for remote SSH — bypasses CG-NAT entirely</div>
+          <div class="fb-body">
+            Installed Tailscale on both spserver and the Windows PC. Both devices reach out to Tailscale's coordination servers — outgoing connections always work behind CG-NAT. They establish a direct encrypted peer-to-peer tunnel. <code>ssh sipu@100.x.x.x</code> (Tailscale IP) now works from any network worldwide. Port forwarding is no longer attempted. See the Tailscale guide for setup.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common SSH problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">ssh: connect to host 192.168.31.150 port 22: Connection refused</div>
+          <div class="ts-body">sshd is not running on the server. Solutions: (1) If you have physical access — start it: <code>sudo systemctl start ssh</code>. (2) Check if it ever ran: <code>sudo systemctl status ssh</code>. (3) Check UFW: <code>sudo ufw status</code> — make sure port 22 is allowed. Connection refused means the port is closed or sshd is down. Connection timed out means the packet never reached the server (firewall or network issue).</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">ssh: connect to host 192.168.31.150 port 22: Connection timed out</div>
+          <div class="ts-body">The connection attempt is not reaching sshd. Causes: (1) UFW is blocking port 22 — check with <code>sudo ufw status</code>. (2) Wrong IP address — verify spserver's IP with <code>ip addr show ethusb0</code>. (3) Connecting from outside home network to local IP — use Tailscale IP instead. (4) Network cable unplugged or interface down.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Permission denied (publickey) — cannot login with password</div>
+          <div class="ts-body">PasswordAuthentication has been set to <code>no</code> in sshd_config. If you don't have key auth set up, you are locked out. Recover with physical access: open <code>/etc/ssh/sshd_config</code>, change <code>PasswordAuthentication no</code> to <code>yes</code>, restart sshd. Or access via Tailscale if it was set up beforehand.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED</div>
+          <div class="ts-body">The server's SSH fingerprint has changed since you last connected. This happens after an OS reinstall or if the sshd host keys were regenerated. It is also the warning SSH shows for potential man-in-the-middle attacks. If you know you reinstalled the OS — safe to clear: <code>ssh-keygen -R 192.168.31.150</code> on your Windows PC. Then reconnect and accept the new fingerprint.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">SSH session drops / disconnects after inactivity</div>
+          <div class="ts-body">The connection times out due to inactivity. Fix on the server side — add to <code>/etc/ssh/sshd_config</code>: <code>ClientAliveInterval 60</code> and <code>ClientAliveCountMax 3</code>. Or fix on the client side — add to <code>~/.ssh/config</code> on your Windows PC: <code>ServerAliveInterval 60</code> under the Host block.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Permission denied — ssh key not working</div>
+          <div class="ts-body">Key authentication failing. Check: (1) Public key is in <code>~/.ssh/authorized_keys</code> on the server. (2) Permissions are correct: <code>chmod 700 ~/.ssh</code> and <code>chmod 600 ~/.ssh/authorized_keys</code> on the server. (3) PubkeyAuthentication is <code>yes</code> in sshd_config. (4) The right private key is being used — check with <code>ssh -v</code>.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Too many authentication failures</div>
+          <div class="ts-body">SSH is trying multiple keys automatically from your keyring and hitting the MaxAuthTries limit. Fix: specify the key explicitly: <code>ssh -i ~/.ssh/id_ed25519 sipu@192.168.31.150</code>. Or add <code>IdentitiesOnly yes</code> to the Host block in your SSH client config.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>SSH key authentication</b> — generate an Ed25519 key pair, copy the public key to spserver, disable password login. More secure and more convenient. Covered in the Config tab — do this next.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>fail2ban</b> — automatically ban IP addresses that fail SSH authentication too many times. Protects against brute force attacks. Install with <code>sudo apt install fail2ban</code> — works out of the box with sensible defaults.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>SSH via Cloudflare Tunnel</b> — expose SSH at <code>ssh.dustyserver.co.in</code> through cloudflared. Requires cloudflared on every client. Less useful than Tailscale for personal use but relevant in enterprise contexts.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>SSH port knocking</b> — hide port 22 completely. UFW blocks it by default. A sequence of connection attempts to other ports "unlocks" port 22 temporarily. Obscurity-level security — not a replacement for keys and fail2ban.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>SSH jump hosts / ProxyJump</b> — connect through one SSH server to reach another. Useful when you have multiple servers and want to use spserver as a gateway to reach them. Config: <code>ProxyJump spserver</code> in client config.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>SSH tunnelling / port forwarding</b> — forward local ports to remote services through SSH. Access a database or internal service on spserver as if it were running locally. Already shown in the commands tab — explore more advanced use cases.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Mosh</b> — Mobile Shell. SSH-like but handles network interruptions gracefully. If your mobile connection drops while SSH'd in, Mosh reconnects automatically. Useful for phone access.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>

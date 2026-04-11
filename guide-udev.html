@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interface Rename with udev — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.name-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: .75rem 0;
+}
+.name-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  text-align: center;
+}
+.name-card.bad  { border-color: rgba(240,101,101,0.25); }
+.name-card.good { border-color: rgba(61,220,132,0.25); }
+.name-val {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: .4rem;
+}
+.name-card.bad .name-val  { color: var(--red); }
+.name-card.good .name-val { color: var(--green); }
+.name-label { font-size: 12px; color: var(--text3); margin-bottom: .5rem; font-family: var(--mono); }
+.name-desc  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+.udev-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: .75rem 0;
+}
+.uf-row {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+}
+.uf-line {
+  width: 2px;
+  background: var(--border2);
+  margin-left: 18px;
+  min-height: 16px;
+}
+.uf-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+.uf-content {
+  flex: 1;
+  padding-bottom: 14px;
+}
+.uf-title { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.uf-sub   { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.uf-sub code {
+  font-family: var(--mono); font-size: 11px;
+  background: var(--bg3); padding: 1px 5px; border-radius: 3px; color: var(--blue);
+}
+
+@media(max-width:600px){ .name-compare{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Interface Rename — udev</div>
+  <div class="nav-phase">Phase 1 — Linux Foundations</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('the-problem')">The problem</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-udev')">What is udev</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('predictable-names')">Predictable naming</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('udev-vs-systemd')">udev vs systemd .link</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-find-mac')">Find MAC address</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-rule')">Write udev rule</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-apply')">Apply and reboot</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify rename worked</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-netplan')">Update Netplan</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-rule')">Rule file explained</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('c-attributes')">udev attributes</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-udev')">udev commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 3 of 14</div>
+      <h1 class="gh-title">Interface Rename <span>with udev</span></h1>
+      <p class="gh-sub">Renaming the USB ethernet adapter from its auto-generated MAC-based name to a clean, human-readable <code>ethusb0</code> — so every config file, firewall rule, and Netplan entry uses a consistent, predictable name.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config file</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="the-problem">
+        <div class="section-eyebrow">01 — The problem</div>
+        <div class="section-title">Why the default interface name is a problem</div>
+        <p class="section-body">
+          spserver uses a USB ethernet adapter instead of the built-in NIC. On modern Linux, USB ethernet adapters get auto-generated names based on their MAC address — producing names like <code>enx00e04c680bc2</code>. This is technically unique and predictable, but completely impractical to work with.
+        </p>
+        <div class="name-compare">
+          <div class="name-card bad">
+            <div class="name-label">auto-generated name</div>
+            <div class="name-val">enx00e04c680bc2</div>
+            <div class="name-desc">18 characters. Encodes the MAC address. Hard to type. Easy to mistype. Changes if you swap adapters. Clutters every config file.</div>
+          </div>
+          <div class="name-card good">
+            <div class="name-label">after udev rename</div>
+            <div class="name-val">ethusb0</div>
+            <div class="name-desc">7 characters. Meaningful — "ethernet USB adapter 0". Easy to type. Never changes. Consistent across all config files.</div>
+          </div>
+        </div>
+        <p class="section-body">
+          Every place the interface name appears — Netplan config, UFW rules, ip commands, network diagnostics — would require typing that 18-character string. A single typo in the Netplan config breaks networking and locks you out of SSH. Renaming to <code>ethusb0</code> makes everything cleaner and less error-prone.
+        </p>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>The interface rename must be done <b>before</b> writing the Netplan static IP config. The name in the Netplan YAML must exactly match the actual interface name. If you write Netplan with the long MAC-based name and then rename — the Netplan config breaks.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="what-udev">
+        <div class="section-eyebrow">02 — Concept</div>
+        <div class="section-title">What is udev</div>
+        <p class="section-body">
+          udev is the Linux <b>device manager</b> — a system service that handles what happens when hardware is connected or disconnected. When you plug in a USB drive, keyboard, ethernet adapter, or any peripheral, udev detects the event and applies rules to configure the device: what name to assign it, what permissions to set, what scripts to run.
+        </p>
+        <p class="section-body">
+          udev rules live in <code>/etc/udev/rules.d/</code> — a directory of rule files that are processed in alphabetical-numerical order. Each rule is one line describing: match conditions (what device to match) and actions (what to do when matched).
+        </p>
+        <div class="udev-flow">
+          <div class="uf-row">
+            <div class="uf-dot"></div>
+            <div class="uf-content">
+              <div class="uf-title">Hardware event</div>
+              <div class="uf-sub">USB ethernet adapter connects at boot (or is plugged in)</div>
+            </div>
+          </div>
+          <div class="uf-line"></div>
+          <div class="uf-row">
+            <div class="uf-dot"></div>
+            <div class="uf-content">
+              <div class="uf-title">Kernel detects device</div>
+              <div class="uf-sub">Kernel creates a device entry and sends a <code>uevent</code> to udev</div>
+            </div>
+          </div>
+          <div class="uf-line"></div>
+          <div class="uf-row">
+            <div class="uf-dot"></div>
+            <div class="uf-content">
+              <div class="uf-title">udev processes rules</div>
+              <div class="uf-sub">udev reads <code>/etc/udev/rules.d/</code> files in order, checks each rule against the device attributes</div>
+            </div>
+          </div>
+          <div class="uf-line"></div>
+          <div class="uf-row">
+            <div class="uf-dot"></div>
+            <div class="uf-content">
+              <div class="uf-title">Rule matches</div>
+              <div class="uf-sub">Our rule matches: <code>SUBSYSTEM=="net"</code>, <code>ACTION=="add"</code>, <code>ATTR{address}=="00:e0:4c:68:0b:c2"</code></div>
+            </div>
+          </div>
+          <div class="uf-line"></div>
+          <div class="uf-row">
+            <div class="uf-dot"></div>
+            <div class="uf-content">
+              <div class="uf-title">Action applied</div>
+              <div class="uf-sub">udev assigns <code>NAME="ethusb0"</code> — the interface appears as ethusb0 instead of enx00e04c680bc2</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="predictable-names">
+        <div class="section-eyebrow">03 — Context</div>
+        <div class="section-title">Why Linux uses these long names by default</div>
+        <p class="section-body">
+          The long MAC-based names are part of Linux's <b>Predictable Network Interface Names</b> scheme introduced in systemd. Before this, interfaces were named <code>eth0</code>, <code>eth1</code> etc. — but those names were assigned in the order hardware was detected at boot, which could change between reboots. A server with two NICs might see them as eth0/eth1 on one boot and eth1/eth0 on the next. For servers with bonded NICs or specific routing rules, this was a serious problem.
+        </p>
+        <p class="section-body">
+          The solution: name interfaces based on their physical characteristics so the same hardware always gets the same name. For PCI NICs this produces names like <code>eno1</code> (onboard) or <code>enp2s0</code> (PCI slot 2). For USB NICs, the MAC address is the most stable identifier — hence <code>enx</code> + MAC address.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--amber)">Predictable naming — the problem it solves</div>
+            <div class="ic-body">Same physical NIC always gets the same name. Bonding, routing rules, and firewall rules survive reboots without re-checking which eth number is which.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--blue)">udev rename — best of both worlds</div>
+            <div class="ic-body">We keep predictability (rule matches by MAC, always same adapter) but get a clean, human-readable name. <code>ethusb0</code> is both stable and easy to type.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="udev-vs-systemd">
+        <div class="section-eyebrow">04 — Important distinction</div>
+        <div class="section-title">udev rules vs systemd .link files — what works on spserver</div>
+        <p class="section-body">
+          There are two common methods for renaming network interfaces on modern Ubuntu — and they are not interchangeable. The correct one depends on your specific setup. We discovered this through trial and error.
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Method</th><th>File location</th><th>Works on spserver?</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">udev rule <span class="tag tag-g">what we use</span></td>
+              <td class="desc"><code>/etc/udev/rules.d/10-network.rules</code></td>
+              <td class="val green">Yes ✓</td>
+              <td class="desc">Reliable on Ubuntu 24.04 with USB ethernet on spserver. Confirmed working after reboot.</td>
+            </tr>
+            <tr>
+              <td class="key">systemd .link file</td>
+              <td class="desc"><code>/etc/systemd/network/10-rename.link</code></td>
+              <td class="val">Not confirmed</td>
+              <td class="desc">The alternative method. Works on some setups where udev alone doesn't apply before systemd-networkd initialises the interface. Not needed on spserver.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span><b>On spserver:</b> udev rule at <code>/etc/udev/rules.d/10-network.rules</code> — rebooted after creating the rule — rename applies correctly and permanently. This is the authoritative method for our setup.</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-find-mac">
+        <div class="section-eyebrow">01 — Find the adapter</div>
+        <div class="section-title">Step 1 — Find the MAC address of the USB ethernet adapter</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Identify the USB ethernet adapter and its MAC address</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The udev rule matches the adapter by its MAC address — a hardware-burned identifier that never changes for a specific adapter. We need the exact MAC address to write an accurate rule. The MAC is visible in the output of <code>ip link show</code>.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run on spserver before the rename</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># List all network interfaces</span>
+<span class="nm">ip link show</span>
+
+<span class="cm"># Example output:</span>
+<span class="cm"># 1: lo: &lt;LOOPBACK&gt; ...</span>
+<span class="cm"># 2: enp2s0: &lt;NO-CARRIER&gt; ... (built-in NIC — not connected)</span>
+<span class="cm"># 3: enx00e04c680bc2: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</span>
+<span class="cm">#       link/ether 00:e0:4c:68:0b:c2 brd ff:ff:ff:ff:ff:ff</span>
+<span class="cm">#                  ↑ this is the MAC address</span>
+
+<span class="cm"># The USB adapter is identifiable by:</span>
+<span class="cm"># - Name starts with "enx" (USB ethernet uses "enx" + MAC)</span>
+<span class="cm"># - State shows UP (it's connected and active)</span>
+<span class="cm"># - Has an assigned IP if Netplan is already working</span>
+
+<span class="cm"># Alternatively — list USB devices to find the adapter</span>
+<span class="nm">lsusb</span>
+<span class="cm"># Look for an ethernet/network adapter in the list</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>Our adapter MAC address: <b>00:e0:4c:68:0b:c2</b> — this is what the udev rule matches against. Yours will be different. Use the MAC from your own <code>ip link show</code> output.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-rule">
+        <div class="section-eyebrow">02 — Write the rule</div>
+        <div class="section-title">Step 2 — Create the udev rule file</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Write the rule — replace MAC with your own</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Rule files in <code>/etc/udev/rules.d/</code> are numbered — lower numbers are processed first. We use <code>10-network.rules</code> (prefix 10) to ensure it runs early, before other network-related rules. Each line in the file is one rule — we only need one.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create the udev rules file</span>
+<span class="nm">sudo nano</span> /etc/udev/rules.d/10-network.rules</pre>
+            </div>
+            <p class="step-why">Paste this single line — replacing the MAC address with your adapter's MAC from step 1:</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/udev/rules.d/10-network.rules</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:e0:4c:68:0b:c2", NAME="ethusb0"</pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>This is a single line — no line breaks. The MAC address must be lowercase with colons exactly as shown by <code>ip link show</code>. The NAME value is what your interface will be called after rename.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-apply">
+        <div class="section-eyebrow">03 — Apply</div>
+        <div class="section-title">Step 3 — Reload rules and reboot</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Reload udev and reboot to apply the rename</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Running <code>udevadm control --reload-rules</code> tells udev to re-read all rule files. However, for a network interface rename, a full reboot is the most reliable way to ensure the new name is applied cleanly — the rename happens when the device is first detected during boot, before networking starts.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Tell udev to reload all rule files</span>
+<span class="nm">sudo udevadm control --reload-rules</span>
+
+<span class="cm"># Trigger udev events (may not fully apply network rename without reboot)</span>
+<span class="nm">sudo udevadm trigger</span>
+
+<span class="cm"># Reboot — the rename will be applied on next boot</span>
+<span class="nm">sudo reboot</span>
+
+<span class="cm"># Note: SSH will disconnect during reboot — reconnect after ~1 minute</span>
+<span class="cm"># ssh sipu@192.168.31.150</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>After reboot, SSH back in using the static IP (192.168.31.150) — same as before. The rename only changes the interface name, not the IP address. If the static IP was already configured in Netplan using the old name, update Netplan to use <code>ethusb0</code> first (see Step 5).</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Verify</div>
+        <div class="section-title">Step 4 — Confirm the rename worked</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run after reboot</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Check interface list — should now show ethusb0, not enx00e04c...</span>
+<span class="nm">ip link show</span>
+
+<span class="cm"># Specifically check ethusb0 exists and is UP</span>
+<span class="nm">ip link show ethusb0</span>
+<span class="cm"># Should show: ethusb0: &lt;BROADCAST,MULTICAST,UP,LOWER_UP&gt;</span>
+
+<span class="cm"># Confirm IP address is still assigned</span>
+<span class="nm">ip addr show ethusb0</span>
+<span class="cm"># Should show: inet 192.168.31.150/24</span>
+
+<span class="cm"># Confirm networking still works</span>
+<span class="nm">ping -c 3 8.8.8.8</span>
+
+<span class="cm"># Check udev saw the rule was applied</span>
+<span class="nm">udevadm info /sys/class/net/ethusb0</span>
+<span class="cm"># Shows all udev properties for the interface</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>If <code>ip link show ethusb0</code> shows the interface as UP and <code>ip addr show ethusb0</code> shows 192.168.31.150 — the rename is working correctly and permanently. The MAC address is hardware-burned, so this rule matches every time the adapter is connected.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-netplan">
+        <div class="section-eyebrow">05 — Update Netplan</div>
+        <div class="section-title">Step 5 — Make sure Netplan uses the new name</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Update Netplan config to reference ethusb0</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">If Netplan was already written using the old MAC-based name, it now refers to an interface that no longer exists. Update the YAML to use <code>ethusb0</code>. If Netplan hasn't been written yet — write it with <code>ethusb0</code> from the start (see the Netplan guide).</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/netplan/01-netcfg.yaml — use ethusb0 not the long name</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="kw">network</span>:
+  <span class="nm">version</span>: <span class="str">2</span>
+  <span class="nm">renderer</span>: <span class="str">networkd</span>
+  <span class="kw">ethernets</span>:
+    <span class="nm">ethusb0</span>:          <span class="cm"># ← use the new name here, not enx00e04c680bc2</span>
+      <span class="nm">dhcp4</span>: <span class="str">false</span>
+      <span class="nm">addresses</span>:
+        - <span class="str">192.168.31.150/24</span>
+      <span class="kw">routes</span>:
+        - <span class="nm">to</span>: <span class="str">default</span>
+          <span class="nm">via</span>: <span class="str">192.168.31.1</span>
+      <span class="kw">nameservers</span>:
+        <span class="nm">addresses</span>: [<span class="str">8.8.8.8</span>, <span class="str">8.8.4.4</span>]</pre>
+            </div>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — apply the updated Netplan</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo netplan try</span>   <span class="cm"># test — auto-reverts in 120s if broken</span>
+<span class="nm">sudo netplan apply</span> <span class="cm"># apply permanently after confirming it works</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="c-rule">
+        <div class="section-eyebrow">01 — The rule file</div>
+        <div class="section-title">Complete rule file — every part explained</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/udev/rules.d/10-network.rules</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:e0:4c:68:0b:c2", NAME="ethusb0"</pre>
+        </div>
+        <table class="le-table">
+          <thead><tr><th style="width:42%">Part</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td class="le-code">SUBSYSTEM=="net"</td><td class="le-desc">Match only network devices. udev handles all hardware — USB drives, input devices, sensors. This filter limits the rule to network interfaces only so it doesn't accidentally match other hardware.</td></tr>
+            <tr><td class="le-code">ACTION=="add"</td><td class="le-desc">Fire only when a device is added (connected or detected at boot). Not on remove or change events. Renaming only makes sense when a device first appears.</td></tr>
+            <tr><td class="le-code">ATTR{address}=="00:e0:4c:68:0b:c2"</td><td class="le-desc">Match by MAC address — the hardware-burned identifier unique to this specific adapter. MAC addresses never change for a given piece of hardware. This is why the rename is permanent — the same adapter always matches.</td></tr>
+            <tr><td class="le-code">NAME="ethusb0"</td><td class="le-desc">The action: assign this name to the matching interface. udev applies this before the interface is registered with the kernel, so the interface appears under this name from the very beginning.</td></tr>
+          </tbody>
+        </table>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>udev rules use <b>==</b> for matching conditions and <b>=</b> for setting values. The comma between conditions means AND — all conditions must match for the rule to fire. Order within a rule line does not matter — all matches are checked before any actions are applied.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="c-attributes">
+        <div class="section-eyebrow">02 — Other match options</div>
+        <div class="section-title">Other ways to match a network interface in udev</div>
+        <p class="section-body">
+          We match by MAC address because it is the most stable identifier for our USB adapter. Other attributes can be used depending on the use case:
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Attribute</th><th>Matches on</th><th>When to use</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">ATTR{address}=="MAC"</td>
+              <td class="desc">Hardware MAC address</td>
+              <td class="desc"><b>Our method.</b> Best for USB adapters — MAC is hardware-burned, never changes for this specific adapter.</td>
+            </tr>
+            <tr>
+              <td class="key">DRIVERS=="r8152"</td>
+              <td class="desc">Driver name</td>
+              <td class="desc">Useful if you want to rename all adapters using the same driver. Less specific than MAC — all adapters of the same chipset would match.</td>
+            </tr>
+            <tr>
+              <td class="key">ATTR{idVendor}=="0bda"</td>
+              <td class="desc">USB vendor ID</td>
+              <td class="desc">Match by USB manufacturer ID (Realtek = 0bda). Combine with idProduct for more specificity.</td>
+            </tr>
+            <tr>
+              <td class="key">KERNELS=="1-1.2"</td>
+              <td class="desc">USB bus/port path</td>
+              <td class="desc">Match by physical USB port. If the adapter is always in the same port — consistent name tied to port not device. Breaks if you move the adapter to a different port.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — find all udev attributes for your adapter</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># List all udev attributes for the interface — use these in rules</span>
+<span class="nm">udevadm info --attribute-walk /sys/class/net/ethusb0</span>
+
+<span class="cm"># Or by device path (before rename, use the long name)</span>
+<span class="nm">udevadm info --attribute-walk /sys/class/net/enx00e04c680bc2</span></pre>
+        </div>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-udev">
+        <div class="section-eyebrow">01 — udev commands</div>
+        <div class="section-title">udev and network interface commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">ip link show</div><div class="cmd-desc">List all network interfaces — confirms rename is working (ethusb0 present)</div></div>
+          <div class="cmd-row"><div class="cmd-code">ip addr show ethusb0</div><div class="cmd-desc">Show ethusb0 details including assigned IP address</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo udevadm control --reload-rules</div><div class="cmd-desc">Reload all udev rule files — required after creating or editing a rule file</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo udevadm trigger</div><div class="cmd-desc">Re-trigger udev events — may apply rule without reboot in some cases. Reboot is more reliable for network interface renaming.</div></div>
+          <div class="cmd-row"><div class="cmd-code">udevadm info /sys/class/net/ethusb0</div><div class="cmd-desc">Show udev database info for the renamed interface — confirms rule was applied</div></div>
+          <div class="cmd-row"><div class="cmd-code">udevadm info --attribute-walk /sys/class/net/ethusb0</div><div class="cmd-desc">Show all udev attributes for the interface — useful for writing more specific rules</div></div>
+          <div class="cmd-row"><div class="cmd-code">udevadm test /sys/class/net/ethusb0</div><div class="cmd-desc">Simulate udev rule processing for a device — shows which rules would match without applying them</div></div>
+          <div class="cmd-row"><div class="cmd-code">ls /etc/udev/rules.d/</div><div class="cmd-desc">List all udev rule files — processed in alphabetical/numerical order</div></div>
+          <div class="cmd-row"><div class="cmd-code">cat /etc/udev/rules.d/10-network.rules</div><div class="cmd-desc">View the rename rule file content</div></div>
+          <div class="cmd-row"><div class="cmd-code">lsusb</div><div class="cmd-desc">List USB devices — identifies USB ethernet adapters and their vendor/product IDs</div></div>
+          <div class="cmd-row"><div class="cmd-code">networkctl status ethusb0</div><div class="cmd-desc">Show systemd-networkd status for ethusb0 — link speed, state, IP address</div></div>
+          <div class="cmd-row"><div class="cmd-code">ethtool ethusb0</div><div class="cmd-desc">Show ethernet adapter info — speed, duplex, link status (install: sudo apt install ethtool)</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit during udev setup</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">udevadm trigger didn't apply the rename — interface still had the old name</div>
+          <div class="bb-body">
+            After writing the rule file and running <code>sudo udevadm control --reload-rules && sudo udevadm trigger</code>, the interface still showed as <code>enx00e04c680bc2</code>. The rule appeared correct but wasn't being applied.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Reboot — udev rename for active interfaces requires reboot</div>
+          <div class="fb-body">
+            udev can rename devices as they are added, but cannot rename an already-active network interface — the kernel holds a reference to the existing name. The rename only takes effect when the device is first detected, which happens at boot. After <code>sudo reboot</code>, the interface appeared as <code>ethusb0</code> immediately. The rule itself was correct from the start — the reload-trigger approach simply doesn't work for already-active interfaces.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Lost network after reboot — Netplan config still referenced old name</div>
+          <div class="bb-body">
+            After rebooting with the udev rule in place, the interface was renamed to ethusb0 correctly — but SSH no longer connected. The server had no IP address. The Netplan config still referenced <code>enx00e04c680bc2</code> — an interface that no longer existed under that name.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Update Netplan to reference ethusb0 BEFORE rebooting</div>
+          <div class="fb-body">
+            Connected physically (keyboard + monitor) to access the server. Edited <code>/etc/netplan/01-netcfg.yaml</code> to replace <code>enx00e04c680bc2</code> with <code>ethusb0</code>. Ran <code>sudo netplan apply</code>. IP address came back immediately. Lesson: always update Netplan to use the new interface name before rebooting after a rename. The correct order is: (1) write udev rule, (2) update Netplan to use new name, (3) reload rules, (4) reboot.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common udev rename problems</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">No network after reboot — SSH not connecting</div>
+          <div class="ts-body">The most common issue — Netplan still references the old interface name. The interface was renamed but Netplan doesn't know its new name, so no IP is assigned. Recovery options: (1) Physical access — connect keyboard and monitor, edit <code>/etc/netplan/01-netcfg.yaml</code>, change <code>enx00e04c680bc2</code> to <code>ethusb0</code>, run <code>sudo netplan apply</code>. (2) Tailscale — if it was set up, SSH in via Tailscale IP. Prevention: always update Netplan before rebooting.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Interface shows old name even after reboot</div>
+          <div class="ts-body">The udev rule didn't match. Check: (1) MAC address in the rule — run <code>udevadm info /sys/class/net/OLDNAME | grep ADDRESS</code> and compare with what's in the rule file. MAC must be lowercase with colons. (2) Rule file syntax — no quotes missing, no extra spaces. (3) Rule file name — must end in .rules. (4) Rule file location — must be in <code>/etc/udev/rules.d/</code> not <code>/etc/udev/</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Rule matches but NAME is ignored — interface keeps old name</div>
+          <div class="ts-body">On some Ubuntu 22.04+ setups, systemd-networkd takes over interface naming before udev can apply. In this case, a systemd .link file is needed alongside or instead of the udev rule. Create: <code>/etc/systemd/network/10-rename.link</code> with <code>[Match] MACAddress=00:e0:4c:68:0b:c2</code> and <code>[Link] Name=ethusb0</code>. Run <code>sudo systemctl restart systemd-networkd</code> and reboot. This was not needed on spserver but may be required on different setups.</td></div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">How to find the old interface name if it no longer exists</div>
+          <div class="ts-body">After a successful rename, the old name is gone. If you need to find the MAC address again: <code>udevadm info /sys/class/net/ethusb0 | grep ID_NET_NAME_MAC</code> — shows the original MAC-based name which contains the MAC address. Or simply: <code>ip link show ethusb0</code> — the <code>link/ether</code> line shows the MAC address directly.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">Verifying the rule is active and matched</div>
+          <div class="ts-body">Run <code>udevadm info /sys/class/net/ethusb0</code> and look for the property <code>ID_NET_NAME_FROM_USER_SPACE=ethusb0</code> — this confirms udev applied the rename via a user-space rule. Also check: <code>udevadm test /sys/class/net/ethusb0 2>&1 | grep NAME</code> — shows what NAME udev would assign when processing rules for this device.</td></div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Rename other devices with udev</b> — the same technique works for USB storage drives (<code>/dev/sdb</code> → <code>/dev/usb-backup</code>), serial ports, and other hardware. Write rules matching by <code>SUBSYSTEM=="block"</code> or <code>SUBSYSTEM=="tty"</code> with SYMLINK+= to create stable device names.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>udev automation rules</b> — trigger scripts when devices connect. For example: when a USB drive with a specific serial is plugged in, automatically mount it and start a backup. udev supports <code>RUN+="/path/to/script"</code> to execute arbitrary commands on device events.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple ethernet adapters</b> — if adding a second USB ethernet adapter, add a second rule with a different MAC and different name (ethusb1). Both adapters get stable names. Could configure bonding or load balancing across them with Netplan.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>systemd .link files</b> — the alternative to udev rules for interface renaming. Managed by systemd-networkd directly. Worth understanding both methods and knowing when each is needed. Documented at <code>man systemd.link</code>.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Network bonding</b> — after mastering interface naming, bond two ethernet adapters together for redundancy or increased bandwidth using Netplan's bonding configuration. If the USB adapter fails, traffic automatically fails over to the built-in NIC.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','config','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '14%';
+  document.getElementById('sp-pct').textContent = '14%';
+}, 300);
+</script>
+</body>
+</html>
