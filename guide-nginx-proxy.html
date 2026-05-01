@@ -1,223 +1,817 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>guide-nginx-docker.html — spserver</title>
-    <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap"
-        rel="stylesheet">
-    <style>
-        /* ── RESET & BASE ── */
-        *,
-        *::before,
-        *::after {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nginx Reverse Proxy — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.arch-diagram {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.3rem 1.5rem;
+  margin: .75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ad-box {
+  border-radius: 8px;
+  padding: .55rem 1rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ad-box.internet  { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+.ad-box.tailscale { background: rgba(99,102,241,.13); border: 1px solid rgba(99,102,241,.3); color: #a5b4fc; }
+.ad-box.nginx     { background: rgba(34,197,94,.12);  border: 1px solid rgba(34,197,94,.3);  color: var(--green); }
+.ad-box.backend   { background: rgba(59,130,246,.13); border: 1px solid rgba(59,130,246,.3); color: var(--blue); }
+.ad-box.mysql     { background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.3); color: var(--amber); }
+.ad-arrow { color: var(--text3); font-size: 16px; flex-shrink: 0; }
+.ad-label { font-size: 11px; color: var(--text3); min-width: 80px; }
 
-        html {
-            scroll-behavior: smooth;
-        }
+.header-table { width: 100%; border-collapse: collapse; margin: .75rem 0; }
+.header-table th { font-size: 12px; font-weight: 600; color: var(--text2); text-align: left; padding: .5rem .8rem; border-bottom: 1px solid var(--border); }
+.header-table td { font-size: 13px; padding: .55rem .8rem; border-bottom: 1px solid var(--bg3); vertical-align: top; }
+.header-table td:first-child { font-family: var(--mono); font-size: 11px; color: var(--blue); white-space: nowrap; }
+.header-table td:nth-child(2) { color: var(--text2); font-size: 12px; }
+.header-table td:nth-child(3) { font-size: 12px; color: var(--text3); }
 
-        body {
-            background: #0a0c10;
-            color: #d4d8e2;
-            font-family: 'DM Sans', sans-serif;
-            font-size: 15px;
-            line-height: 1.7;
-            min-height: 100vh;
-            overflow-x: hidden;
-        }
+.route-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: .75rem 0;
+}
+.route-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .9rem 1.1rem;
+}
+.rc-domain { font-family: var(--mono); font-size: 12px; color: var(--blue); font-weight: 700; margin-bottom: .3rem; }
+.rc-arrow  { font-size: 11px; color: var(--text3); margin-bottom: .3rem; }
+.rc-dest   { font-family: var(--mono); font-size: 12px; color: var(--green); font-weight: 600; margin-bottom: .4rem; }
+.rc-note   { font-size: 12px; color: var(--text2); line-height: 1.5; }
 
-        /* ── CSS VARIABLES ── */
-        :root {
-            --bg: #0a0c10;
-            --bg2: #10131a;
-            --bg3: #161b24;
-            --bg4: #1c2230;
-            --border: rgba(255, 255, 255, 0.06);
-            --border2: rgba(255, 255, 255, 0.12);
-            --text: #d4d8e2;
-            --text2: #a9acb3;
-            --text3: #c8c9cc;
-            --green: #3ddc84;
-            --green2: rgba(61, 220, 132, 0.12);
-            --blue: #5ba3f5;
-            --blue2: rgba(91, 163, 245, 0.12);
-            --amber: #f0a500;
-            --amber2: rgba(240, 165, 0, 0.10);
-            --mono: 'JetBrains Mono', monospace;
-            --display: 'Bebas Neue', sans-serif;
-            --sans: 'DM Sans', sans-serif;
-        }
-
-        pre {
-            background: #161b22;
-            padding: 20px;
-            border-radius: 8px;
-            font-family: var(--mono);
-            font-size: 15px;
-            overflow-x: auto;
-            color: #00ff9d;
-            border: 1px solid #00ff9d;
-        }
-
-        h1,
-        h2 {
-            font-family: var(--display);
-            color: #00ff9d;
-            letter-spacing: 0.04em;
-        }
-
-        code {
-            background: #161b22;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: var(--mono);
-        }
-
-        .section {
-            max-width: 1080px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .hero-prompt {
-            background: #0a0c10;
-            border: 1px solid #00ff9d;
-            padding: 12px 20px;
-            font-family: var(--mono);
-            font-size: 15px;
-            color: #00ff9d;
-            margin-bottom: 2rem;
-        }
-    </style>
+@media(max-width:600px){
+  .route-grid { grid-template-columns: 1fr; }
+  .ad-label   { display: none; }
+}
+</style>
 </head>
-
 <body>
 
-    <div class="hero-prompt">
-        sipu@ 192.168.31.150 · dustyserver.co.in<br>
-        Ubuntu 24.04 LTS · Nginx Docker Reverse Proxy Guide
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Nginx Reverse Proxy</div>
+  <div class="nav-phase">Phase 2 · Nginx Reverse Proxy</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('architecture')">spserver architecture</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('proxy-headers')">Proxy headers</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('subdomain-routing')">Subdomain routing</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install Nginx</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-server-block')">Write server block</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-enable')">Enable config</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-test-reload')">Test &amp; reload</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-https')">Add HTTPS with Certbot</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-nginx')">Nginx commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-certbot')">Certbot commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 2 · Topic 6 of 7</div>
+      <h1 class="gh-title">Nginx <span>Reverse Proxy</span></h1>
+      <p class="gh-sub">Running Nginx on the host as the single entry point for all spserver services — domain-based routing to Docker backends, proxy headers, and HTTPS via Certbot and Let's Encrypt.</p>
     </div>
 
-    <div class="section">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
 
-        <h1>Nginx Docker Reverse Proxy for Containers</h1>
-        <p style="color:#00ff9d; font-family:var(--mono); margin-bottom:2rem;">Phase 2 — Completed</p>
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
 
-        <h2>Overview</h2>
-        <p>We moved Nginx inside Docker so it becomes the single gateway for all containerised apps. Flask now runs
-            internally only on the shared Docker network <code>appnet</code>. Cloudflare Tunnel points to Nginx (port
-            8082), which forwards traffic to Flask.</p>
+      <div class="section" id="what-why">
+        <div class="section-eyebrow">01 — What &amp; Why</div>
+        <div class="section-title">What a reverse proxy is — and why Nginx</div>
+        <p class="section-body">
+          A <b>reverse proxy</b> sits in front of one or more backend services and forwards incoming requests to them. The client talks to Nginx on port 80 or 443 — it never sees the backend directly. Nginx decides which backend to forward each request to, based on the hostname, path, or other rules.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Without a reverse proxy</div>
+            <div class="ic-body">Every service exposes its own port on the host. Jenkins on :8090, Flask on :5000, Gitea on :3000. Users must remember different ports. No SSL — everything is plain HTTP. No single place to add auth, rate limiting, or logging. UFW needs a hole per service.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">With Nginx as reverse proxy</div>
+            <div class="ic-body">All traffic enters on port 80 and 443. Nginx routes by subdomain: <code>jenkins.dustyserver.co.in</code> → Jenkins, <code>dustyserver.co.in</code> → Flask. SSL is terminated at Nginx — one cert, all services. Backend services bind to localhost only and are never directly exposed.</div>
+          </div>
+        </div>
+        <p class="section-body">
+          Nginx is installed directly on the Ubuntu host — not inside Docker. This gives it access to all host ports and makes it the single point of entry for every service on spserver, whether Dockerised or running natively.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why host Nginx, not containerised Nginx?</b> Running Nginx on the host gives it access to all services — Docker containers, systemd services, anything listening on localhost — without extra network config. A containerised Nginx would need additional configuration to reach services outside its Compose network. For a multi-purpose server like spserver, host Nginx is simpler and more flexible.</span>
+        </div>
+      </div>
 
-        <h2>Concepts</h2>
-        <ul>
-            <li><strong>Docker Network (appnet)</strong> — isolated network so containers can reach each other by
-                service name (<code>http://flask:5000</code>)</li>
-            <li><strong>Reverse Proxy</strong> — Nginx receives public traffic and forwards it internally to Flask</li>
-            <li><strong>Internal-only ports</strong> — Flask port 5000 is no longer exposed to the host</li>
-            <li><strong>Port 8082</strong> — only Nginx container publishes to the host</li>
-        </ul>
+      <div class="divider"></div>
 
-        <h2>Final Config Files</h2>
+      <div class="section" id="architecture">
+        <div class="section-eyebrow">02 — Architecture</div>
+        <div class="section-title">How Nginx fits into spserver</div>
 
-        <h3>1. Flask docker-compose.yml (updated)</h3>
-        <pre><code>services:
-  flask:
-    build: .
-    expose:
-      - "5000"
-    volumes:
-      - .:/app
-    restart: always
-    networks:
-      - appnet
+        <div class="arch-diagram">
+          <div class="ad-row">
+            <div class="ad-box internet">Browser / client</div>
+            <div class="ad-arrow">→</div>
+            <div class="ad-label">HTTPS :443</div>
+            <div class="ad-box tailscale">Tailscale (exit node)<br><span style="font-weight:400;font-size:10px">routes through CGNAT to spserver</span></div>
+            <div class="ad-arrow">→</div>
+            <div class="ad-box nginx">Nginx · host<br><span style="font-weight:400;font-size:10px">:80 and :443</span></div>
+          </div>
+          <div style="padding-left:1.5rem;margin-top:4px;display:flex;flex-direction:column;gap:6px;">
+            <div class="ad-row">
+              <div class="ad-label" style="color:var(--text3);font-size:11px;">jenkins.dustyserver.co.in</div>
+              <div class="ad-arrow">→</div>
+              <div class="ad-box backend">Jenkins · Docker<br><span style="font-weight:400;font-size:10px">127.0.0.1:8090</span></div>
+            </div>
+            <div class="ad-row">
+              <div class="ad-label" style="color:var(--text3);font-size:11px;">dustyserver.co.in</div>
+              <div class="ad-arrow">→</div>
+              <div class="ad-box backend">Flask · Docker<br><span style="font-weight:400;font-size:10px">127.0.0.1:5000</span></div>
+            </div>
+            <div class="ad-row">
+              <div class="ad-label" style="color:var(--text3);font-size:11px;">internal only</div>
+              <div class="ad-arrow" style="opacity:.2">→</div>
+              <div class="ad-box mysql">MySQL · Docker<br><span style="font-weight:400;font-size:10px">no host port — never exposed</span></div>
+            </div>
+          </div>
+        </div>
 
-networks:
-  appnet:
-    external: true</code></pre>
-
-        <h3>2. Nginx docker-compose.yml</h3>
-        <pre><code>version: '3.8'
-
-services:
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-docker-proxy
-    restart: unless-stopped
-    ports:
-      - "8082:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      - appnet
-
-networks:
-  appnet:
-    external: true</code></pre>
-
-        <h3>3. nginx/nginx.conf</h3>
-        <pre><code>server {
-    listen 80;
-    server_name flask.dustyserver.co.in;
-
-    location / {
-        proxy_pass http://flask:5000;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        proxy_redirect off;
-        proxy_read_timeout 300s;
-        proxy_send_timeout 300s;
-    }
-}</code></pre>
-
-        <h2>Commands Cheatsheet</h2>
-        <pre><code>docker network create appnet
-cd ~/projects/flaskapp && docker compose up -d
-cd ~/projects/nginx-proxy && docker compose up -d
-sudo nano /etc/cloudflared/config.yml          # change flask → localhost:8082
-sudo systemctl restart cloudflared
-docker compose ps
-docker network inspect appnet
-curl -I http://localhost:8082</code></pre>
-
-        <h2>Blockers Hit & How We Solved Them</h2>
-        <ul>
-            <li>Old nginx_app folder leftover → completely removed</li>
-            <li>appnet network not found → created with <code>docker network create appnet</code></li>
-            <li>Typo in <code>external:true</code> → fixed spacing</li>
-            <li>Flask still bound to host port 5000 → removed ports, added expose + network</li>
-        </ul>
-
-        <h2>Troubleshoot</h2>
-        <ul>
-            <li><strong>502 Bad Gateway</strong> → service name mismatch in proxy_pass (must be <code>flask</code>)</li>
-            <li><strong>Connection refused</strong> → both containers must be on appnet</li>
-            <li><strong>Port 8082 in use</strong> → <code>sudo ss -tlnp | grep 8082</code></li>
-        </ul>
-
-        <h2>Future Scope</h2>
-        <ul>
-            <li>Flask + MySQL multi-container app on same appnet</li>
-            <li>Move traditional host Nginx traffic to Docker Nginx too</li>
-            <li>Add more services with their own subdomains</li>
-            <li>Switch to Traefik later for automatic discovery</li>
-        </ul>
-
-        <p style="margin-top:3rem; color:#00ff9d; font-family:var(--mono); font-size:13px;">
-            Last updated: April 05, 2026 • Built as hands-on DevOps learning lab by sipu
+        <p class="section-body">
+          Each Dockerised backend service maps its container port to a <b>localhost port</b> on the host. Nginx proxies to these localhost ports. Docker services are never directly reachable from the LAN or internet — all traffic goes through Nginx first.
         </p>
 
-    </div>
+        <div class="route-grid">
+          <div class="route-card">
+            <div class="rc-domain">jenkins.dustyserver.co.in</div>
+            <div class="rc-arrow">↓ proxy_pass</div>
+            <div class="rc-dest">http://127.0.0.1:8090</div>
+            <div class="rc-note">Jenkins running in Docker with port mapped to host:8090. Nginx forwards all traffic for this subdomain to it.</div>
+          </div>
+          <div class="route-card">
+            <div class="rc-domain">dustyserver.co.in</div>
+            <div class="rc-arrow">↓ proxy_pass</div>
+            <div class="rc-dest">http://127.0.0.1:5000</div>
+            <div class="rc-note">Flask app running in Docker with port mapped to host:5000. The main domain routes here.</div>
+          </div>
+        </div>
+      </div>
 
+      <div class="divider"></div>
+
+      <div class="section" id="proxy-headers">
+        <div class="section-eyebrow">03 — Proxy headers</div>
+        <div class="section-title">Why proxy headers matter</div>
+        <p class="section-body">
+          When Nginx forwards a request to a backend, the backend sees the connection as coming from <code>127.0.0.1</code> — Nginx itself — not the real client. This breaks IP-based logging, rate limiting, and security checks. Proxy headers carry the original request details through to the backend.
+        </p>
+        <table class="header-table">
+          <thead><tr><th>Header</th><th>What it carries</th><th>Why backends need it</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>X-Real-IP</td>
+              <td>The client's original IP address</td>
+              <td>Lets the backend log or rate-limit by real client IP. Without it, every request looks like it came from 127.0.0.1.</td>
+            </tr>
+            <tr>
+              <td>X-Forwarded-For</td>
+              <td>Chain of IPs through all proxies</td>
+              <td>Standard header read by Flask, Django, and most logging tools. Format: <code>client, proxy1, proxy2</code>.</td>
+            </tr>
+            <tr>
+              <td>X-Forwarded-Proto</td>
+              <td>The original protocol — http or https</td>
+              <td>Lets the backend know if the original request was HTTPS even though Nginx forwarded it as HTTP internally. Needed for redirect logic.</td>
+            </tr>
+            <tr>
+              <td>Host</td>
+              <td>The original Host header from the client</td>
+              <td>Without this, the backend sees the proxy address as the host. Needed for virtual hosting and URL generation inside the app.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Include all four headers in every <code>proxy_pass</code> block as a matter of habit. Jenkins in particular reads <code>X-Forwarded-For</code> and <code>X-Forwarded-Proto</code> to validate its "Jenkins URL" config — missing headers cause an admin warning that can't be dismissed until they are set correctly.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="subdomain-routing">
+        <div class="section-eyebrow">04 — Routing strategy</div>
+        <div class="section-title">Subdomain-based routing — why not port-based</div>
+        <table class="kv-table">
+          <thead><tr><th>Approach</th><th>Example</th><th>Tradeoffs</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Port-based <span class="tag tag-r">avoid</span></td>
+              <td class="val"><code>dustyserver.co.in:8090</code></td>
+              <td class="desc">Users must remember port numbers. Non-standard ports are blocked by many corporate firewalls. No easy SSL. Cannot put two services on port 443.</td>
+            </tr>
+            <tr>
+              <td class="key">Subdomain-based <span class="tag tag-g">chosen</span></td>
+              <td class="val"><code>jenkins.dustyserver.co.in</code></td>
+              <td class="desc">Clean, memorable URLs. All traffic on port 443. One SSL cert covers multiple subdomains. Each service gets its own Nginx server block — easy to add, modify, or remove independently.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          Each subdomain requires a DNS A record at the registrar pointing to spserver's public IP. All subdomains of <code>dustyserver.co.in</code> resolve to the same IP — Nginx uses the <code>server_name</code> directive to route each request to the correct backend.
+        </p>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Step 1 — Install Nginx on the host</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install and verify Nginx</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Nginx from Ubuntu's official repo is current enough for everything we need and receives security updates via <code>apt upgrade</code>. We enable it as a systemd service so it starts automatically on every server reboot.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo apt update</span>
+<span class="nm">sudo apt install -y nginx</span>
+
+<span class="nm">sudo systemctl enable nginx</span>
+<span class="nm">sudo systemctl start nginx</span>
+
+<span class="cm"># Confirm it is running</span>
+<span class="nm">sudo systemctl status nginx</span>
+<span class="cm"># Should show: Active: active (running)</span>
+
+<span class="cm"># Confirm Nginx responds on port 80</span>
+<span class="nm">curl -s http://localhost | head -5</span>
+<span class="cm"># Returns the default Nginx welcome page HTML</span>
+
+<span class="nm">nginx -v</span>
+<span class="cm"># nginx version: nginx/1.24.x</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card" style="margin-top:1rem;">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Allow ports 80 and 443 through UFW</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Ports 80 and 443 must be open for Nginx to receive external traffic — and for Certbot's HTTP-01 challenge to work when obtaining SSL certificates. <code>'Nginx Full'</code> is a pre-defined UFW app profile that opens both at once.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">sudo ufw allow 'Nginx Full'</span>
+<span class="cm"># Equivalent to: sudo ufw allow 80 && sudo ufw allow 443</span>
+
+<span class="nm">sudo ufw status</span>
+<span class="cm"># Should show Nginx Full as ALLOW</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-server-block">
+        <div class="section-eyebrow">02 — Server block</div>
+        <div class="section-title">Step 2 — Write server blocks for each service</div>
+        <p class="section-body">
+          Each service gets its own config file in <code>/etc/nginx/sites-available/</code>. The file is not active until it is symlinked into <code>/etc/nginx/sites-enabled/</code>. The pattern — <code>server_name</code>, <code>proxy_pass</code>, proxy headers — is identical for every service. Only the domain and upstream address change.
+        </p>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Jenkins server block — jenkins.dustyserver.co.in → 127.0.0.1:8090</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/jenkins</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>server {
+    <span class="cm"># Listen on port 80 for HTTP</span>
+    <span class="cm"># Certbot will add a :443 block and a redirect here after it runs</span>
+    listen 80;
+    listen [::]:80;
+
+    <span class="cm"># Nginx matches the incoming Host header against this value</span>
+    server_name jenkins.dustyserver.co.in;
+
+    location / {
+        <span class="cm"># Forward all requests to Jenkins on localhost:8090</span>
+        <span class="cm"># Jenkins Docker container has ports: "8090:8080" in compose</span>
+        proxy_pass http://127.0.0.1:8090;
+
+        <span class="cm"># Real client IP — without this Jenkins sees every request from 127.0.0.1</span>
+        proxy_set_header X-Real-IP        $remote_addr;
+
+        <span class="cm"># Standard proxy chain header — frameworks and logging tools read this</span>
+        proxy_set_header X-Forwarded-For  $proxy_add_x_forwarded_for;
+
+        <span class="cm"># Original protocol — Jenkins needs this to generate correct redirect URLs</span>
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        <span class="cm"># Original Host header — Jenkins uses this to build its own absolute URLs</span>
+        proxy_set_header Host             $host;
+
+        <span class="cm"># Increase timeouts — Jenkins builds and SCM polling can take time</span>
+        proxy_read_timeout    90s;
+        proxy_connect_timeout 90s;
+
+        <span class="cm"># Websocket support — required for Jenkins live log streaming and terminal</span>
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card" style="margin-top:1rem;">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Flask app server block — dustyserver.co.in → 127.0.0.1:5000</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/flask-app</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>server {
+    listen 80;
+    listen [::]:80;
+
+    server_name dustyserver.co.in;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+    }
+}</pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>Websocket headers are omitted here — Flask doesn't use websockets by default. If the Flask app is extended with Flask-SocketIO, add the same <code>Upgrade</code> and <code>Connection</code> headers as the Jenkins block.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-enable">
+        <div class="section-eyebrow">03 — Enable</div>
+        <div class="section-title">Step 3 — Enable configs with symlinks</div>
+        <p class="section-body">
+          Nginx reads configs from <code>/etc/nginx/sites-enabled/</code>. Files in <code>sites-available/</code> are not active until symlinked there. This pattern lets you keep configs ready but disabled — useful for quickly toggling a service offline.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Symlink format: ln -s &lt;absolute-target&gt; &lt;link-path&gt;</span>
+<span class="nm">sudo ln -s</span> /etc/nginx/sites-available/jenkins   /etc/nginx/sites-enabled/jenkins
+<span class="nm">sudo ln -s</span> /etc/nginx/sites-available/flask-app /etc/nginx/sites-enabled/flask-app
+
+<span class="cm"># Confirm symlinks are correct</span>
+<span class="nm">ls -la /etc/nginx/sites-enabled/</span>
+<span class="cm"># jenkins   -> /etc/nginx/sites-available/jenkins</span>
+<span class="cm"># flask-app -> /etc/nginx/sites-available/flask-app</span>
+<span class="cm"># default   -> /etc/nginx/sites-available/default  (pre-existing)</span>
+
+<span class="cm"># To disable a config without deleting it — remove only the symlink</span>
+<span class="cm"># sudo rm /etc/nginx/sites-enabled/flask-app</span>
+<span class="cm"># The file in sites-available/ stays intact and can be re-enabled anytime</span></pre>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Use <b>absolute paths</b> in the symlink — <code>/etc/nginx/sites-available/jenkins</code>, not <code>../sites-available/jenkins</code>. A relative symlink is resolved from the directory where <code>ln -s</code> was run, not from the symlink's location. Get it wrong and the symlink silently points nowhere — no error, but the config is never loaded.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-test-reload">
+        <div class="section-eyebrow">04 — Test &amp; reload</div>
+        <div class="section-title">Step 4 — Validate config and reload Nginx</div>
+        <p class="section-body">
+          <b>Always test before reloading.</b> A syntax error in a new config file will make Nginx refuse to reload — but if Nginx is restarted (not reloaded) with a bad config, it won't start at all, taking every service behind it offline. <code>nginx -t</code> validates the full configuration without touching the running process.
+        </p>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">5</div>
+            <div class="step-title">Test, reload, and verify routing</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Validate ALL Nginx config files — including new ones</span>
+<span class="nm">sudo nginx -t</span>
+<span class="cm"># nginx: the configuration file /etc/nginx/nginx.conf syntax is ok</span>
+<span class="cm"># nginx: configuration file /etc/nginx/nginx.conf test is successful</span>
+<span class="cm">#</span>
+<span class="cm"># If you see errors — fix them before continuing. Do NOT reload with a failing -t.</span>
+
+<span class="cm"># Reload: apply config changes without dropping existing connections</span>
+<span class="nm">sudo nginx -s reload</span>
+<span class="cm"># Or equivalently:</span>
+<span class="nm">sudo systemctl reload nginx</span>
+
+<span class="cm"># Test routing before DNS is configured — override the Host header with curl</span>
+<span class="nm">curl -H "Host: jenkins.dustyserver.co.in" http://localhost/</span>
+<span class="cm"># Should return Jenkins HTML (typically a redirect to /login)</span>
+
+<span class="nm">curl -H "Host: dustyserver.co.in" http://localhost/</span>
+<span class="cm"># Should return Flask JSON response</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>If <code>nginx -t</code> reports "test is successful" and the curl Host-header tests return the expected backend responses — Nginx is routing correctly. DNS records and HTTPS are the next steps.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-https">
+        <div class="section-eyebrow">05 — HTTPS</div>
+        <div class="section-title">Step 5 — Add HTTPS with Certbot and Let's Encrypt</div>
+        <p class="section-body">
+          <b>Certbot</b> is the official Let's Encrypt client. It obtains a free SSL/TLS certificate, installs it into Nginx, and edits the server block automatically to redirect HTTP → HTTPS. Certificates are valid for 90 days — Certbot installs a systemd timer to auto-renew them before expiry.
+        </p>
+        <p class="section-body">
+          The <b>HTTP-01 challenge</b> requires that Let's Encrypt can reach port 80 on spserver from the public internet to verify domain ownership. UFW must allow port 80, and the domain's DNS must be resolvable externally via Tailscale.
+        </p>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">6</div>
+            <div class="step-title">Install Certbot and obtain certificates</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Install Certbot and its Nginx plugin</span>
+<span class="nm">sudo apt install -y certbot python3-certbot-nginx</span>
+
+<span class="cm"># Obtain and install a certificate for Jenkins</span>
+<span class="cm"># Certbot reads server_name from the Nginx config and edits it automatically</span>
+<span class="nm">sudo certbot --nginx -d jenkins.dustyserver.co.in</span>
+
+<span class="cm"># Obtain a certificate for the main domain</span>
+<span class="nm">sudo certbot --nginx -d dustyserver.co.in</span>
+
+<span class="cm"># Or obtain one certificate covering both (Subject Alternative Names)</span>
+<span class="nm">sudo certbot --nginx -d dustyserver.co.in -d jenkins.dustyserver.co.in</span>
+
+<span class="cm"># What Certbot does automatically:</span>
+<span class="cm">#  1. Verifies domain ownership via HTTP-01 challenge on port 80</span>
+<span class="cm">#  2. Downloads the certificate from Let's Encrypt</span>
+<span class="cm">#  3. Edits the Nginx server block — adds ssl directives and 80 → 443 redirect</span>
+<span class="cm">#  4. Reloads Nginx</span>
+<span class="cm">#  5. Installs a systemd timer for auto-renewal</span>
+
+<span class="cm"># Confirm the auto-renewal timer is active</span>
+<span class="nm">sudo systemctl status certbot.timer</span>
+
+<span class="cm"># Test renewal without actually renewing</span>
+<span class="nm">sudo certbot renew --dry-run</span>
+<span class="cm"># Should show: Congratulations, all simulated renewals succeeded</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:1.5rem;">What the config looks like after Certbot</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/jenkins — after Certbot edits</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>server {
+    <span class="cm"># Certbot adds this: redirect all HTTP traffic to HTTPS</span>
+    listen 80;
+    listen [::]:80;
+    server_name jenkins.dustyserver.co.in;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name jenkins.dustyserver.co.in;
+
+    <span class="cm"># Certificate paths — managed by Certbot, do not edit manually</span>
+    ssl_certificate     /etc/letsencrypt/live/jenkins.dustyserver.co.in/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/jenkins.dustyserver.co.in/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    location / {
+        proxy_pass              http://127.0.0.1:8090;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host              $host;
+        proxy_read_timeout    90s;
+        proxy_connect_timeout 90s;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}</pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>After Certbot runs, always verify with <code>sudo nginx -t</code> — Certbot edits the config in place and occasionally introduces whitespace issues on some Ubuntu versions. If the test fails, check <code>sudo cat /etc/nginx/sites-available/jenkins</code> to inspect what Certbot wrote.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-nginx">
+        <div class="section-eyebrow">01 — Nginx</div>
+        <div class="section-title">Nginx commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -t</div><div class="cmd-desc">Test all Nginx config files for syntax errors — always run before reload. Does not affect the running process.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -s reload</div><div class="cmd-desc">Apply config changes gracefully — existing connections are not dropped</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl reload nginx</div><div class="cmd-desc">Same as nginx -s reload. Preferred when using systemd.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart nginx</div><div class="cmd-desc">Full restart — drops connections briefly. Use after package upgrades or if reload fails.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status nginx</div><div class="cmd-desc">Show Nginx daemon status — running state, last log lines, recent errors</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u nginx -f</div><div class="cmd-desc">Follow Nginx system logs live — start/stop events and critical errors</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tail -f /var/log/nginx/access.log</div><div class="cmd-desc">Follow access log — every request with status code, response size, and referrer</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tail -f /var/log/nginx/error.log</div><div class="cmd-desc">Follow error log — proxy failures, upstream connection errors, config issues at runtime</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo ln -s /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins</div><div class="cmd-desc">Enable a server block by creating a symlink into sites-enabled</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo rm /etc/nginx/sites-enabled/jenkins</div><div class="cmd-desc">Disable a server block without deleting the config — removes only the symlink</div></div>
+          <div class="cmd-row"><div class="cmd-code">nginx -V</div><div class="cmd-desc">Print version plus all compile-time options and compiled-in modules</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-certbot">
+        <div class="section-eyebrow">02 — Certbot</div>
+        <div class="section-title">Certbot and certificate commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo certbot --nginx -d jenkins.dustyserver.co.in</div><div class="cmd-desc">Obtain and install a Let's Encrypt certificate. Certbot edits the Nginx config automatically.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo certbot renew --dry-run</div><div class="cmd-desc">Test renewal without actually renewing — confirms auto-renewal will succeed when due</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo certbot renew</div><div class="cmd-desc">Renew all certificates within 30 days of expiry. Normally runs automatically via systemd timer.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo certbot certificates</div><div class="cmd-desc">List all Certbot-managed certificates — domain, expiry date, and file path</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo certbot delete --cert-name jenkins.dustyserver.co.in</div><div class="cmd-desc">Delete a certificate and its renewal config. Does not revert Nginx config edits.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status certbot.timer</div><div class="cmd-desc">Confirm the auto-renewal systemd timer is active and its next trigger time</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo openssl x509 -in /etc/letsencrypt/live/jenkins.dustyserver.co.in/fullchain.pem -noout -dates</div><div class="cmd-desc">Check certificate expiry dates manually — notBefore and notAfter</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit while setting up Nginx reverse proxy</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">nginx -s reload failed — syntax error in new config</div>
+          <div class="bb-body">
+            After writing the Jenkins server block, ran <code>sudo nginx -s reload</code> directly without testing first. Nginx logged: "nginx: [emerg] unexpected end of file, expecting ';' or '}'". The new block wasn't active — Nginx kept serving the old config.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Always run nginx -t before reload — it reports the exact line and file</div>
+          <div class="fb-body">
+            Ran <code>sudo nginx -t</code> which reported the exact file and line number — a missing semicolon at the end of the <code>proxy_pass</code> line. Fixed it, ran <code>nginx -t</code> again, confirmed "test is successful", then reloaded. The block became active immediately. Lesson learned: <code>sudo nginx -t && sudo nginx -s reload</code> as a single habit — the <code>&&</code> ensures reload only runs if the test passes.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Certbot failed — HTTP-01 challenge connection timeout</div>
+          <div class="bb-body">
+            Running <code>sudo certbot --nginx -d jenkins.dustyserver.co.in</code> failed with a timeout during the HTTP-01 challenge. Let's Encrypt's servers couldn't reach port 80 on spserver to verify domain ownership.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Two issues: UFW blocking port 80, and DNS pointing to unreachable address</div>
+          <div class="fb-body">
+            (1) UFW was blocking port 80 — fixed with <code>sudo ufw allow 'Nginx Full'</code>. (2) The domain's DNS A record was pointing to the Tailscale IP rather than the externally reachable public IP. Fixed the DNS record at the registrar to point to the correct address. After both fixes, Certbot succeeded. Key check before running Certbot: <code>curl -4 ifconfig.io</code> to see your public IP, then confirm the DNS A record matches it with <code>nslookup jenkins.dustyserver.co.in</code>.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Symlink in sites-enabled pointed nowhere — config silently ignored</div>
+          <div class="bb-body">
+            Created the symlink with a relative path: <code>sudo ln -s ../sites-available/jenkins /etc/nginx/sites-enabled/jenkins</code>. The symlink appeared in <code>ls</code> output, but <code>nginx -t</code> didn't include the Jenkins config and the proxy wasn't working — no errors, just no routing.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Symlinks must use absolute paths — relative paths resolve from the wrong directory</div>
+          <div class="fb-body">
+            A relative symlink path is resolved from the directory where <code>ln -s</code> was run — not from the symlink's own location. Since the command was run from the home directory, <code>../sites-available/jenkins</code> resolved to a path that doesn't exist. Verified with <code>readlink -f /etc/nginx/sites-enabled/jenkins</code> — showed a non-existent path. Deleted the broken symlink and recreated: <code>sudo ln -s /etc/nginx/sites-available/jenkins /etc/nginx/sites-enabled/jenkins</code>. Config loaded on next <code>nginx -t</code>.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 4</div>
+          <div class="bb-title">Jenkins showed "reverse proxy set up is broken" warning</div>
+          <div class="bb-body">
+            Jenkins loaded through Nginx but displayed a persistent admin warning: "It appears that your reverse proxy set up is broken". Jenkins was generating URLs as <code>http://127.0.0.1:8090/...</code> instead of <code>https://jenkins.dustyserver.co.in/...</code>.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Set Jenkins URL in admin settings + confirm proxy headers are present</div>
+          <div class="fb-body">
+            Two-part fix: (1) Jenkins → Manage Jenkins → System → Jenkins URL — set it to <code>https://jenkins.dustyserver.co.in</code>. Jenkins uses this value to generate webhook and redirect URLs. (2) Confirmed <code>proxy_set_header Host $host</code> and <code>X-Forwarded-Proto $scheme</code> were set in the Nginx location block — Jenkins reads these to confirm it is behind a proxy and to know the externally facing scheme. After both changes and an Nginx reload, the warning disappeared and all URLs were correct.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Nginx reverse proxy problems and fixes</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">502 Bad Gateway</div>
+          <div class="ts-body">Nginx reached the port in proxy_pass but the backend refused the connection or isn't running. Check: (1) Is the backend running? <code>docker compose ps</code> — look for the service as "Up". (2) Is it listening on the right port? <code>ss -tlnp | grep 8090</code>. (3) Is the port bound to <code>127.0.0.1</code> (accessible to Nginx on the host) not just the Docker network? Check <code>docker compose ps</code> — the Ports column shows the bind address. (4) <code>sudo tail /var/log/nginx/error.log</code> — the error message explains exactly what failed upstream.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">504 Gateway Timeout</div>
+          <div class="ts-body">Nginx connected to the backend but it didn't respond in time. Common with Jenkins during heavy builds. Fix: increase timeouts in the server block — <code>proxy_read_timeout 300s; proxy_connect_timeout 300s;</code>. Check if the backend is overloaded: <code>docker stats</code>. For Jenkins: also ensure the Jenkins URL is set correctly in admin settings — a misconfigured URL can cause redirect loops that exhaust the timeout.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">nginx: [emerg] error on reload or restart</div>
+          <div class="ts-body">Config syntax error — Nginx won't reload with a broken config. Run <code>sudo nginx -t</code> to see the exact file, line, and error. Common mistakes: missing semicolons, unmatched braces, wrong directive names (e.g. <code>proxy-pass</code> vs <code>proxy_pass</code>), duplicate <code>server_name</code> values across blocks. Fix the error and confirm <code>nginx -t</code> reports "test is successful" before reloading.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Server block not loading — nginx -t doesn't include it</div>
+          <div class="ts-body">Config file is not symlinked into <code>sites-enabled/</code> or the symlink is broken. Check: <code>ls -la /etc/nginx/sites-enabled/</code> — look for the expected entry. If it exists, verify the target: <code>readlink -f /etc/nginx/sites-enabled/jenkins</code> — should print the absolute path to the file in <code>sites-available/</code>. If the path doesn't exist, the symlink is broken — delete and recreate with an absolute path.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Certbot fails — challenge timed out or connection refused</div>
+          <div class="ts-body">Let's Encrypt cannot reach port 80 on spserver. Check: (1) UFW: <code>sudo ufw status</code> — port 80 must be ALLOW. (2) DNS: <code>nslookup jenkins.dustyserver.co.in</code> — must resolve to spserver's public IP. (3) Is Nginx running and responding on port 80 before Certbot runs? Certbot temporarily serves a challenge file through Nginx — Nginx must be up. (4) Is Tailscale routing port 80 traffic to spserver from the public internet?</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Backend sees all requests as 127.0.0.1 — real IP lost</div>
+          <div class="ts-body">Proxy headers are missing or the backend isn't reading them. Check the Nginx config: <code>proxy_set_header X-Real-IP $remote_addr;</code> must be inside the <code>location</code> block. In Flask, add ProxyFix middleware: <code>from werkzeug.middleware.proxy_fix import ProxyFix</code> and <code>app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)</code>. Without ProxyFix, Flask ignores X-Forwarded-* headers by default as a security measure.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to test routing before DNS is set up</div>
+          <div class="ts-body">Simulate a real request using a custom Host header: <code>curl -H "Host: jenkins.dustyserver.co.in" http://localhost/</code>. Nginx matches on the Host header — this exercises the full routing logic without needing actual DNS. If you get the expected backend response, the Nginx config is correct. DNS and Certbot can then be configured with confidence.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Wildcard certificate</b> — instead of one certificate per subdomain, obtain a wildcard: <code>sudo certbot certonly --manual --preferred-challenges dns -d "*.dustyserver.co.in"</code>. One cert covers all current and future subdomains. Requires DNS validation (add a TXT record at the registrar) rather than HTTP-01. Renewal also requires DNS validation, so full automation needs registrar API integration.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>IP allowlist for admin services</b> — restrict Jenkins to the Tailscale network range only: inside the Jenkins <code>location</code> block add <code>allow 100.64.0.0/10;</code> (Tailscale CGNAT range) and <code>deny all;</code>. Jenkins is then only reachable over Tailscale, even if the domain resolves publicly. A simple, high-impact security improvement.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Rate limiting</b> — protect the Flask API from abuse: define a zone in <code>nginx.conf</code> — <code>limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;</code> — then add <code>limit_req zone=api burst=20 nodelay;</code> to the Flask location block. Requests beyond the rate get a 429 response instead of hitting the backend.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Flask ProxyFix middleware</b> — so Flask reads the proxy headers Nginx sets: <code>from werkzeug.middleware.proxy_fix import ProxyFix</code> and <code>app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)</code> in app.py. This makes <code>request.remote_addr</code> return the real client IP and <code>request.url</code> use <code>https://</code> correctly, even though Flask internally sees HTTP from Nginx.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nginx static file serving</b> — instead of sending static file requests through Gunicorn/Flask, serve them directly from Nginx: <code>location /static/ { alias /var/www/flask-static/; expires 30d; }</code>. Nginx is much faster at serving static files than Python. Use a bind mount or a shared Docker volume to make the static directory accessible to both the Flask container and host Nginx.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Containerised Nginx (nginx-proxy + acme-companion)</b> — for a fully Dockerised setup, replace host Nginx with the <code>nginx-proxy</code> container. It watches the Docker socket and automatically generates Nginx configs for any container with a <code>VIRTUAL_HOST</code> environment variable. The <code>acme-companion</code> sidecar handles SSL via Let's Encrypt automatically — no manual Certbot commands needed. The entire proxy layer becomes part of the Compose stack.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
 </body>
-
 </html>
