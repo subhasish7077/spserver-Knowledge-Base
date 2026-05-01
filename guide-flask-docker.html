@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flask App in Docker — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.file-tree {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.3rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 2;
+  margin: .75rem 0;
+}
+.ft-dir  { color: var(--blue);  font-weight: 700; }
+.ft-file { color: var(--text);  font-weight: 500; }
+.ft-note { color: var(--text3); font-size: 11px; margin-left: .5rem; }
+.ft-imp  { color: var(--green); font-weight: 700; }
+
+.net-diagram {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: .75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nd-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.nd-box {
+  border-radius: 8px;
+  padding: .55rem .9rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+.nd-box.host    { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+.nd-box.flask   { background: rgba(59,130,246,.13); border: 1px solid rgba(59,130,246,.35); color: var(--blue); }
+.nd-box.mysql   { background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.3);  color: var(--amber); }
+.nd-box.network { background: rgba(168,85,247,.1);  border: 1px solid rgba(168,85,247,.3);  color: #c084fc; font-size: 11px; padding: .35rem .8rem; }
+.nd-arrow { color: var(--text3); font-size: 16px; flex-shrink: 0; }
+.nd-label { font-size: 11px; color: var(--text3); }
+
+.env-table { width: 100%; border-collapse: collapse; margin: .75rem 0; }
+.env-table th { font-size: 12px; font-weight: 600; color: var(--text2); text-align: left; padding: .5rem .8rem; border-bottom: 1px solid var(--border); }
+.env-table td { font-size: 13px; padding: .55rem .8rem; border-bottom: 1px solid var(--bg3); vertical-align: top; }
+.env-table td:first-child { font-family: var(--mono); font-size: 12px; color: var(--blue); white-space: nowrap; }
+.env-table td:nth-child(2) { font-family: var(--mono); font-size: 11px; color: var(--text3); }
+.env-table td:nth-child(3) { color: var(--text2); font-size: 12px; }
+
+@media(max-width:600px){
+  .nd-label { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Flask App in Docker</div>
+  <div class="nav-phase">Phase 2 · Flask App in Docker</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('project-structure')">Project structure</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('networking')">Inter-container networking</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('env-vars')">Environment variables</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-requirements')">requirements.txt</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-apppy')">Write app.py</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-db-connect')">MySQL connection</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-compose-run')">Run with Compose</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-test')">Test the endpoint</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-dev')">Dev commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-debug')">Debug commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 2 · Topic 5 of 7</div>
+      <h1 class="gh-title">Flask App <span>in Docker</span></h1>
+      <p class="gh-sub">Structuring and wiring up the spserver-flask app for Docker — app.py, requirements.txt, MySQL connection via service name, and testing the full stack from a browser on the LAN.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-why">
+        <div class="section-eyebrow">01 — What &amp; Why</div>
+        <div class="section-title">What this guide covers</div>
+        <p class="section-body">
+          The Dockerfile and Compose guides covered the container infrastructure. This guide covers the <b>Flask application itself</b> — how to write it so it runs correctly inside Docker, how to connect it to MySQL using Compose's internal DNS, and how to read configuration from environment variables instead of hardcoding it.
+        </p>
+        <p class="section-body">
+          The app is intentionally simple — a single route that reads a row from MySQL and returns JSON. The goal here is not Flask feature depth but understanding the wiring between the Flask container and the MySQL container, and the patterns (env vars, service name as hostname, bind address) that make a Flask app work correctly in a Docker environment.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Flask on the host (what we're moving away from)</div>
+            <div class="ic-body">Flask running directly on Ubuntu. Python installed system-wide. MySQL running as a systemd service. Connection string hardcoded with <code>localhost</code>. Works on this one machine, impossible to reproduce elsewhere, no isolation between services.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Flask in Docker (what we're building)</div>
+            <div class="ic-body">Flask runs in a container built from a Dockerfile. MySQL runs in its own container. They communicate by service name over Docker's internal network. Config comes from environment variables. The whole stack starts with one command.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="project-structure">
+        <div class="section-eyebrow">02 — Project structure</div>
+        <div class="section-title">File layout for the spserver-flask project</div>
+        <p class="section-body">Every file in the repo has a specific role. The structure is kept flat and minimal — no unnecessary nesting.</p>
+        <div class="file-tree">
+          <div><span class="ft-dir">spserver-flask/</span></div>
+          <div>&nbsp;&nbsp;├── <span class="ft-imp">app.py</span> <span class="ft-note">Flask application — routes, DB connection, startup config</span></div>
+          <div>&nbsp;&nbsp;├── <span class="ft-imp">requirements.txt</span> <span class="ft-note">pip dependencies — flask, mysql-connector-python</span></div>
+          <div>&nbsp;&nbsp;├── <span class="ft-file">Dockerfile</span> <span class="ft-note">builds the flask-app image</span></div>
+          <div>&nbsp;&nbsp;├── <span class="ft-file">docker-compose.yml</span> <span class="ft-note">defines flask-app + mysql services</span></div>
+          <div>&nbsp;&nbsp;├── <span class="ft-file">.dockerignore</span> <span class="ft-note">excludes venv/, __pycache__, .git from build context</span></div>
+          <div>&nbsp;&nbsp;├── <span class="ft-file">.gitignore</span> <span class="ft-note">excludes venv/, .env, __pycache__ from git</span></div>
+          <div>&nbsp;&nbsp;└── <span class="ft-file">templates/</span> <span class="ft-note">Jinja2 HTML templates (if any)</span></div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>There is no <code>venv/</code> in the Docker workflow. Dependencies are installed inside the container by the Dockerfile's <code>RUN pip install</code> step. A local venv is only needed if you want to run the app directly on the host for development — and it must be excluded from the Docker build context via <code>.dockerignore</code>.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="networking">
+        <div class="section-eyebrow">03 — Inter-container networking</div>
+        <div class="section-title">How Flask reaches MySQL — Docker Compose internal DNS</div>
+        <p class="section-body">
+          When Docker Compose starts a stack, it automatically creates a <b>bridge network</b> shared by all services in the compose file. Each service gets a hostname equal to its <b>service name</b>. Docker runs an internal DNS server that resolves these names to the container's IP address.
+        </p>
+        <p class="section-body">
+          This means Flask can connect to MySQL using the hostname <code>mysql</code> — the service name defined in docker-compose.yml. No IP addresses, no <code>localhost</code>, no port mapping needed between the two containers.
+        </p>
+
+        <div class="net-diagram">
+          <div class="nd-row">
+            <div class="nd-box host">Browser / curl<br><span style="font-size:10px;font-weight:400">192.168.31.150 (host LAN)</span></div>
+            <div class="nd-arrow">→</div>
+            <div class="nd-label">port 5000<br>host → container</div>
+            <div class="nd-arrow">→</div>
+            <div class="nd-box flask">flask-app<br><span style="font-size:10px;font-weight:400">container · 0.0.0.0:5000</span></div>
+          </div>
+          <div class="nd-row" style="padding-left:2rem;">
+            <div class="nd-box network">Docker bridge network — spserver-flask_default</div>
+          </div>
+          <div class="nd-row" style="padding-left:4rem;">
+            <div class="nd-box flask" style="font-size:11px;">flask-app → mysql:3306</div>
+            <div class="nd-arrow">→</div>
+            <div class="nd-label">service name<br>resolved by Compose DNS</div>
+            <div class="nd-arrow">→</div>
+            <div class="nd-box mysql">mysql<br><span style="font-size:10px;font-weight:400">container · port 3306 (internal only)</span></div>
+          </div>
+        </div>
+
+        <table class="kv-table">
+          <thead><tr><th>Connection</th><th>Hostname to use</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Flask → MySQL (inside Docker)</td>
+              <td class="val"><code>mysql</code></td>
+              <td class="desc">Compose DNS resolves the service name to the container IP — works from any container on the same network</td>
+            </tr>
+            <tr>
+              <td class="key">Browser → Flask (from host)</td>
+              <td class="val"><code>192.168.31.150:5000</code></td>
+              <td class="desc">Port 5000 is mapped from host to container via <code>ports: "5000:5000"</code> in compose</td>
+            </tr>
+            <tr>
+              <td class="key">Browser → MySQL (from host)</td>
+              <td class="val">Not accessible</td>
+              <td class="desc">MySQL has no <code>ports:</code> mapping — intentionally internal only. Only Flask can reach it.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="env-vars">
+        <div class="section-eyebrow">04 — Configuration</div>
+        <div class="section-title">Environment variables — why and which ones</div>
+        <p class="section-body">
+          Hardcoding database credentials in <code>app.py</code> is a security risk — credentials end up in the git history and anyone with repo access has the database password. Environment variables keep config out of the code. The values are defined in <code>docker-compose.yml</code> (or a <code>.env</code> file) and read in Python with <code>os.environ.get()</code>.
+        </p>
+        <table class="env-table">
+          <thead><tr><th>Variable</th><th>Example value</th><th>Read by</th></tr></thead>
+          <tbody>
+            <tr><td>DB_HOST</td><td>mysql</td><td>Flask app — MySQL hostname. Must be the Compose service name, not localhost.</td></tr>
+            <tr><td>DB_PORT</td><td>3306</td><td>Flask app — MySQL port. Almost always 3306.</td></tr>
+            <tr><td>DB_NAME</td><td>flaskdb</td><td>Flask app — the database to connect to. Must match MYSQL_DATABASE in the mysql service.</td></tr>
+            <tr><td>DB_USER</td><td>flaskuser</td><td>Flask app — the MySQL user. Must match MYSQL_USER in the mysql service.</td></tr>
+            <tr><td>DB_PASSWORD</td><td>flaskpass</td><td>Flask app — the MySQL password. Must match MYSQL_PASSWORD in the mysql service.</td></tr>
+            <tr><td>FLASK_ENV</td><td>development</td><td>Flask — enables debug mode and auto-reloader when set to <code>development</code>. Use <code>production</code> on spserver.</td></tr>
+          </tbody>
+        </table>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>Use <code>os.environ.get('DB_PASSWORD', 'fallback')</code> in Python — not <code>os.environ['DB_PASSWORD']</code>. The <code>get()</code> form returns <code>None</code> (or the fallback) if the variable is missing rather than raising a <code>KeyError</code> that crashes the app at startup. It also makes it obvious what the expected variable names are.</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-requirements">
+        <div class="section-eyebrow">01 — Dependencies</div>
+        <div class="section-title">Step 1 — Write requirements.txt</div>
+        <p class="section-body">
+          <code>requirements.txt</code> lists every Python package the app needs. The Dockerfile's <code>RUN pip install -r requirements.txt</code> installs these inside the container at build time.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/requirements.txt</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>Flask
+mysql-connector-python</pre>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>mysql-connector-python — not mysqlclient.</b> <code>mysqlclient</code> is a C extension that needs <code>pkg-config</code> and <code>libmysqlclient-dev</code> system packages — not present in <code>python:3.11-slim</code>. The build fails with a gcc compilation error. <code>mysql-connector-python</code> is a pure-Python driver that installs without any system dependencies. Same functionality for our use case.</span>
+        </div>
+        <p class="section-body">Pin versions once the app is stable to ensure reproducible builds:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">requirements.txt — with pinned versions</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>Flask==3.0.3
+mysql-connector-python==8.4.0
+<span class="cm"># Generate pinned versions from a working environment:</span>
+<span class="cm"># pip freeze > requirements.txt</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-apppy">
+        <div class="section-eyebrow">02 — Application code</div>
+        <div class="section-title">Step 2 — Write app.py</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Full app.py — annotated</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Every decision in this file has a reason — the annotations explain what would break if you did it differently.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/app.py</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>import os
+import json
+import mysql.connector
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+<span class="cm"># Read all DB config from environment variables</span>
+<span class="cm"># These are set in docker-compose.yml under the flask-app service's environment block</span>
+<span class="cm"># os.environ.get() returns None if missing — better than KeyError on startup</span>
+DB_CONFIG = {
+    'host':     os.environ.get('DB_HOST',     'localhost'),
+    'port':     int(os.environ.get('DB_PORT', '3306')),
+    'database': os.environ.get('DB_NAME',     'flaskdb'),
+    'user':     os.environ.get('DB_USER',     'flaskuser'),
+    'password': os.environ.get('DB_PASSWORD', ''),
+}
+
+
+def get_db_connection():
+    <span class="cm">"""Open and return a new MySQL connection using the global DB_CONFIG."""</span>
+    return mysql.connector.connect(**DB_CONFIG)
+
+
+@app.route('/')
+def index():
+    <span class="cm"># Basic health check — confirms Flask is up without touching the DB</span>
+    return jsonify({'status': 'ok', 'service': 'spserver-flask'})
+
+
+@app.route('/items')
+def get_items():
+    <span class="cm"># Connect to MySQL, query the items table, return results as JSON</span>
+    conn   = get_db_connection()
+    cursor = conn.cursor(dictionary=True)  <span class="cm"># dictionary=True → rows as dicts, not tuples</span>
+    cursor.execute('SELECT * FROM items')
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return jsonify(rows)
+
+
+@app.route('/health')
+def health():
+    <span class="cm"># Deeper health check — confirms DB connectivity</span>
+    <span class="cm"># Useful for Nginx upstream checks or monitoring</span>
+    try:
+        conn = get_db_connection()
+        conn.close()
+        return jsonify({'status': 'ok', 'db': 'reachable'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'db': str(e)}), 500
+
+
+if __name__ == '__main__':
+    <span class="cm"># host='0.0.0.0' — listen on all interfaces inside the container</span>
+    <span class="cm"># Without this, Flask binds to 127.0.0.1 (loopback only) and is</span>
+    <span class="cm"># unreachable from outside the container even with port mapping</span>
+    app.run(host='0.0.0.0', port=5000, debug=False)</pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span><b>host='0.0.0.0' is critical.</b> By default, Flask's development server binds to <code>127.0.0.1</code> — the container's loopback interface. Traffic coming in through Docker's port mapping arrives on the container's network interface, not loopback. If Flask isn't listening on <code>0.0.0.0</code>, the port mapping does nothing and <code>curl localhost:5000</code> from the host gets connection refused.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-db-connect">
+        <div class="section-eyebrow">03 — Database setup</div>
+        <div class="section-title">Step 3 — Create the MySQL table</div>
+        <p class="section-body">
+          The MySQL container initialises the <code>flaskdb</code> database and the <code>flaskuser</code> automatically on first start (from the compose env vars). But the <b>table structure</b> is not created automatically — you need to create it. The cleanest approach for a small app is to do it once from a MySQL shell.
+        </p>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Create the items table inside the running MySQL container</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The stack must already be running (<code>docker compose up -d</code>) before running these commands. We exec directly into the MySQL container to run the SQL — no need to expose port 3306 to the host.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run from spserver-flask/</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Open a MySQL shell inside the running mysql container as flaskuser</span>
+<span class="nm">docker compose exec mysql</span> mysql -u flaskuser -pflaskpass flaskdb
+
+<span class="cm"># Inside the MySQL shell:</span>
+CREATE TABLE items (
+    id   INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    qty  INT DEFAULT 0
+);
+
+INSERT INTO items (name, qty) VALUES ('widget', 10), ('gadget', 5);
+
+SELECT * FROM items;
+<span class="cm"># Should show both rows</span>
+
+EXIT;</pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>For a more production-like approach, place <code>init.sql</code> in the project and bind-mount it to <code>/docker-entrypoint-initdb.d/</code> in the MySQL service — the MySQL image runs scripts in that directory automatically on first start. This is covered in the Future scope tab.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-compose-run">
+        <div class="section-eyebrow">04 — Run</div>
+        <div class="section-title">Step 4 — Build and start the full stack</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">docker compose up -d --build</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">We use <code>--build</code> here because we just wrote app.py — we need the image to be built fresh with the current code. On subsequent restarts where the code hasn't changed, plain <code>docker compose up -d</code> is sufficient.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — from spserver-flask/</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Build flask-app image and start both services</span>
+<span class="nm">docker compose up -d --build</span>
+
+<span class="cm"># Watch MySQL become healthy (takes ~30 seconds on first start)</span>
+<span class="nm">docker compose ps</span>
+<span class="cm"># Wait for mysql to show: Up (healthy)</span>
+<span class="cm"># flask-app won't start until MySQL healthcheck passes</span>
+
+<span class="cm"># Confirm both services are running</span>
+<span class="nm">docker compose ps</span>
+<span class="cm"># NAME                            STATUS</span>
+<span class="cm"># spserver-flask-mysql-1      Up (healthy)</span>
+<span class="cm"># spserver-flask-flask-app-1  Up</span>
+
+<span class="cm"># Follow logs to see startup messages from both services</span>
+<span class="nm">docker compose logs -f</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-test">
+        <div class="section-eyebrow">05 — Test</div>
+        <div class="section-title">Step 5 — Test the endpoints</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — from spserver or any LAN machine</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Basic health check — Flask up, no DB involved</span>
+<span class="nm">curl http://localhost:5000/</span>
+<span class="cm"># {"service": "spserver-flask", "status": "ok"}</span>
+
+<span class="cm"># DB connectivity check</span>
+<span class="nm">curl http://localhost:5000/health</span>
+<span class="cm"># {"db": "reachable", "status": "ok"}</span>
+
+<span class="cm"># Fetch items from MySQL</span>
+<span class="nm">curl http://localhost:5000/items</span>
+<span class="cm"># [{"id": 1, "name": "widget", "qty": 10}, {"id": 2, "name": "gadget", "qty": 5}]</span>
+
+<span class="cm"># Same endpoints from another machine on the LAN</span>
+<span class="nm">curl http://192.168.31.150:5000/items</span>
+
+<span class="cm"># Or open in a browser: http://192.168.31.150:5000/items</span></pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>If <code>/items</code> returns the JSON rows from MySQL — the full stack is working. Flask is running in a container, connecting to MySQL in another container by service name, and serving the result over the port mapped to the host. The entire path from browser to database is functional.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-dev">
+        <div class="section-eyebrow">01 — Development</div>
+        <div class="section-title">Day-to-day development commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker compose up -d --build</div><div class="cmd-desc">Rebuild the flask-app image and restart the stack — use after any change to app.py, requirements.txt, or Dockerfile</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose up -d</div><div class="cmd-desc">Start the stack using the existing image — use when code hasn't changed (e.g. after a reboot)</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose down</div><div class="cmd-desc">Stop and remove containers. MySQL data volume is kept — data survives.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose down -v</div><div class="cmd-desc">Stop, remove containers, AND delete volumes. Wipes the MySQL database — fresh start on next up.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose restart flask-app</div><div class="cmd-desc">Restart only the Flask container — MySQL stays running, session is preserved</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose logs -f flask-app</div><div class="cmd-desc">Follow Flask container logs live — see requests, errors, print statements</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose ps</div><div class="cmd-desc">Check both services are Up and MySQL shows (healthy)</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-debug">
+        <div class="section-eyebrow">02 — Debug</div>
+        <div class="section-title">Debugging commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app /bin/bash</div><div class="cmd-desc">Open a shell inside the running Flask container — inspect the filesystem, check env vars, test imports</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app env</div><div class="cmd-desc">Print all environment variables inside the Flask container — verify DB_HOST, DB_NAME, etc. are set</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app ping -c 3 mysql</div><div class="cmd-desc">Ping the MySQL container by service name from inside Flask — confirms Compose DNS is resolving correctly</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app python -c "import mysql.connector; print('ok')"</div><div class="cmd-desc">Confirm mysql-connector-python is installed and importable inside the container</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec mysql mysql -u flaskuser -pflaskpass flaskdb</div><div class="cmd-desc">Open a MySQL shell as flaskuser — inspect tables, run queries, verify data</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec mysql mysql -u root -prootsecret -e "SHOW DATABASES;"</div><div class="cmd-desc">List all databases as root — confirm flaskdb was created by compose env vars</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -v http://localhost:5000/health</div><div class="cmd-desc">Verbose curl — shows HTTP headers, useful to confirm Flask is returning the right content-type and status code</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit while building the Flask + MySQL app</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">curl localhost:5000 — connection refused — Flask not reachable from host</div>
+          <div class="bb-body">
+            Stack started, <code>docker compose ps</code> showed flask-app as Up, but <code>curl localhost:5000</code> returned "Connection refused". Flask logs showed it was running — "Running on http://127.0.0.1:5000". Port mapping was correct in the compose file.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Flask must bind to 0.0.0.0, not 127.0.0.1</div>
+          <div class="fb-body">
+            Flask's default bind address is <code>127.0.0.1</code> — the container's loopback interface. Docker's port mapping sends traffic to the container's network interface (not loopback), so it never reaches Flask. The fix is <code>app.run(host='0.0.0.0', port=5000)</code>. After rebuilding and restarting, Flask logged "Running on http://0.0.0.0:5000" and the endpoint was reachable from the host.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Flask crashed on first boot — "Can't connect to MySQL" — even with depends_on</div>
+          <div class="bb-body">
+            After adding the DB connection to app.py and starting the stack, Flask crashed immediately. <code>docker compose logs flask-app</code> showed: <code>mysql.connector.errors.DatabaseError: 2003 (HY000): Can't connect to MySQL server on 'mysql'</code>. The MySQL container was running but MySQL wasn't ready yet — it takes 20–30 seconds to initialise on first start.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Two-part fix: healthcheck in compose + restart flask-app manually once</div>
+          <div class="fb-body">
+            Long-term fix: the Compose healthcheck + <code>condition: service_healthy</code> pattern (covered in the Compose guide) prevents Flask from starting before MySQL is ready. Short-term fix during first-time setup: once <code>docker compose ps</code> showed MySQL as healthy, ran <code>docker compose restart flask-app</code>. Flask started successfully because MySQL was fully up by then. The healthcheck is the correct solution — the manual restart is just a workaround while the healthcheck is being set up.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">ModuleNotFoundError: No module named 'mysql'</div>
+          <div class="bb-body">
+            Flask started but every request to <code>/items</code> crashed with <code>ModuleNotFoundError: No module named 'mysql'</code>. The module was installed in the local venv but not inside the container.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">mysql-connector-python was missing from requirements.txt</div>
+          <div class="fb-body">
+            The local venv had <code>mysql-connector-python</code> installed manually via pip but it was never added to <code>requirements.txt</code>. The Dockerfile's <code>pip install -r requirements.txt</code> only installs what's in the file — so the container image was built without it. Fix: add <code>mysql-connector-python</code> to requirements.txt, then <code>docker compose up -d --build</code> to rebuild the image. The module was then available inside the container.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Flask-in-Docker problems and fixes</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Connection refused on curl localhost:5000</div>
+          <div class="ts-body">
+            Check in order: (1) Is flask-app shown as Up in <code>docker compose ps</code>? If not, it crashed — check <code>docker compose logs flask-app</code>. (2) Is <code>app.run(host='0.0.0.0')</code> set in app.py? If Flask binds to 127.0.0.1, it's unreachable from outside the container. (3) Is <code>ports: "5000:5000"</code> in the compose file under flask-app? Without this, no host port is mapped. (4) Is UFW blocking port 5000 on spserver? Check: <code>sudo ufw status</code>.
+          </div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">mysql.connector error — Can't connect to MySQL server on 'mysql'</div>
+          <div class="ts-body">
+            Three possible causes: (1) MySQL isn't ready yet — check <code>docker compose ps</code>, wait for mysql to show <code>(healthy)</code>, then <code>docker compose restart flask-app</code>. (2) DB_HOST is wrong — it must be <code>mysql</code> (the service name), not <code>localhost</code> or an IP. Verify: <code>docker compose exec flask-app env | grep DB_HOST</code>. (3) The two services are not on the same network — confirm they are defined in the same docker-compose.yml file. Run <code>docker compose exec flask-app ping mysql</code> to test connectivity.
+          </div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">ModuleNotFoundError at runtime — package missing inside container</div>
+          <div class="ts-body">
+            A Python package is installed in the local venv but not in the container. Fix: add the package to <code>requirements.txt</code>, then rebuild: <code>docker compose up -d --build</code>. The container uses only what's in requirements.txt — your local venv has no effect. Always verify by checking: <code>docker compose exec flask-app pip list</code> to see what's actually installed inside the container.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Code changes not reflected after docker compose up -d</div>
+          <div class="ts-body">
+            Compose reused the existing image. Always use <code>docker compose up -d --build</code> after changing app.py or any file that's COPY'd into the image. Confirm the rebuild: <code>docker images flask-app</code> — the "CREATED" column should show a recent timestamp. Also confirm the new code is inside the container: <code>docker compose exec flask-app cat /app/app.py</code>.
+          </div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Access denied for MySQL user — wrong credentials</div>
+          <div class="ts-body">
+            Flask is connecting to MySQL with the wrong user or password. Check: (1) <code>docker compose exec flask-app env | grep DB_</code> — print the env vars inside the Flask container. (2) Compare DB_USER and DB_PASSWORD with MYSQL_USER and MYSQL_PASSWORD in the mysql service. They must match exactly. (3) If you changed credentials after the volume was created, the old credentials are still in effect — see the Compose guide blocker about MySQL not re-initialising. Fix: <code>docker compose down -v</code> and <code>docker compose up -d</code> to fully reset.
+          </div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to run Flask interactively inside the container for debugging</div>
+          <div class="ts-body">Stop the running flask-app container (<code>docker compose stop flask-app</code>), then start a one-off container with an interactive shell: <code>docker compose run --rm flask-app /bin/bash</code>. Inside, you can run <code>python app.py</code> directly, or <code>python -c "..."</code> to test individual pieces. All env vars from the compose file are set — it's the same environment as the running container. Exit with <code>exit</code> and the container is removed (<code>--rm</code>).</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Gunicorn instead of Flask dev server</b> — <code>app.run()</code> uses Flask's single-threaded development server, which is not production-ready. Replace CMD in the Dockerfile with <code>CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]</code>. Add <code>gunicorn</code> to requirements.txt. Gunicorn handles multiple concurrent requests and restarts workers on crash.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Automatic DB schema initialisation</b> — instead of manually running CREATE TABLE, place <code>init.sql</code> in the project and bind-mount it into MySQL: <code>./init.sql:/docker-entrypoint-initdb.d/init.sql</code>. MySQL runs all <code>.sql</code> files in that directory on first start. The table is created automatically on <code>docker compose up</code> with a fresh volume. Combine with seed data inserts for a fully automated dev environment.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Connection retry logic in Flask</b> — if MySQL is still initialising when Flask starts, the connection attempt fails. Add a retry loop at startup: try to connect, sleep 2 seconds on failure, retry up to 10 times. This makes the app robust to transient startup races even without a perfect healthcheck. Libraries like <code>tenacity</code> make this clean with decorators.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nginx reverse proxy — next topic</b> — currently Flask is directly exposed on port 5000. Adding Nginx as a reverse proxy in the Compose file puts Nginx on port 80 (and later 443 with TLS). Nginx forwards requests to Flask internally. Benefits: SSL termination, static file serving, access logs, and Flask is no longer directly reachable from the host network.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Flask application factory pattern</b> — as the app grows, restructure app.py to use a factory function: <code>def create_app(): app = Flask(__name__); ...; return app</code>. This makes the app easier to test (create a test instance with a separate config), supports Flask blueprints for splitting routes into files, and is the standard pattern for non-trivial Flask projects.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Flask-SQLAlchemy for DB access</b> — raw <code>mysql.connector</code> is fine for simple queries but becomes cumbersome as the schema grows. Flask-SQLAlchemy adds an ORM layer: define models as Python classes, query with Python rather than raw SQL, and handle connection pooling automatically. Add <code>Flask-SQLAlchemy</code> and <code>PyMySQL</code> (pure-Python MySQL dialect for SQLAlchemy) to requirements.txt.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>
