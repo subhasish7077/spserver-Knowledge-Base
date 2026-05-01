@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What is Jenkins — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.pipeline-vis {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: .9rem 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pv-stage {
+  flex: 1;
+  min-width: 90px;
+  border-radius: 8px;
+  padding: .75rem .8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.pv-stage.code    { background: rgba(59,130,246,.12);  border: 1px solid rgba(59,130,246,.3); }
+.pv-stage.build   { background: rgba(249,115,22,.11);  border: 1px solid rgba(249,115,22,.28); }
+.pv-stage.test    { background: rgba(168,85,247,.1);   border: 1px solid rgba(168,85,247,.28); }
+.pv-stage.package { background: rgba(34,197,94,.1);    border: 1px solid rgba(34,197,94,.28); }
+.pv-stage.deploy  { background: rgba(239,68,68,.1);    border: 1px solid rgba(239,68,68,.28); }
+.pv-stage.jenkins { background: rgba(34,197,94,.15);   border: 2px solid rgba(34,197,94,.5); }
+.pv-icon  { font-size: 20px; }
+.pv-label { font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: .03em; }
+.pv-sub   { font-size: 10px; color: var(--text3); line-height: 1.4; }
+.pv-arrow { color: var(--text3); font-size: 16px; align-self: center; flex-shrink: 0; }
+
+.arch-diagram {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.3rem 1.5rem;
+  margin: .75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ad-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ad-box {
+  border-radius: 8px;
+  padding: .6rem 1rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ad-box.controller { background: rgba(34,197,94,.12);  border: 2px solid rgba(34,197,94,.4);  color: var(--green); }
+.ad-box.agent      { background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); color: var(--blue);  }
+.ad-box.host       { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+.ad-box.vol        { background: rgba(249,115,22,.1);  border: 1px solid rgba(249,115,22,.28); color: var(--amber); }
+.ad-arrow { color: var(--text3); font-size: 16px; flex-shrink: 0; }
+.ad-label { font-size: 11px; color: var(--text3); }
+
+.ui-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.ui-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .9rem 1.1rem;
+}
+.ui-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: .25rem; }
+.ui-path { font-family: var(--mono); font-size: 11px; color: var(--blue); margin-bottom: .4rem; }
+.ui-body { font-size: 12px; color: var(--text2); line-height: 1.6; }
+
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.plugin-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: .85rem 1rem;
+}
+.plugin-name { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--blue); margin-bottom: .25rem; }
+.plugin-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+@media(max-width:600px){
+  .pipeline-vis { flex-direction: column; }
+  .pv-arrow     { transform: rotate(90deg); align-self: flex-start; margin-left: 1rem; }
+  .ui-grid      { grid-template-columns: 1fr; }
+  .plugin-grid  { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">What is Jenkins</div>
+  <div class="nav-phase">Phase 3 · What is Jenkins</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('cicd')">CI/CD explained</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('devops-position')">Where Jenkins fits</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-github-actions')">vs GitHub Actions</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Architecture</div>
+      <div class="sidebar-link" onclick="switchTab('architecture');scrollToId('master-agent')">Master / Agent model</div>
+      <div class="sidebar-link" onclick="switchTab('architecture');scrollToId('on-spserver')">Jenkins on spserver</div>
+      <div class="sidebar-link" onclick="switchTab('architecture');scrollToId('plugins')">Plugin system</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">UI &amp; Reference</div>
+      <div class="sidebar-link" onclick="switchTab('ui');scrollToId('ui-overview')">UI walkthrough</div>
+      <div class="sidebar-link" onclick="switchTab('ui');scrollToId('ui-job')">Jobs &amp; builds</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-docker')">Docker commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-admin')">Admin commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 3 · Topic 1 of 7</div>
+      <h1 class="gh-title">What is <span>Jenkins</span></h1>
+      <p class="gh-sub">Jenkins is an open source automation server — the industry-standard tool for CI/CD. This guide covers what it is, why it exists, how it fits into a DevOps pipeline, and how it runs on spserver behind Nginx.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('architecture')">Architecture</button>
+      <button class="tab-btn" onclick="switchTab('ui')">UI walkthrough</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('future')">Phase 3 roadmap</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-why">
+        <div class="section-eyebrow">01 — What &amp; Why</div>
+        <div class="section-title">What Jenkins is</div>
+        <p class="section-body">
+          <b>Jenkins</b> is an open source automation server written in Java. Its job is to automate repetitive tasks in the software development lifecycle — things that humans would otherwise do manually every time: running tests, building artifacts, packaging Docker images, deploying to servers, sending notifications.
+        </p>
+        <p class="section-body">
+          It was originally forked from Hudson in 2011 and has grown into the most widely used CI/CD tool in the industry. It runs on your own infrastructure — not in the cloud — which is one of its key advantages over hosted solutions.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Without Jenkins — manual workflow</div>
+            <div class="ic-body">Developer pushes code to GitHub. Someone manually SSHs into the server, pulls the latest code, runs tests, builds the Docker image, restarts the container. Every deployment is a manual process. Steps get skipped. Humans make mistakes. Deployments only happen when someone has time.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">With Jenkins — automated pipeline</div>
+            <div class="ic-body">Developer pushes code to GitHub. Jenkins detects the push via webhook. It automatically: pulls the code, runs tests, builds the Docker image, restarts the Flask container — in under two minutes, with no human involvement. Every push triggers the same steps, in the same order, every time.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why Jenkins specifically?</b> Jenkins is the industry standard — it is used in enterprise environments including companies like Zscaler. Learning Jenkins on spserver means the skills transfer directly to production environments. GitHub Actions is hosted by GitHub and simpler to start with, but Jenkins is self-hosted, has no usage limits, and is significantly more configurable. The comparison is in the last section of this tab.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cicd">
+        <div class="section-eyebrow">02 — CI/CD</div>
+        <div class="section-title">CI/CD — what it actually means</div>
+        <p class="section-body">
+          <b>CI/CD</b> stands for Continuous Integration / Continuous Delivery (or Deployment). It is a practice, not a tool. Jenkins is the tool that implements the practice.
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Term</th><th>What it means</th><th>What Jenkins does for it</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Continuous Integration (CI)</td>
+              <td class="val">Developers merge code frequently — multiple times per day. Every merge is automatically tested to catch integration problems early.</td>
+              <td class="desc">Jenkins triggers on every push to GitHub. Runs the test suite automatically. Reports pass or fail back to the developer and GitHub PR.</td>
+            </tr>
+            <tr>
+              <td class="key">Continuous Delivery (CD)</td>
+              <td class="val">The codebase is always in a deployable state. After CI passes, the build artifact (Docker image, binary, package) is automatically prepared and staged.</td>
+              <td class="desc">Jenkins builds the Docker image after tests pass. Pushes it to a registry or stages it for deployment. The deploy step may still require manual approval.</td>
+            </tr>
+            <tr>
+              <td class="key">Continuous Deployment</td>
+              <td class="val">Every code change that passes CI is automatically deployed to production — no manual step. The pipeline goes all the way from push to live.</td>
+              <td class="desc">Jenkins restarts the production container automatically after a successful build. No human involvement from push to deploy.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          On spserver, we target <b>Continuous Deployment</b> for the Flask app — a push to the main branch triggers Jenkins, which builds the image, runs tests, and restarts the container. The whole process completes in under two minutes.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why CI/CD matters beyond automation:</b> The biggest benefit of CI/CD is not speed — it is <em>feedback time</em>. Without CI, a bug introduced on Monday might not be found until Thursday when someone manually tests. With CI, the same bug is caught in two minutes. The earlier a bug is caught, the cheaper it is to fix.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="devops-position">
+        <div class="section-eyebrow">03 — DevOps pipeline</div>
+        <div class="section-title">Where Jenkins fits in the software delivery pipeline</div>
+        <p class="section-body">Jenkins is the automation layer — it sits between the code repository and the running application, orchestrating every step of the delivery process.</p>
+
+        <div class="pipeline-vis">
+          <div class="pv-stage code">
+            <div class="pv-icon">📝</div>
+            <div class="pv-label">Code</div>
+            <div class="pv-sub">Push to<br>GitHub</div>
+          </div>
+          <div class="pv-arrow">→</div>
+          <div class="pv-stage jenkins">
+            <div class="pv-icon">⚙</div>
+            <div class="pv-label">Jenkins</div>
+            <div class="pv-sub">Webhook<br>trigger</div>
+          </div>
+          <div class="pv-arrow">→</div>
+          <div class="pv-stage build">
+            <div class="pv-icon">🔨</div>
+            <div class="pv-label">Build</div>
+            <div class="pv-sub">docker build<br>flask-app</div>
+          </div>
+          <div class="pv-arrow">→</div>
+          <div class="pv-stage test">
+            <div class="pv-icon">✓</div>
+            <div class="pv-label">Test</div>
+            <div class="pv-sub">pytest<br>unit tests</div>
+          </div>
+          <div class="pv-arrow">→</div>
+          <div class="pv-stage package">
+            <div class="pv-icon">📦</div>
+            <div class="pv-label">Package</div>
+            <div class="pv-sub">Docker<br>image ready</div>
+          </div>
+          <div class="pv-arrow">→</div>
+          <div class="pv-stage deploy">
+            <div class="pv-icon">🚀</div>
+            <div class="pv-label">Deploy</div>
+            <div class="pv-sub">docker compose<br>up -d --build</div>
+          </div>
+        </div>
+
+        <p class="section-body">
+          Jenkins is responsible for the middle of this chain — everything from detecting the code push to handing off the running container. The developer owns the code on the left. Nginx, users, and monitoring own the right. Jenkins owns the automation in between.
+        </p>
+        <p class="section-body">
+          Each step in the pipeline is defined in a <b>Jenkinsfile</b> — a text file checked into the repo alongside the code. This means the pipeline itself is versioned and code-reviewed, not configured through a UI that only one person has access to.
+        </p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-github-actions">
+        <div class="section-eyebrow">04 — Comparison</div>
+        <div class="section-title">Jenkins vs GitHub Actions</div>
+        <table class="kv-table">
+          <thead><tr><th>Dimension</th><th>Jenkins <span class="tag tag-g">chosen</span></th><th>GitHub Actions</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Hosting</td>
+              <td class="val">Self-hosted on spserver. Full control over the machine and environment.</td>
+              <td class="desc">Hosted by GitHub. Runs on GitHub's infrastructure — you have no control over the runner hardware.</td>
+            </tr>
+            <tr>
+              <td class="key">Cost</td>
+              <td class="val">Free (open source). Runs on hardware you already own. No usage limits.</td>
+              <td class="desc">Free tier: 2,000 minutes/month for public repos, 500 minutes for private. Beyond that: paid.</td>
+            </tr>
+            <tr>
+              <td class="key">Industry relevance</td>
+              <td class="val">Dominant in enterprise environments. Used at Zscaler and most large companies. Jenkins skills are directly transferable to production jobs.</td>
+              <td class="desc">Growing fast, dominant in open source and startups. Less common in large enterprises with established Jenkins setups.</td>
+            </tr>
+            <tr>
+              <td class="key">Configuration</td>
+              <td class="val">Jenkinsfile (Groovy DSL). Stored in the repo. Highly flexible — can do almost anything.</td>
+              <td class="desc">YAML workflow files. Simpler syntax. Strong ecosystem of reusable actions from the GitHub marketplace.</td>
+            </tr>
+            <tr>
+              <td class="key">Setup complexity</td>
+              <td class="val">Significant — Jenkins must be installed, configured, plugins managed. Covered in Phase 3.</td>
+              <td class="desc">Zero — just add a <code>.github/workflows/</code> YAML file. Works immediately on any GitHub repo.</td>
+            </tr>
+            <tr>
+              <td class="key">Network access</td>
+              <td class="val">Runs on spserver — can reach internal services (MySQL, other Docker containers) directly on the LAN.</td>
+              <td class="desc">Runs on GitHub's servers — cannot reach services on a private LAN without a reverse tunnel or VPN.</td>
+            </tr>
+            <tr>
+              <td class="key">Plugin ecosystem</td>
+              <td class="val">1,800+ plugins. Long-established integrations with every tool in the DevOps ecosystem.</td>
+              <td class="desc">Large marketplace of Actions. Younger ecosystem but growing very rapidly.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="section-body">
+          Both are valid tools. We use Jenkins on spserver because it is the industry-relevant choice for enterprise DevOps roles — and because running it on our own infrastructure is part of the learning. GitHub Actions would be faster to get started with; Jenkins teaches you how CI/CD actually works under the hood.
+        </p>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ ARCHITECTURE ══ -->
+    <div class="tab-pane" id="pane-architecture">
+
+      <div class="section" id="master-agent">
+        <div class="section-eyebrow">01 — Master / Agent model</div>
+        <div class="section-title">How Jenkins distributes work</div>
+        <p class="section-body">
+          Jenkins uses a <b>Controller / Agent</b> architecture (historically called Master / Agent). The Controller is the central Jenkins server — it manages configuration, schedules jobs, serves the web UI, and coordinates agents. Agents are separate machines or processes that actually run the build jobs.
+        </p>
+        <div class="arch-diagram">
+          <div class="ad-row">
+            <div class="ad-box controller">Jenkins Controller (Master)<br><span style="font-weight:400;font-size:10px">spserver · Docker · port 8090</span></div>
+          </div>
+          <div style="padding-left:1rem;display:flex;flex-direction:column;gap:6px;">
+            <div style="font-size:11px;color:var(--text3);margin-top:4px;">distributes jobs to →</div>
+            <div class="ad-row">
+              <div class="ad-box agent">Built-in node<br><span style="font-weight:400;font-size:10px">runs jobs directly on Controller</span></div>
+              <div class="ad-box agent">SSH Agent<br><span style="font-weight:400;font-size:10px">remote server via SSH</span></div>
+              <div class="ad-box agent">Docker Agent<br><span style="font-weight:400;font-size:10px">spins up container per build</span></div>
+              <div class="ad-box agent">Cloud Agent<br><span style="font-weight:400;font-size:10px">AWS EC2, GCP, Azure</span></div>
+            </div>
+          </div>
+        </div>
+
+        <table class="kv-table" style="margin-top:1rem;">
+          <thead><tr><th>Component</th><th>Role</th><th>On spserver</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Controller (Master)</td>
+              <td class="val">Serves the web UI. Stores job definitions, build history, plugins, and credentials. Schedules and delegates builds to agents.</td>
+              <td class="desc">Runs in Docker as the Jenkins container. All persistent data in the <code>jenkins_home</code> volume.</td>
+            </tr>
+            <tr>
+              <td class="key">Built-in node</td>
+              <td class="val">An agent built into the Controller. Runs jobs on the same machine as the Controller.</td>
+              <td class="desc">Used on spserver for Phase 3 — the Controller runs jobs locally. Sufficient for a single-server setup.</td>
+            </tr>
+            <tr>
+              <td class="key">Remote agents</td>
+              <td class="val">Separate machines connected to the Controller via SSH or JNLP. Each agent can have different OS, tools, or capabilities.</td>
+              <td class="desc">Not used in Phase 3 — introduced when multiple build environments are needed (e.g. Linux + Windows builds).</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>In production Jenkins setups at companies, the Controller never runs builds directly — it only manages and delegates. Builds run on dedicated agents (often ephemeral Docker containers or cloud VMs that spin up for a build and terminate afterwards). For spserver Phase 3, the built-in node is sufficient — we're running one service on one server.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="on-spserver">
+        <div class="section-eyebrow">02 — Jenkins on spserver</div>
+        <div class="section-title">How Jenkins is set up on spserver</div>
+        <p class="section-body">Jenkins runs as a Docker container on spserver, with its data persisted in a named volume. Nginx proxies <code>jenkins.dustyserver.co.in</code> to the Jenkins container on port 8090.</p>
+
+        <div class="arch-diagram">
+          <div class="ad-row">
+            <div class="ad-box host">Browser<br><span style="font-weight:400;font-size:10px">jenkins.dustyserver.co.in</span></div>
+            <div class="ad-arrow">→</div>
+            <div class="ad-label">HTTPS :443</div>
+            <div class="ad-box host">Nginx (host)<br><span style="font-weight:400;font-size:10px">reverse proxy</span></div>
+            <div class="ad-arrow">→</div>
+            <div class="ad-label">127.0.0.1:8090</div>
+            <div class="ad-box controller">Jenkins container<br><span style="font-weight:400;font-size:10px">port 8090:8080</span></div>
+          </div>
+          <div class="ad-row" style="padding-left:2rem;margin-top:4px;">
+            <div class="ad-label" style="color:var(--text3);font-size:11px;">persists all data</div>
+            <div class="ad-arrow">↔</div>
+            <div class="ad-box vol">jenkins_home volume<br><span style="font-weight:400;font-size:10px">/var/jenkins_home inside container</span></div>
+          </div>
+        </div>
+
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">docker run — how Jenkins container is started on spserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">docker run -d</span> \
+  --name jenkins \
+  --restart unless-stopped \
+  -p 8090:8080 \                    <span class="cm"># map host:8090 to Jenkins internal port 8080</span>
+  -p 50000:50000 \                  <span class="cm"># JNLP port for agent connections</span>
+  -v jenkins_home:/var/jenkins_home \  <span class="cm"># named volume for all Jenkins data</span>
+  -v /var/run/docker.sock:/var/run/docker.sock \  <span class="cm"># allows Jenkins to run Docker commands</span>
+  jenkins/jenkins:lts-jdk17
+
+<span class="cm"># jenkins/jenkins:lts-jdk17 — the official LTS (Long Term Support) image</span>
+<span class="cm"># LTS releases are stable and supported for ~12 months</span>
+<span class="cm"># jdk17 — ships with Java 17, required for modern Jenkins and plugins</span></pre>
+        </div>
+
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>The jenkins_home volume is critical.</b> All Jenkins configuration — jobs, pipelines, credentials, plugin settings, build history — lives in <code>/var/jenkins_home</code> inside the container. Without the volume mount, every container restart wipes the entire Jenkins setup. The volume must always be present. Never run Jenkins without it.</span>
+        </div>
+
+        <p class="section-body">The Docker socket mount (<code>/var/run/docker.sock</code>) deserves special attention:</p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title">Why mount the Docker socket?</div>
+            <div class="ic-body">Mounting <code>/var/run/docker.sock</code> lets the Jenkins container run Docker commands on the host. This is how Jenkins builds Docker images and restarts the Flask container as part of the CI/CD pipeline — it calls <code>docker build</code> and <code>docker compose up</code> from inside the Jenkins container, which execute on the host Docker daemon.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--amber)">Security implication</div>
+            <div class="ic-body">Mounting the Docker socket gives the Jenkins container root-equivalent access to the host. Any pipeline that can run code inside Jenkins can run arbitrary Docker commands on the host machine. This is acceptable on a personal lab server — in production, use a dedicated agent with carefully scoped permissions instead.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="plugins">
+        <div class="section-eyebrow">03 — Plugin system</div>
+        <div class="section-title">Why Jenkins uses a plugin architecture</div>
+        <p class="section-body">
+          Jenkins core is deliberately lean — it handles scheduling, the UI, and agent communication. Almost everything else is a plugin: Git integration, GitHub webhooks, Docker support, Slack notifications, credentials management, pipeline syntax. There are over 1,800 community-maintained plugins.
+        </p>
+        <p class="section-body">
+          This design means Jenkins can integrate with any tool in the DevOps ecosystem without the core becoming bloated. You install only what you need. Plugin updates are independent of Jenkins core updates.
+        </p>
+        <div class="plugin-grid">
+          <div class="plugin-card">
+            <div class="plugin-name">Git plugin</div>
+            <div class="plugin-desc">Lets Jenkins clone and poll Git repositories. Required for pulling code from GitHub before a build.</div>
+          </div>
+          <div class="plugin-card">
+            <div class="plugin-name">GitHub plugin</div>
+            <div class="plugin-desc">Integrates with GitHub API — receives webhooks, updates commit status (✓ or ✗), links builds to PRs.</div>
+          </div>
+          <div class="plugin-card">
+            <div class="plugin-name">Pipeline plugin</div>
+            <div class="plugin-desc">Enables Jenkinsfile-based pipelines — the core of modern Jenkins. Installed by default with "suggested plugins".</div>
+          </div>
+          <div class="plugin-card">
+            <div class="plugin-name">Docker Pipeline</div>
+            <div class="plugin-desc">Provides <code>docker.build()</code> and <code>docker.image()</code> steps for use inside Jenkinsfiles. Simplifies Docker operations in pipelines.</div>
+          </div>
+          <div class="plugin-card">
+            <div class="plugin-name">Credentials plugin</div>
+            <div class="plugin-desc">Stores secrets (SSH keys, passwords, tokens) securely in Jenkins. Referenced by ID in Jenkinsfiles — never hardcoded.</div>
+          </div>
+          <div class="plugin-card">
+            <div class="plugin-name">Blue Ocean</div>
+            <div class="plugin-desc">A modern visual UI for Jenkins pipelines — shows stage-by-stage progress, logs, and test results. Optional but improves readability.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>During Jenkins setup, the "Install suggested plugins" option installs a curated set of commonly needed plugins — Pipeline, Git, GitHub, Credentials, and others. This is the right choice for a first install. Additional plugins can be added later via Manage Jenkins → Plugins.</span>
+        </div>
+      </div>
+
+    </div><!-- end architecture -->
+
+    <!-- ══ UI WALKTHROUGH ══ -->
+    <div class="tab-pane" id="pane-ui">
+
+      <div class="section" id="ui-overview">
+        <div class="section-eyebrow">01 — Dashboard</div>
+        <div class="section-title">Jenkins UI — the main screens</div>
+        <p class="section-body">
+          Jenkins is accessed at <code>https://jenkins.dustyserver.co.in</code>. The UI is structured around a left sidebar for navigation, a main content area for jobs and builds, and a top bar for global actions.
+        </p>
+        <div class="ui-grid">
+          <div class="ui-card">
+            <div class="ui-name">Dashboard</div>
+            <div class="ui-path">/ (root)</div>
+            <div class="ui-body">The home screen. Lists all jobs with their last build status (blue = pass, red = fail, grey = never run). Shows weather icons summarising recent build health — sun for consistently passing, storm for consistently failing.</div>
+          </div>
+          <div class="ui-card">
+            <div class="ui-name">New Item</div>
+            <div class="ui-path">Dashboard → New Item</div>
+            <div class="ui-body">Create a new Job or Pipeline. Options: Freestyle Project (GUI-configured), Pipeline (Jenkinsfile-based), Multibranch Pipeline (one pipeline per branch), Folder (group jobs). For Phase 3, always use Pipeline.</div>
+          </div>
+          <div class="ui-card">
+            <div class="ui-name">Manage Jenkins</div>
+            <div class="ui-path">Dashboard → Manage Jenkins</div>
+            <div class="ui-body">Global configuration — system settings, plugins, credentials, nodes, security, system information. This is where plugin installation, Jenkins URL, and SMTP settings live. Requires admin access.</div>
+          </div>
+          <div class="ui-card">
+            <div class="ui-name">Credentials</div>
+            <div class="ui-path">Manage Jenkins → Credentials</div>
+            <div class="ui-body">Store secrets securely — GitHub personal access tokens, SSH private keys, Docker Hub passwords. Secrets are referenced in Jenkinsfiles by a credential ID — the actual value is never visible in logs or pipeline code.</div>
+          </div>
+          <div class="ui-card">
+            <div class="ui-name">Plugins</div>
+            <div class="ui-path">Manage Jenkins → Plugins</div>
+            <div class="ui-body">Install, update, and remove Jenkins plugins. "Available plugins" tab searches the plugin marketplace. "Installed plugins" shows what's active. Restart Jenkins after installing plugins to activate them.</div>
+          </div>
+          <div class="ui-card">
+            <div class="ui-name">Nodes</div>
+            <div class="ui-path">Manage Jenkins → Nodes</div>
+            <div class="ui-body">View and manage build agents (nodes). "Built-In Node" is the Controller itself. Shows executor count, disk space, and connectivity status. Phase 3 uses only the built-in node.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="ui-job">
+        <div class="section-eyebrow">02 — Jobs &amp; builds</div>
+        <div class="section-title">Jobs, builds, and where to find the output</div>
+        <p class="section-body">
+          In Jenkins, a <b>Job</b> (also called a Project) is the configuration of an automated task — what to do, when to do it, and with what parameters. A <b>Build</b> is a single execution of a Job — one run of the pipeline with a specific result.
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Term</th><th>What it is</th><th>Where to find it</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Job / Project</td>
+              <td class="val">The definition of a pipeline — source code location, trigger, stages to run. Persistent configuration stored in jenkins_home.</td>
+              <td class="desc">Dashboard → click the job name. Left sidebar shows configuration, build history, and workspace.</td>
+            </tr>
+            <tr>
+              <td class="key">Build</td>
+              <td class="val">One execution of the Job. Has a build number (#1, #2, #3...), a result (SUCCESS, FAILURE, ABORTED), and a duration.</td>
+              <td class="desc">Job page → Build History panel on the left. Click a build number to see its details.</td>
+            </tr>
+            <tr>
+              <td class="key">Console Output</td>
+              <td class="val">The full log of everything that ran during a build — every command executed, its output, and the final result. The most important debugging tool in Jenkins.</td>
+              <td class="desc">Build page → Console Output in the left sidebar. Or click the build number in the history panel.</td>
+            </tr>
+            <tr>
+              <td class="key">Workspace</td>
+              <td class="val">The directory on the agent where Jenkins checks out the code and runs the build. Cleaned between builds optionally.</td>
+              <td class="desc">Job page → Workspace in the left sidebar. Shows the files on disk from the last build.</td>
+            </tr>
+            <tr>
+              <td class="key">Jenkinsfile</td>
+              <td class="val">A text file in the code repository that defines the pipeline stages and steps. Checked in with the code — versioned alongside it.</td>
+              <td class="desc">In the GitHub repo root. Jenkins reads it automatically for Pipeline and Multibranch Pipeline jobs.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="section-title" style="margin-top:1.5rem;">Build status indicators</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code" style="color:var(--blue)">● Blue / Green</div><div class="cmd-desc">Build succeeded — all stages passed, no errors</div></div>
+          <div class="cmd-row"><div class="cmd-code" style="color:var(--red)">● Red</div><div class="cmd-desc">Build failed — a stage returned a non-zero exit code or an error was thrown</div></div>
+          <div class="cmd-row"><div class="cmd-code" style="color:var(--amber)">● Yellow</div><div class="cmd-desc">Build is unstable — completed but with warnings (often failed tests that were marked as warnings, not failures)</div></div>
+          <div class="cmd-row"><div class="cmd-code" style="color:var(--text3)">● Grey</div><div class="cmd-desc">Build was aborted — manually cancelled or timed out</div></div>
+          <div class="cmd-row"><div class="cmd-code" style="color:var(--text2)">● Blinking</div><div class="cmd-desc">Build is currently running — the icon animates during an active build</div></div>
+        </div>
+      </div>
+
+    </div><!-- end ui -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-docker">
+        <div class="section-eyebrow">01 — Docker commands</div>
+        <div class="section-title">Managing the Jenkins container</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker ps | grep jenkins</div><div class="cmd-desc">Confirm the Jenkins container is running — shows container ID, image, ports, status</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker logs jenkins</div><div class="cmd-desc">View Jenkins container logs — startup messages, plugin loading errors, Java exceptions</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker logs -f jenkins</div><div class="cmd-desc">Follow Jenkins logs live — useful during startup or when diagnosing a hanging build</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker restart jenkins</div><div class="cmd-desc">Restart the Jenkins container — picks up plugin changes, clears stuck builds. jenkins_home volume is preserved.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker stop jenkins</div><div class="cmd-desc">Gracefully stop Jenkins — allows running builds to complete or timeout before shutting down</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker exec -it jenkins /bin/bash</div><div class="cmd-desc">Open a shell inside the Jenkins container — inspect the filesystem, check environment variables, run groovy scripts</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume inspect jenkins_home</div><div class="cmd-desc">Show where the jenkins_home volume is stored on the host and its metadata</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker stats jenkins</div><div class="cmd-desc">Live CPU and memory usage for the Jenkins container — useful during heavy builds</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-admin">
+        <div class="section-eyebrow">02 — Admin &amp; setup</div>
+        <div class="section-title">Jenkins admin and first-time setup commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword</div><div class="cmd-desc">Print the initial admin password — required for first-time web UI unlock. Only needed once on a fresh install.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker exec jenkins jenkins-plugin-cli --list</div><div class="cmd-desc">List all installed plugins with their versions from inside the container</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker exec jenkins ls /var/jenkins_home/jobs/</div><div class="cmd-desc">List all Jenkins jobs — each job is a directory in jenkins_home/jobs/</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker exec jenkins ls /var/jenkins_home/workspace/</div><div class="cmd-desc">List all job workspaces — the directories where Jenkins checks out code during builds</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -s http://localhost:8090/api/json | python3 -m json.tool</div><div class="cmd-desc">Jenkins REST API — returns JSON with all jobs and their status. Useful for scripting and monitoring.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -s http://localhost:8090/api/json?tree=jobs[name,color]</div><div class="cmd-desc">Jenkins API — return only job names and build status colours. Efficient status check.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo du -sh /var/lib/docker/volumes/jenkins_home</div><div class="cmd-desc">Check how much disk space the jenkins_home volume is using on the host</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit while setting up Jenkins on spserver</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Jenkins config and jobs lost after container restart — no volume mounted</div>
+          <div class="bb-body">
+            Started Jenkins with <code>docker run jenkins/jenkins:lts</code> without a volume mount. Set up several jobs and installed plugins. After restarting the container (<code>docker restart jenkins</code>), all jobs, plugins, and configuration were gone — reverted to a fresh install with the initial admin password prompt.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Always mount a named volume at /var/jenkins_home</div>
+          <div class="fb-body">
+            Stopped the container, removed it, and recreated with <code>-v jenkins_home:/var/jenkins_home</code>. Went through initial setup again (this time with the volume). After that, restarting or even removing and recreating the container leaves all Jenkins data intact — the volume persists independently of the container. The initial admin password is also stored in the volume: <code>docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword</code>.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Jenkins accessible at localhost:8090 but not at jenkins.dustyserver.co.in</div>
+          <div class="bb-body">
+            Jenkins was running and reachable from spserver itself at <code>http://localhost:8090</code>, but accessing <code>https://jenkins.dustyserver.co.in</code> from a browser showed Nginx's default page or a connection error — not Jenkins.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">DNS A record, Nginx server block, and Certbot all need to be in place</div>
+          <div class="fb-body">
+            Three things were needed: (1) DNS — <code>jenkins.dustyserver.co.in</code> A record at the registrar pointing to spserver's public IP. (2) Nginx server block — <code>/etc/nginx/sites-available/jenkins</code> with <code>server_name jenkins.dustyserver.co.in</code> and <code>proxy_pass http://127.0.0.1:8090</code>, symlinked into <code>sites-enabled/</code>. (3) Certbot — <code>sudo certbot --nginx -d jenkins.dustyserver.co.in</code> for HTTPS. All three were covered in the Nginx Reverse Proxy guide. After all three were in place, the domain worked correctly.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Initial admin password — where to find it</div>
+          <div class="bb-body">
+            On first access to the Jenkins UI, the setup wizard asks for an "Initial Admin Password". The UI shows it is in <code>/var/jenkins_home/secrets/initialAdminPassword</code> — but this path is inside the container, not on the host.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">docker exec to read the file from inside the container</div>
+          <div class="fb-body">
+            Run: <code>docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword</code>. This prints the password directly to the terminal — paste it into the Jenkins UI setup wizard. It is a 32-character hexadecimal string. After completing setup and creating an admin user, this file is no longer needed — but it remains in the volume for reference.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — Phase 3 roadmap</div>
+        <div class="section-title">What the rest of Phase 3 covers</div>
+        <p class="section-body">
+          This guide covered what Jenkins is and how it runs on spserver. The remaining topics in Phase 3 go deeper into each layer — from architecture to writing actual pipelines to managing secrets correctly.
+        </p>
+        <div class="future-box">
+          <div class="future-label">⟶ Phase 3 topics ahead</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Topic 2 — Jenkins Architecture</b> — deep dive into how the Controller manages jobs and agents, the executor model (how many builds can run simultaneously), build queuing, and how the Docker socket mount enables builds to run Docker commands on the host from inside the Jenkins container.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Topic 3 — Jobs, Builds, Pipelines, Nodes</b> — the difference between Freestyle Jobs and Declarative Pipelines. Creating the first Pipeline job for spserver-flask. Triggering it manually. Reading Console Output to diagnose failures. Understanding the build workspace and how Jenkins checks out code.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Topic 4 — Jenkinsfile and Declarative Syntax</b> — writing a Jenkinsfile for spserver-flask. The <code>pipeline</code>, <code>agent</code>, <code>stages</code>, <code>stage</code>, <code>steps</code>, and <code>post</code> blocks. Environment variables. Conditional stages. When expressions. Archiving artifacts. The Jenkinsfile lives in the repo root and is version-controlled alongside the application code.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Topic 5 — Plugin Ecosystem</b> — installing and configuring the plugins needed for the spserver pipeline: Git, GitHub, Docker Pipeline, and Credentials. Understanding plugin dependencies. Managing plugin updates without breaking the pipeline.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Topic 6 — Credentials Management</b> — storing GitHub tokens and SSH keys in Jenkins Credentials without exposing them in Jenkinsfiles or logs. The <code>withCredentials</code> block. Binding credentials to environment variables. The difference between global credentials and folder-scoped credentials.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Topic 7 — Jenkins Best Practices</b> — keeping Jenkinsfiles simple and readable, not storing state in the workspace between builds, using <code>agent any</code> vs specific node labels, archiving test results, setting build timeouts, and the principle of making pipeline failures loud and fast rather than silently continuing.</div></div>
+        </div>
+
+        <div class="future-box" style="margin-top:1rem;">
+          <div class="future-label">⟶ Phase 5 — CI/CD with Jenkins (the end goal)</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Full CI/CD pipeline for spserver-flask</b> — the Phase 5 goal. Push to GitHub → Jenkins webhook trigger → pull code → run pytest → docker build → docker compose up -d --build → Flask container restarted with new code — all in under two minutes, fully automated. Phase 3 builds the knowledge needed to write and debug this pipeline.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','architecture','ui','commands','blockers','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>
