@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docker Compose — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.field-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.field-name { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: .25rem; }
+.field-role { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: .35rem; }
+.field-body { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.field-body code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 4px; border-radius: 3px; color: var(--blue); }
+
+.vol-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: .75rem 0;
+}
+.vc-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.vc-title { font-size: 14px; font-weight: 600; margin-bottom: .35rem; }
+.vc-body  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.vc-body code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 4px; border-radius: 3px; color: var(--blue); }
+
+.svc-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 1rem 0;
+}
+.svc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.svc-box {
+  border-radius: 8px;
+  padding: .6rem 1rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.svc-box.flask { background: rgba(59,130,246,.13); border: 1px solid rgba(59,130,246,.3); color: var(--blue); }
+.svc-box.mysql { background: rgba(249,115,22,.13); border: 1px solid rgba(249,115,22,.3); color: var(--amber); }
+.svc-box.vol   { background: rgba(34,197,94,.12);  border: 1px solid rgba(34,197,94,.3);  color: var(--green); }
+.svc-arrow { font-size: 18px; color: var(--text3); }
+.svc-label { font-size: 11px; color: var(--text3); width: 130px; }
+
+@media(max-width:600px){
+  .vol-compare { grid-template-columns:1fr; }
+  .field-grid   { grid-template-columns:1fr 1fr; }
+  .svc-label    { display:none; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Docker Compose</div>
+  <div class="nav-phase">Phase 2 · Docker Compose</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('vs-docker-run')">vs docker run</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('yml-structure')">YAML structure</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('field-ref')">Field reference</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('volumes-explained')">Named volumes vs bind mounts</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-prereq')">Prerequisites</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-compose-file')">Write compose file</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-up')">Start the stack</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify &amp; test</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-rebuild')">Rebuild after changes</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-lifecycle')">Lifecycle commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-inspect')">Inspect &amp; debug</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 2 · Topic 4 of 7</div>
+      <h1 class="gh-title">Docker <span>Compose</span></h1>
+      <p class="gh-sub">Defining and running a multi-container stack — Flask app + MySQL — from a single YAML file. Covers the full lifecycle, named volumes, internal networking, health checks, and why depends_on isn't enough.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-why">
+        <div class="section-eyebrow">01 — What &amp; Why</div>
+        <div class="section-title">What Docker Compose is — and why it exists</div>
+        <p class="section-body">
+          <b>Docker Compose</b> is a tool for defining and running multi-container Docker applications. Instead of starting each container with a separate <code>docker run</code> command (with all its flags), you describe the entire stack — every service, port, volume, network, and environment variable — in a single YAML file called <code>docker-compose.yml</code>. Then you start everything with one command: <code>docker compose up -d</code>.
+        </p>
+        <p class="section-body">
+          The compose file is checked into version control alongside your code. Anyone who clones the repo and runs <code>docker compose up</code> gets the exact same environment — same containers, same config, same networking, same volume structure.
+        </p>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>We use <b>docker compose</b> (no hyphen) — the modern Compose V2 plugin installed as part of Docker Engine. The old <code>docker-compose</code> (with hyphen, Python-based, v1) is deprecated. If your system only has the hyphenated version, upgrade to Docker Engine from the official repository.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="vs-docker-run">
+        <div class="section-eyebrow">02 — Compose vs docker run</div>
+        <div class="section-title">Why Compose instead of plain docker run</div>
+        <p class="section-body">Consider what it takes to run a Flask app with a MySQL database using only <code>docker run</code>:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — docker run approach (fragile)</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Step 1: create a network manually</span>
+<span class="nm">docker network create</span> spserver-net
+
+<span class="cm"># Step 2: create a volume manually</span>
+<span class="nm">docker volume create</span> mysql-data
+
+<span class="cm"># Step 3: start MySQL (remember ALL these flags every time)</span>
+<span class="nm">docker run -d</span> \
+  --name mysql \
+  --network spserver-net \
+  --volume mysql-data:/var/lib/mysql \
+  -e MYSQL_ROOT_PASSWORD=secret \
+  -e MYSQL_DATABASE=flaskdb \
+  -e MYSQL_USER=flaskuser \
+  -e MYSQL_PASSWORD=flaskpass \
+  mysql:8.0
+
+<span class="cm"># Step 4: start Flask (must remember the same network name)</span>
+<span class="nm">docker run -d</span> \
+  --name flask-app \
+  --network spserver-net \
+  -p 5000:5000 \
+  -e DB_HOST=mysql \
+  -e DB_NAME=flaskdb \
+  flask-app:latest
+
+<span class="cm"># To tear it all down, must remember to stop and remove each container,</span>
+<span class="cm"># remove the network, and decide what to do about the volume.</span></pre>
+        </div>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Problems with docker run</div>
+            <div class="ic-body">Long, fragile shell commands that are hard to remember and easy to get wrong. Nothing is version-controlled — the configuration lives only in your shell history. Impossible to share reliably. No single command to bring the whole stack up or down.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Compose fixes all of this</div>
+            <div class="ic-body">The entire stack — both services, all environment variables, the network, the volume — is declared in one YAML file. Checked into git. Start everything: <code>docker compose up -d</code>. Stop everything: <code>docker compose down</code>. Reproducible on any machine.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="yml-structure">
+        <div class="section-eyebrow">03 — YAML structure</div>
+        <div class="section-title">The top-level structure of docker-compose.yml</div>
+        <p class="section-body">A docker-compose.yml has four top-level keys. Only <code>services</code> is required — the others are optional but used in almost every real setup.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">docker-compose.yml — skeleton</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># services — the containers to run (required)</span>
+<span class="nm">services:</span>
+  service-name:
+    image: some-image:tag    <span class="cm"># OR use build: to build from Dockerfile</span>
+    ports: [...]
+    environment: [...]
+    volumes: [...]
+    depends_on: [...]
+
+<span class="cm"># volumes — declare named volumes used by services (optional)</span>
+<span class="nm">volumes:</span>
+  mysql-data:               <span class="cm"># named volume — Docker manages its location</span>
+
+<span class="cm"># networks — declare custom networks (optional)</span>
+<span class="cm"># If omitted, Compose creates a default bridge network automatically</span>
+<span class="nm">networks:</span>
+  backend:
+
+<span class="cm"># configs / secrets — advanced, for Swarm mode (not used here)</span></pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>The <code>version:</code> key (e.g. <code>version: "3.8"</code>) used to be required but is now <b>obsolete</b> in Compose V2. Modern Docker Compose ignores it and may warn about it. Leave it out entirely in new files.</span>
+        </div>
+
+        <div class="section-title" style="margin-top:1.5rem;">How services communicate</div>
+        <p class="section-body">Compose automatically puts all services in the same default bridge network. Services can reach each other using their <b>service name as the hostname</b> — no IP addresses needed.</p>
+
+        <div class="svc-diagram">
+          <div class="svc-row">
+            <div class="svc-label">Host machine</div>
+            <div class="svc-box flask">flask-app  <span style="font-weight:400;font-size:11px;color:var(--text3)">→ port 5000 mapped to host</span></div>
+          </div>
+          <div class="svc-row">
+            <div class="svc-label" style="color:var(--text3);font-size:11px;">connects to mysql:3306</div>
+            <div class="svc-box mysql">mysql  <span style="font-weight:400;font-size:11px;color:var(--text3)">→ internal only, no host mapping</span></div>
+          </div>
+          <div class="svc-row">
+            <div class="svc-label" style="color:var(--text3);font-size:11px;">persists data across restarts</div>
+            <div class="svc-box vol">mysql-data volume  <span style="font-weight:400;font-size:11px;color:var(--text3)">→ /var/lib/mysql</span></div>
+          </div>
+        </div>
+        <p class="section-body">Inside the Flask container, the database host is simply <code>mysql</code> — Compose's internal DNS resolves this to the MySQL container's IP automatically. This is why we set <code>DB_HOST=mysql</code> in the Flask environment.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="field-ref">
+        <div class="section-eyebrow">04 — Field reference</div>
+        <div class="section-title">Key fields in a service definition</div>
+        <div class="field-grid">
+          <div class="field-card">
+            <div class="field-name">image</div>
+            <div class="field-role">Use a pre-built image</div>
+            <div class="field-body">Pulls and runs an existing image from Docker Hub or a registry. <code>image: mysql:8.0</code> — Compose pulls mysql:8.0 from Docker Hub if not already local.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">build</div>
+            <div class="field-role">Build from a Dockerfile</div>
+            <div class="field-body"><code>build: .</code> tells Compose to build the image using the Dockerfile in the current directory. The <code>--build</code> flag in <code>docker compose up --build</code> forces a rebuild. Without it, Compose reuses the existing image.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">ports</div>
+            <div class="field-role">Publish ports to the host</div>
+            <div class="field-body">Maps host port to container port: <code>"5000:5000"</code> — host:container. Only services that need to be reachable from outside Docker should have ports mapped. MySQL should NOT — it should only be accessible from within the Docker network.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">environment</div>
+            <div class="field-role">Set environment variables</div>
+            <div class="field-body">Pass env vars into the container. Can be a list (<code>- KEY=value</code>) or a map (<code>KEY: value</code>). Used for MySQL credentials, Flask config, connection strings. Sensitive values should use <code>env_file:</code> or Docker secrets instead of hardcoding.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">depends_on</div>
+            <div class="field-role">Start order dependency</div>
+            <div class="field-body">Tells Compose to start this service after another service's <em>container is running</em>. <b>Does not wait for the service inside to be ready</b> — MySQL container running does not mean MySQL is accepting connections. Use <code>healthcheck</code> + <code>condition: service_healthy</code> for real readiness.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">volumes</div>
+            <div class="field-role">Mount storage into the container</div>
+            <div class="field-body">Two forms: named volume (<code>mysql-data:/var/lib/mysql</code>) — Docker manages the storage location, data persists across <code>docker compose down</code>. Bind mount (<code>./app:/app</code>) — mounts a host directory directly, changes are reflected live.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">restart</div>
+            <div class="field-role">Restart policy</div>
+            <div class="field-body"><code>restart: unless-stopped</code> — container auto-restarts on crash or server reboot unless you explicitly stopped it. Other values: <code>no</code> (default), <code>always</code>, <code>on-failure</code>. Essential for production services on spserver.</div>
+          </div>
+          <div class="field-card">
+            <div class="field-name">healthcheck</div>
+            <div class="field-role">Readiness probe</div>
+            <div class="field-body">Defines a command Docker runs periodically to check if the service is healthy. Other services using <code>depends_on: condition: service_healthy</code> wait until this check passes. Use <code>mysqladmin ping</code> for MySQL to detect true readiness, not just container start.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="volumes-explained">
+        <div class="section-eyebrow">05 — Storage</div>
+        <div class="section-title">Named volumes vs bind mounts — when to use each</div>
+        <p class="section-body">Both allow data to persist outside the container's writable layer, but they serve different purposes:</p>
+        <div class="vol-compare">
+          <div class="vc-card">
+            <div class="vc-title" style="color:var(--blue)">Named volume — <code>mysql-data:/var/lib/mysql</code></div>
+            <div class="vc-body">
+              Docker creates and manages the storage location on the host (under <code>/var/lib/docker/volumes/</code>). You never need to know the exact path. Data survives <code>docker compose down</code> and even container removal. The only way to delete it is <code>docker compose down -v</code> or <code>docker volume rm</code>.<br><br>
+              <b>Use for:</b> database data, anything you want Docker to manage. Best practice for stateful services.
+            </div>
+          </div>
+          <div class="vc-card">
+            <div class="vc-title" style="color:var(--amber)">Bind mount — <code>./app:/app</code></div>
+            <div class="vc-body">
+              Mounts a specific directory from the host filesystem directly into the container. Changes on the host are reflected inside the container immediately — and vice versa. You control the exact path.<br><br>
+              <b>Use for:</b> development — mounting source code so changes are live without rebuilding the image. Not recommended for production database storage (permissions, portability issues).
+            </div>
+          </div>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>docker compose down does NOT delete volumes.</b> This is intentional — your database data survives a stack restart. To wipe volumes too, use <code>docker compose down -v</code>. Be careful: this permanently deletes all data in named volumes declared in the compose file.</span>
+        </div>
+        <table class="kv-table" style="margin-top:1rem;">
+          <thead><tr><th>Scenario</th><th>Use</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td class="key">MySQL data persistence</td><td class="val">Named volume</td><td class="desc">Docker manages it, survives restarts, portable across machines</td></tr>
+            <tr><td class="key">Live code reloading in dev</td><td class="val">Bind mount</td><td class="desc">Edits on host reflect inside container instantly</td></tr>
+            <tr><td class="key">Nginx config files</td><td class="val">Bind mount</td><td class="desc">Config lives in your repo, easy to edit and track with git</td></tr>
+            <tr><td class="key">App logs</td><td class="val">Named volume or bind mount</td><td class="desc">Bind mount if you want logs on the host for easy access; named volume if just for retention</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-prereq">
+        <div class="section-eyebrow">01 — Prerequisites</div>
+        <div class="section-title">What's needed before writing the compose file</div>
+        <p class="section-body">We're working in the <code>spserver-flask</code> project on spserver (192.168.31.150), repo at <a href="https://github.com/subhasish7077/spserver-flask" style="color:var(--blue)">github.com/subhasish7077/spserver-flask</a>. The Dockerfile from the previous guide should already exist. The Flask app should use <code>mysql-connector-python</code> — not <code>mysqlclient</code> — to connect to MySQL.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">requirements.txt — must include mysql-connector-python</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre>Flask
+mysql-connector-python
+<span class="cm"># NOT mysqlclient — that requires pkg-config and libmysqlclient-dev</span>
+<span class="cm"># system packages which are not in python:3.11-slim by default</span></pre>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>mysql-connector-python vs mysqlclient:</b> <code>mysqlclient</code> is a C extension that requires <code>pkg-config</code> and <code>libmysqlclient-dev</code> to be installed at build time. The <code>python:3.11-slim</code> base image doesn't include these — the build fails with a compiler error. <code>mysql-connector-python</code> is a pure-Python driver that installs cleanly with no system dependencies. Use it.</span>
+        </div>
+        <p class="section-body">Confirm the project structure before writing the compose file:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/ — expected before compose</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="dg">spserver-flask/</span>
+├── app.py
+├── requirements.txt   <span class="cm"># includes mysql-connector-python</span>
+├── Dockerfile
+├── .dockerignore
+└── templates/</pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-compose-file">
+        <div class="section-eyebrow">02 — Write the compose file</div>
+        <div class="section-title">Step 1 — Create docker-compose.yml for Flask + MySQL</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Write the full docker-compose.yml</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Every field is annotated to explain why it is there. Read the comments — they explain the decisions, not just the syntax.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/docker-compose.yml</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="nm">services:</span>
+
+  <span class="dg">flask-app:</span>
+    <span class="cm"># Build from the Dockerfile in the current directory</span>
+    <span class="cm"># Use 'image: flask-app:latest' instead if the image is already built</span>
+    <span class="nm">build:</span> .
+
+    <span class="cm"># Map host port 5000 to container port 5000</span>
+    <span class="cm"># Flask is the only service that should be reachable from the host</span>
+    <span class="nm">ports:</span>
+      - <span class="dr">"5000:5000"</span>
+
+    <span class="cm"># Environment variables passed into the Flask container</span>
+    <span class="cm"># DB_HOST=mysql  — "mysql" is the service name, resolved by Compose DNS</span>
+    <span class="nm">environment:</span>
+      - <span class="dr">DB_HOST=mysql</span>
+      - <span class="dr">DB_PORT=3306</span>
+      - <span class="dr">DB_NAME=flaskdb</span>
+      - <span class="dr">DB_USER=flaskuser</span>
+      - <span class="dr">DB_PASSWORD=flaskpass</span>
+
+    <span class="cm"># Start flask-app only after mysql is healthy (not just running)</span>
+    <span class="cm"># condition: service_healthy requires a healthcheck on the mysql service</span>
+    <span class="nm">depends_on:</span>
+      <span class="dg">mysql:</span>
+        <span class="nm">condition:</span> service_healthy
+
+    <span class="cm"># Restart automatically if the container crashes or spserver reboots</span>
+    <span class="nm">restart:</span> unless-stopped
+
+  <span class="dr">mysql:</span>
+    <span class="cm"># Official MySQL 8.0 image from Docker Hub</span>
+    <span class="nm">image:</span> mysql:8.0
+
+    <span class="cm"># NO ports mapping — MySQL is intentionally internal only</span>
+    <span class="cm"># Only flask-app (on the same Docker network) can reach port 3306</span>
+    <span class="cm"># Exposing MySQL to the host would be a security risk</span>
+
+    <span class="cm"># MySQL official image reads these env vars on first start</span>
+    <span class="cm"># to initialise the database, root password, user, and password</span>
+    <span class="nm">environment:</span>
+      - <span class="dr">MYSQL_ROOT_PASSWORD=rootsecret</span>
+      - <span class="dr">MYSQL_DATABASE=flaskdb</span>
+      - <span class="dr">MYSQL_USER=flaskuser</span>
+      - <span class="dr">MYSQL_PASSWORD=flaskpass</span>
+
+    <span class="cm"># Named volume — persists MySQL data across docker compose down</span>
+    <span class="cm"># Without this, all database data is lost every time the container stops</span>
+    <span class="nm">volumes:</span>
+      - <span class="dg">mysql-data:/var/lib/mysql</span>
+
+    <span class="cm"># Health check — polls mysqladmin to detect when MySQL is actually ready</span>
+    <span class="cm"># depends_on alone only waits for the container to start, not MySQL to boot</span>
+    <span class="cm"># Flask will not start until this check passes (because of condition: service_healthy above)</span>
+    <span class="nm">healthcheck:</span>
+      <span class="nm">test:</span> [<span class="dr">"CMD"</span>, <span class="dr">"mysqladmin"</span>, <span class="dr">"ping"</span>, <span class="dr">"-h"</span>, <span class="dr">"localhost"</span>, <span class="dr">"-u"</span>, <span class="dr">"root"</span>, <span class="dr">"-prootsecret"</span>]
+      <span class="nm">interval:</span> 10s     <span class="cm"># check every 10 seconds</span>
+      <span class="nm">timeout:</span> 5s       <span class="cm"># fail if no response within 5 seconds</span>
+      <span class="nm">retries:</span> 5        <span class="cm"># mark unhealthy after 5 consecutive failures</span>
+      <span class="nm">start_period:</span> 30s <span class="cm"># give MySQL 30s to initialise before health checks count</span>
+
+    <span class="nm">restart:</span> unless-stopped
+
+<span class="cm"># Declare named volumes used by services above</span>
+<span class="cm"># Docker creates and manages this volume's location on the host</span>
+<span class="nm">volumes:</span>
+  <span class="dg">mysql-data:</span></pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span><b>Why no ports on MySQL?</b> MySQL running on port 3306 of the host means anyone on the LAN can attempt to connect to your database. Inside Docker, containers on the same Compose network reach each other by service name — Flask can connect to <code>mysql:3306</code> without the port ever being exposed to the host. Always keep database ports internal.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-up">
+        <div class="section-eyebrow">03 — Start</div>
+        <div class="section-title">Step 2 — Start the full stack</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">docker compose up -d</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Run from the directory that contains <code>docker-compose.yml</code>. The <code>-d</code> flag runs all containers in the background (detached mode) — without it, the logs stream to your terminal and Ctrl+C stops the entire stack.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run from spserver-flask/</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Build the flask-app image and start all services in the background</span>
+<span class="nm">docker compose up -d</span>
+
+<span class="cm"># What happens:</span>
+<span class="cm"># 1. Builds flask-app image from Dockerfile (first time)</span>
+<span class="cm"># 2. Pulls mysql:8.0 from Docker Hub (first time)</span>
+<span class="cm"># 3. Creates the mysql-data named volume</span>
+<span class="cm"># 4. Creates the default bridge network for these services</span>
+<span class="cm"># 5. Starts mysql container</span>
+<span class="cm"># 6. Waits for mysql healthcheck to pass (up to ~80 seconds)</span>
+<span class="cm"># 7. Starts flask-app container</span>
+
+<span class="cm"># Check that both services are running</span>
+<span class="nm">docker compose ps</span>
+<span class="cm"># NAME                    STATUS</span>
+<span class="cm"># spserver-flask-mysql-1      Up (healthy)</span>
+<span class="cm"># spserver-flask-flask-app-1  Up</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-verify">
+        <div class="section-eyebrow">04 — Verify</div>
+        <div class="section-title">Step 3 — Confirm the stack is working</div>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Test Flask is responding on the host</span>
+<span class="nm">curl http://localhost:5000</span>
+
+<span class="cm"># View live logs from all services</span>
+<span class="nm">docker compose logs -f</span>
+
+<span class="cm"># View logs from only flask-app</span>
+<span class="nm">docker compose logs -f flask-app</span>
+
+<span class="cm"># Confirm MySQL container is healthy</span>
+<span class="nm">docker compose ps</span>
+<span class="cm"># mysql column should show: Up (healthy)</span>
+
+<span class="cm"># Open a shell inside the running MySQL container to inspect the DB</span>
+<span class="nm">docker compose exec mysql</span> mysql -u flaskuser -pflaskpass flaskdb
+<span class="cm"># Then run SQL: SHOW TABLES;</span>
+
+<span class="cm"># Open a shell inside the Flask container</span>
+<span class="nm">docker compose exec flask-app</span> /bin/bash</pre>
+        </div>
+        <div class="alert success">
+          <span class="alert-icon">✓</span>
+          <span>If <code>docker compose ps</code> shows both services as <b>Up</b> and MySQL as <b>(healthy)</b>, and <code>curl localhost:5000</code> returns a response — the stack is fully operational. Flask is talking to MySQL through Docker's internal network.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-rebuild">
+        <div class="section-eyebrow">05 — Rebuilding</div>
+        <div class="section-title">Step 4 — Rebuild after Dockerfile or code changes</div>
+        <p class="section-body">
+          <code>docker compose up -d</code> by default reuses the existing <code>flask-app</code> image — it does not automatically rebuild when you change the Dockerfile or application code. You must add <code>--build</code> to force a rebuild.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — after changing Dockerfile or app code</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Rebuild the flask-app image and restart only changed services</span>
+<span class="nm">docker compose up -d --build</span>
+
+<span class="cm"># Compose is smart: MySQL won't restart if its config hasn't changed</span>
+<span class="cm"># Only flask-app is rebuilt and restarted</span>
+
+<span class="cm"># To stop all services without removing volumes</span>
+<span class="nm">docker compose down</span>
+<span class="cm"># Containers and networks are removed, mysql-data volume is kept</span>
+
+<span class="cm"># To stop all services AND delete all volumes (wipes database data)</span>
+<span class="nm">docker compose down -v</span>
+<span class="cm"># WARNING: mysql-data volume is deleted — all database data is lost</span>
+
+<span class="cm"># To restart a single service without rebuilding</span>
+<span class="nm">docker compose restart flask-app</span></pre>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span>If you change the <b>docker-compose.yml</b> (add a new environment variable, change a port, add a volume) you must run <code>docker compose up -d</code> again — Compose will detect the changed config and recreate the affected containers automatically.</span>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-lifecycle">
+        <div class="section-eyebrow">01 — Lifecycle</div>
+        <div class="section-title">Stack lifecycle commands</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker compose up -d</div><div class="cmd-desc">Create and start all services in the background. Pulls images if needed, creates networks and volumes.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose up -d --build</div><div class="cmd-desc">Same as above but rebuilds images first — required after Dockerfile or source changes</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose down</div><div class="cmd-desc">Stop and remove all containers and networks. Named volumes are kept — data is safe.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose down -v</div><div class="cmd-desc">Stop and remove containers, networks, AND named volumes. Permanently deletes database data.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose stop</div><div class="cmd-desc">Stop all containers without removing them. Containers can be restarted with <code>docker compose start</code>.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose start</div><div class="cmd-desc">Start existing (stopped) containers — does not create new ones or rebuild images</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose restart</div><div class="cmd-desc">Restart all running services. Useful to apply new environment variables.</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose restart flask-app</div><div class="cmd-desc">Restart only the flask-app service — MySQL keeps running uninterrupted</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose pull</div><div class="cmd-desc">Pull the latest versions of all images defined in the compose file</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-inspect">
+        <div class="section-eyebrow">02 — Inspect &amp; debug</div>
+        <div class="section-title">Observing and debugging the stack</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker compose ps</div><div class="cmd-desc">Show status of all services — name, state (Up/Exit), ports, health status</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose logs</div><div class="cmd-desc">Show logs from all services since start</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose logs -f</div><div class="cmd-desc">Follow (tail) logs from all services live — Ctrl+C to stop following without stopping containers</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose logs -f flask-app</div><div class="cmd-desc">Follow logs from only the flask-app service</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose logs --tail=50 mysql</div><div class="cmd-desc">Show last 50 lines of MySQL logs</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app /bin/bash</div><div class="cmd-desc">Open an interactive shell inside the running flask-app container</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec mysql mysql -u root -p</div><div class="cmd-desc">Open a MySQL prompt inside the running mysql container as root</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose config</div><div class="cmd-desc">Validate and print the resolved compose file — useful to check that env vars are expanded correctly</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume ls</div><div class="cmd-desc">List all Docker volumes — shows mysql-data volume created by Compose</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume inspect spserver-flask_mysql-data</div><div class="cmd-desc">Show where on the host the named volume is stored and its full metadata</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit while setting up Flask + MySQL Compose</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Flask crashed on startup — "Can't connect to MySQL server" — depends_on wasn't enough</div>
+          <div class="bb-body">
+            Stack started successfully but <code>docker compose logs flask-app</code> showed the Flask app crashing immediately with a MySQL connection error. The MySQL container was running but MySQL inside it hadn't finished initialising — it takes 10–30 seconds to set up the database on first run.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Add healthcheck to MySQL and use condition: service_healthy in depends_on</div>
+          <div class="fb-body">
+            <code>depends_on</code> alone only tells Compose to <em>start</em> the mysql container before flask-app — it does not wait for MySQL to be accepting connections. Added a <code>healthcheck</code> block to the mysql service using <code>mysqladmin ping</code>, and changed <code>depends_on</code> to use <code>condition: service_healthy</code>. Now Compose waits until MySQL passes the health check before starting Flask. The <code>start_period: 30s</code> gives MySQL time to initialise before failures count against it.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">pip install failed during docker build — mysqlclient compilation error</div>
+          <div class="bb-body">
+            Build failed during <code>RUN pip install -r requirements.txt</code> with: <code>error: command '/usr/bin/x86_64-linux-gnu-gcc' failed with exit code 1</code> and a long stack trace about missing headers. The initial requirements.txt included <code>mysqlclient</code> as the MySQL driver.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Switch from mysqlclient to mysql-connector-python</div>
+          <div class="fb-body">
+            <code>mysqlclient</code> is a C extension. It requires <code>pkg-config</code> and <code>libmysqlclient-dev</code> (the MySQL C client library headers) to compile at install time. These system packages are not present in <code>python:3.11-slim</code>. The fix: replace <code>mysqlclient</code> with <code>mysql-connector-python</code> in requirements.txt. This is a pure-Python MySQL driver — no C compilation, no system dependencies, installs cleanly in the slim image. The Python API is slightly different but functionally equivalent for our use case.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Stale data after recreating MySQL container — environment variables didn't re-initialise</div>
+          <div class="bb-body">
+            Changed <code>MYSQL_DATABASE</code> and <code>MYSQL_USER</code> in the compose file, ran <code>docker compose down</code> and <code>docker compose up -d</code>, but the new database and user were not created. The old data and credentials were still there.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">MySQL only initialises from env vars if the data directory is empty — use down -v to reset</div>
+          <div class="fb-body">
+            The MySQL official image only runs its initialisation (creating the database, user, and setting passwords from env vars) when <code>/var/lib/mysql</code> is empty — i.e., on first start. If the <code>mysql-data</code> volume already exists and has data in it, the env vars are ignored. To fully reset: <code>docker compose down -v</code> (deletes the volume), then <code>docker compose up -d</code>. This wipes all data so only do it in a dev/reset context.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Docker Compose problems and fixes</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Flask exits immediately — MySQL connection refused</div>
+          <div class="ts-body">MySQL container is running but MySQL isn't ready yet. Check: (1) <code>docker compose ps</code> — does MySQL show <code>(healthy)</code>? If not, the healthcheck hasn't passed yet — wait longer or check MySQL logs. (2) Is <code>depends_on</code> using <code>condition: service_healthy</code>? If it just says <code>depends_on: [mysql]</code>, it doesn't wait for readiness. (3) <code>docker compose logs mysql</code> — look for "ready for connections" message. Fix: add a healthcheck + <code>condition: service_healthy</code>. As a temporary workaround, add a retry loop in app.py to retry the DB connection on startup.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Cannot connect to MySQL from Flask — connection refused or unknown host</div>
+          <div class="ts-body">Flask is trying to connect to the wrong host. Check: (1) Is <code>DB_HOST</code> set to <code>mysql</code> (the service name) — not <code>localhost</code> or an IP? Inside Docker, use the service name. (2) Is the Flask app reading the <code>DB_HOST</code> env var correctly? Print it at startup to confirm. (3) Are both services in the same Compose project (same directory, same compose file)? Services in different projects are on different networks. (4) Run <code>docker compose exec flask-app ping mysql</code> — if it resolves, networking is fine and the issue is in the app code.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Changes to app.py are not reflected after docker compose up -d</div>
+          <div class="ts-body">Compose reused the existing flask-app image. Fix: always use <code>docker compose up -d --build</code> after changing the Dockerfile or any file that gets COPY'd into the image. Without <code>--build</code>, Compose does not rebuild — it uses whatever image exists from the last build. Confirm the rebuild happened by checking the timestamp in <code>docker images flask-app</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">New MySQL env vars not taking effect after docker compose down / up</div>
+          <div class="ts-body">MySQL only initialises credentials from env vars on first start (when the data directory is empty). If the <code>mysql-data</code> volume already exists, the env vars are ignored. Fix: run <code>docker compose down -v</code> to delete the volume, then <code>docker compose up -d</code>. This wipes all database data — only appropriate in development. In production, use SQL commands to change the database/user instead of changing env vars.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">docker compose ps shows service as "Exit 1" or "Restarting"</div>
+          <div class="ts-body">The container started but the main process crashed. Check logs immediately: <code>docker compose logs flask-app</code> or <code>docker compose logs mysql</code>. Common Flask causes: import error, missing env var, syntax error in app.py. Common MySQL causes: wrong root password format, volume permission issue. If the container restarts in a loop (<code>restart: unless-stopped</code>), the logs may be from the most recent start — check all: <code>docker compose logs --no-log-prefix flask-app</code>.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to confirm services can reach each other by service name</div>
+          <div class="ts-body">Run a ping from inside a container: <code>docker compose exec flask-app ping -c 3 mysql</code>. If DNS resolves and packets return, the network is working. If ping is not available in the slim image, try: <code>docker compose exec flask-app python -c "import socket; print(socket.gethostbyname('mysql'))"</code> — if it prints an IP, Compose DNS is working. The issue is then in your app's connection logic, not Docker networking.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>env_file instead of environment</b> — move credentials out of docker-compose.yml into a <code>.env</code> file: <code>env_file: .env</code>. The .env file is excluded from git via .gitignore. This keeps secrets out of version control. The <code>.env</code> file in the same directory as docker-compose.yml is also automatically loaded by Compose for variable substitution in the YAML.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Nginx as reverse proxy — next topic</b> — add a third service to the compose file: <code>nginx</code>. Nginx terminates incoming HTTP requests and proxies them to flask-app internally. Users hit port 80 (or 443 with HTTPS) on the host; flask-app port 5000 is no longer mapped directly to the host. Nginx handles TLS, compression, and static file serving.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Connection retry in Flask app</b> — MySQL can take 10–30 seconds to be ready even with healthchecks. A robust app retries the DB connection on startup with exponential backoff instead of crashing. Use a loop with <code>time.sleep</code> or a library like <code>tenacity</code>. This makes the app resilient to transient startup race conditions.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker Compose profiles</b> — define different service sets for different environments. A <code>dev</code> profile adds a bind-mounted source directory for live reloading; a <code>prod</code> profile uses the built image with no bind mounts. Start with: <code>docker compose --profile dev up -d</code>.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multiple compose files</b> — use a base <code>docker-compose.yml</code> plus an override file: <code>docker-compose.override.yml</code> for dev and <code>docker-compose.prod.yml</code> for production. Compose merges them: <code>docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d</code>. Keeps common config in one place while allowing per-environment overrides.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Database initialisation scripts</b> — place <code>.sql</code> files in a directory and bind-mount it to <code>/docker-entrypoint-initdb.d/</code> in the MySQL container. MySQL runs these scripts on first start (when the data directory is empty) — useful for creating tables, inserting seed data, or setting up grants automatically.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>
