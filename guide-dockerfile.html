@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dockerfile — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+.instr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: .75rem 0;
+}
+.instr-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem 1.1rem;
+}
+.instr-name  { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--blue); margin-bottom: .25rem; }
+.instr-role  { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: .35rem; }
+.instr-body  { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.instr-body code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 4px; border-radius: 3px; color: var(--blue); }
+
+.layer-vis {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lv-num  { font-family: var(--mono); font-size: 11px; color: var(--text3); width: 22px; text-align: right; }
+.lv-bar  { height: 36px; border-radius: 6px; display: flex; align-items: center; padding: 0 12px; font-family: var(--mono); font-size: 12px; font-weight: 600; flex: 1; }
+.lv-bar.cached { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+.lv-bar.rebuilt { background: rgba(59,130,246,.15); color: var(--blue); border: 1px solid rgba(59,130,246,.3); }
+.lv-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; margin-left: auto; }
+.badge-cache  { background: rgba(34,197,94,.15);  color: var(--green); }
+.badge-build  { background: rgba(59,130,246,.15); color: var(--blue);  }
+
+@media(max-width:600px) {
+  .instr-grid { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Dockerfile</div>
+  <div class="nav-phase">Phase 2 · Dockerfile</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('image-vs-container')">Image vs Container</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('instruction-ref')">Instruction reference</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-prereq')">Prerequisites</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-write')">Write the Dockerfile</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-build')">Build the image</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-run')">Run the container</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-caching')">Layer caching</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-dockerignore')">.dockerignore</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Reference</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-build')">Build commands</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-image')">Image commands</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 2 · Topic 3 of 6</div>
+      <h1 class="gh-title">Docker<span>file</span></h1>
+      <p class="gh-sub">Writing a Dockerfile to build a custom image for the spserver Flask app. Covers every instruction, layer caching, .dockerignore, and how to go from source code to a running container.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+      <button class="tab-btn" onclick="switchTab('future')">Future scope</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-why">
+        <div class="section-eyebrow">01 — What &amp; Why</div>
+        <div class="section-title">What a Dockerfile is — and why it exists</div>
+        <p class="section-body">
+          A <b>Dockerfile</b> is a plain text file that contains a series of instructions for building a Docker <b>image</b>. It is a recipe — a repeatable, version-controlled description of exactly what goes into the image: which OS, which runtime, which files, which dependencies, how the app starts.
+        </p>
+        <p class="section-body">
+          Without a Dockerfile you would manually set up a server, install dependencies, copy files, and configure the app — every time, on every machine. A Dockerfile makes this process deterministic. The same Dockerfile produces the same image on any machine, every time.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Without a Dockerfile</div>
+            <div class="ic-body">SSH into the server. Install Python 3.11. Install pip packages. Copy your files. Set environment variables. Write a systemd service. Repeat for staging, repeat for a colleague's machine. Any drift and things break silently.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">With a Dockerfile</div>
+            <div class="ic-body">Write the steps once in a Dockerfile. Run <code>docker build</code> — Docker executes every step reproducibly and packages the result into an image. Run the image anywhere. The environment is always identical.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>A Dockerfile is always named exactly <b>Dockerfile</b> — no extension, capital D. Docker automatically finds it when you run <code>docker build</code> in the same directory. You can use a different name with <code>-f</code> but this is rarely needed.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="image-vs-container">
+        <div class="section-eyebrow">02 — Core concepts</div>
+        <div class="section-title">Image vs Container — the critical distinction</div>
+        <p class="section-body">
+          These two terms are used constantly and are often confused at first. The relationship is like a class and an instance in programming — or a recipe and a dish.
+        </p>
+        <table class="kv-table">
+          <thead><tr><th>Concept</th><th>What it is</th><th>Analogy</th><th>Command</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Image</td>
+              <td class="val">A read-only, layered snapshot of a filesystem — the built result of a Dockerfile. Stored on disk. Does not run on its own.</td>
+              <td class="desc">A recipe / blueprint</td>
+              <td class="val"><code>docker build</code></td>
+            </tr>
+            <tr>
+              <td class="key">Container</td>
+              <td class="val">A running instance of an image. Docker adds a thin writable layer on top of the image and starts the process. Multiple containers can run from the same image simultaneously.</td>
+              <td class="desc">A cooked dish / running process</td>
+              <td class="val"><code>docker run</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="diagram">
+<span class="dm">Dockerfile  →  docker build  →  Image  →  docker run  →  Container</span>
+
+<span class="dm">One image can spawn many containers:</span>
+<span class="dg">flask-app:latest</span>  <span class="dm">→</span>  <span class="dg">container A</span>  <span class="dm">(port 5000)</span>
+<span class="dm">               </span>  <span class="dm">→</span>  <span class="dg">container B</span>  <span class="dm">(port 5001) — e.g. for staging</span>
+<span class="dm">               </span>  <span class="dm">→</span>  <span class="dg">container C</span>  <span class="dm">(port 5002) — e.g. for testing</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Images are immutable — a running container cannot change the image it came from. Anything written inside the container (logs, temp files) lives only in that container's writable layer and is lost when the container is removed. Use Docker volumes for persistent data.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="instruction-ref">
+        <div class="section-eyebrow">03 — Instruction reference</div>
+        <div class="section-title">Dockerfile instructions — what each one does</div>
+        <p class="section-body">Each line in a Dockerfile is an instruction. Every instruction (except <code>FROM</code> and <code>ARG</code>) creates a new layer in the image.</p>
+        <div class="instr-grid">
+          <div class="instr-card">
+            <div class="instr-name">FROM</div>
+            <div class="instr-role">Base image</div>
+            <div class="instr-body">Every Dockerfile must start with FROM. It sets the starting point — the OS, runtime, and tools your image is built on. <code>FROM python:3.11-slim</code> gives you a Debian-based OS with Python 3.11 pre-installed. This determines available tools, image size, and security posture.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">WORKDIR</div>
+            <div class="instr-role">Working directory</div>
+            <div class="instr-body">Sets the current directory inside the container for all subsequent instructions. If the directory does not exist, Docker creates it. All <code>COPY</code>, <code>RUN</code>, and <code>CMD</code> instructions that follow operate relative to this path. We use <code>WORKDIR /app</code>.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">COPY</div>
+            <div class="instr-role">Copy files into image</div>
+            <div class="instr-body">Copies files or directories from the <b>build context</b> (the directory you run <code>docker build</code> from) into the image filesystem. <code>COPY requirements.txt .</code> copies requirements.txt into WORKDIR. <code>COPY . .</code> copies everything.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">RUN</div>
+            <div class="instr-role">Execute commands at build time</div>
+            <div class="instr-body">Runs a shell command during the build and commits the result as a new layer. Used to install packages, run scripts, create directories. Happens once at build time — not when the container starts. <code>RUN pip install -r requirements.txt</code>.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">EXPOSE</div>
+            <div class="instr-role">Document the port</div>
+            <div class="instr-body">Documents which port the container's application listens on. Does NOT actually publish the port — that is done at <code>docker run -p</code>. It is metadata for humans and tools. <code>EXPOSE 5000</code> for Flask. Think of it as a label, not a firewall rule.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">CMD</div>
+            <div class="instr-role">Default start command</div>
+            <div class="instr-body">The command that runs when the container starts. This is runtime — not build time. Only the last CMD in a Dockerfile takes effect. Can be overridden at <code>docker run</code>. Use exec form (JSON array) to avoid shell wrapping issues: <code>CMD ["python", "app.py"]</code>.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">ENV</div>
+            <div class="instr-role">Environment variables</div>
+            <div class="instr-body">Sets environment variables inside the container — available both during build (in subsequent RUN instructions) and at runtime. <code>ENV FLASK_ENV=production</code>. Use for config values that should be baked into the image. Sensitive values (passwords) should be passed at runtime with <code>docker run -e</code> instead.</div>
+          </div>
+          <div class="instr-card">
+            <div class="instr-name">ARG</div>
+            <div class="instr-role">Build-time variable</div>
+            <div class="instr-body">Like ENV but only available during the build — not in the running container. Pass at build time: <code>docker build --build-arg VERSION=1.2</code>. Useful for parameterising builds without baking values into the final image. Does not create a layer.</div>
+          </div>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>RUN vs CMD</b> — the most common confusion. <code>RUN</code> executes during <code>docker build</code> to modify the image (install packages, compile code). <code>CMD</code> executes when you start a container from the image. RUN is build time. CMD is run time.</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-prereq">
+        <div class="section-eyebrow">01 — Prerequisites</div>
+        <div class="section-title">What you need before writing the Dockerfile</div>
+        <p class="section-body">We are working inside the <code>spserver-flask</code> project on spserver (192.168.31.150). Docker Engine must already be installed — see the Docker Install guide. The project directory should look like this before we begin:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/ — expected structure</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="dg">spserver-flask/</span>
+├── app.py              <span class="cm"># Flask application entry point</span>
+├── requirements.txt    <span class="cm"># pip dependencies (flask, gunicorn, etc.)</span>
+├── templates/          <span class="cm"># Jinja2 HTML templates (if any)</span>
+└── static/             <span class="cm"># CSS, JS, images (if any)</span></pre>
+        </div>
+        <p class="section-body">If <code>requirements.txt</code> does not exist yet, generate it from your active virtual environment:</p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># From inside spserver-flask/ with venv active</span>
+<span class="nm">pip freeze</span> > requirements.txt
+<span class="nm">cat</span> requirements.txt
+<span class="cm"># Should include Flask and any other dependencies</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-write">
+        <div class="section-eyebrow">02 — Write the Dockerfile</div>
+        <div class="section-title">Step 1 — Create the Dockerfile for the Flask app</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Create Dockerfile in the project root</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The Dockerfile lives in the project root — the same directory as <code>app.py</code> and <code>requirements.txt</code>. Docker uses this location as the <b>build context</b> — the set of files it can access during the build. Every COPY instruction pulls files relative to this directory.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/Dockerfile</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Base image — Debian slim with Python 3.11 pre-installed</span>
+<span class="cm"># "slim" omits optional packages → smaller image (~150 MB vs ~1 GB for full)</span>
+<span class="nm">FROM</span> python:3.11-slim
+
+<span class="cm"># Set working directory inside the container</span>
+<span class="cm"># All subsequent commands run relative to /app</span>
+<span class="nm">WORKDIR</span> /app
+
+<span class="cm"># Copy requirements FIRST — before copying the rest of the code</span>
+<span class="cm"># This is intentional: requirements change less often than code</span>
+<span class="cm"># Docker can cache this layer and skip re-installing on code-only changes</span>
+<span class="nm">COPY</span> requirements.txt .
+
+<span class="cm"># Install Python dependencies</span>
+<span class="cm"># --no-cache-dir: don't store pip's download cache in the image</span>
+<span class="cm"># Both flags shrink the final image size</span>
+<span class="nm">RUN</span> pip install --no-cache-dir -r requirements.txt
+
+<span class="cm"># Copy the rest of the application code into /app</span>
+<span class="cm"># Done AFTER pip install — so code changes don't invalidate the pip cache layer</span>
+<span class="nm">COPY</span> . .
+
+<span class="cm"># Document that the Flask app listens on port 5000</span>
+<span class="cm"># This is metadata — it does not publish the port</span>
+<span class="nm">EXPOSE</span> 5000
+
+<span class="cm"># Start the Flask app when a container is created from this image</span>
+<span class="cm"># Exec form (JSON array) is preferred — avoids shell signal handling issues</span>
+<span class="nm">CMD</span> ["python", "app.py"]</pre>
+            </div>
+            <div class="alert info">
+              <span class="alert-icon">ℹ</span>
+              <span>We use <code>python:3.11-slim</code> and not <code>python:3.11</code> or <code>python:latest</code>. The <b>slim</b> variant omits many optional Debian packages and produces a much smaller image — typically around 150 MB vs 1 GB for the full variant. Always pin the version (<code>3.11</code>) rather than using <code>latest</code> — so builds are reproducible and a future Python release doesn't break your app unexpectedly.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-build">
+        <div class="section-eyebrow">03 — Build</div>
+        <div class="section-title">Step 2 — Build the image with docker build</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Build and tag the image</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">Running <code>docker build</code> executes every instruction in the Dockerfile in order. The <code>-t</code> flag tags the resulting image with a name so you can refer to it later. The <code>.</code> at the end tells Docker to use the current directory as the build context — the set of files available to COPY instructions.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run from spserver-flask/</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Build the image and tag it as flask-app:latest</span>
+<span class="cm"># -t flask-app:latest   → name:tag (tag defaults to 'latest' if omitted)</span>
+<span class="cm"># .                     → build context is the current directory</span>
+<span class="nm">docker build -t flask-app:latest .</span>
+
+<span class="cm"># You will see each step execute:</span>
+<span class="cm"># [1/5] FROM python:3.11-slim  ← pulls base image (first time only)</span>
+<span class="cm"># [2/5] WORKDIR /app</span>
+<span class="cm"># [3/5] COPY requirements.txt .</span>
+<span class="cm"># [4/5] RUN pip install ...    ← installs packages (takes a moment)</span>
+<span class="cm"># [5/5] COPY . .</span>
+
+<span class="cm"># Confirm the image was created</span>
+<span class="nm">docker images</span>
+<span class="cm"># REPOSITORY   TAG       IMAGE ID       CREATED        SIZE</span>
+<span class="cm"># flask-app    latest    a1b2c3d4e5f6   3 seconds ago  180MB</span>
+
+<span class="cm"># Tag the image with a version number (optional but good practice)</span>
+<span class="nm">docker tag flask-app:latest flask-app:v1.0</span>
+<span class="nm">docker images</span>
+<span class="cm"># Both tags now point to the same image ID</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-run">
+        <div class="section-eyebrow">04 — Run</div>
+        <div class="section-title">Step 3 — Run a container from the image</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Start a container and test the Flask app</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why"><code>docker run</code> creates and starts a container from the image. The <code>-p</code> flag maps a port on the host to a port in the container — without it, the app is unreachable from outside the container even though EXPOSE is set. <code>-d</code> runs the container in the background so the terminal is free.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Run container in the background (-d detached mode)</span>
+<span class="cm"># -p 5000:5000 → host port 5000 maps to container port 5000</span>
+<span class="cm"># --name flask-app → give the container a name (easier to manage)</span>
+<span class="nm">docker run -d -p 5000:5000 --name flask-app flask-app:latest</span>
+
+<span class="cm"># Confirm the container is running</span>
+<span class="nm">docker ps</span>
+<span class="cm"># CONTAINER ID   IMAGE              COMMAND           STATUS</span>
+<span class="cm"># abc123def456   flask-app:latest   "python app.py"   Up 3 seconds</span>
+
+<span class="cm"># Test the app is responding</span>
+<span class="nm">curl http://localhost:5000</span>
+<span class="cm"># Or from another machine on the LAN:</span>
+<span class="cm"># curl http://192.168.31.150:5000</span>
+
+<span class="cm"># View container logs</span>
+<span class="nm">docker logs flask-app</span>
+
+<span class="cm"># Follow logs live</span>
+<span class="nm">docker logs -f flask-app</span>
+
+<span class="cm"># Stop and remove the container when done</span>
+<span class="nm">docker stop flask-app</span>
+<span class="nm">docker rm flask-app</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>If <code>curl http://localhost:5000</code> returns your Flask app's response — the Dockerfile works. The app is running in a container with its own isolated filesystem, and port 5000 is mapped to the host.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-caching">
+        <div class="section-eyebrow">05 — Layer caching</div>
+        <div class="section-title">How Docker caches layers — and why order matters</div>
+        <p class="section-body">
+          Every instruction in a Dockerfile creates a <b>layer</b> — an immutable snapshot of the filesystem at that point. Docker caches each layer. On the next build, if an instruction (and everything above it) has not changed, Docker reuses the cached layer instead of re-running it. This makes rebuilds dramatically faster.
+        </p>
+        <p class="section-body">
+          The key rule: <b>once a layer is invalidated, all layers below it are also rebuilt</b>. Cache invalidation cascades downward. This is why instruction order is critical.
+        </p>
+
+        <div class="layer-vis">
+          <div class="lv-row">
+            <div class="lv-num">1</div>
+            <div class="lv-bar cached">FROM python:3.11-slim<div class="lv-badge badge-cache">CACHED</div></div>
+          </div>
+          <div class="lv-row">
+            <div class="lv-num">2</div>
+            <div class="lv-bar cached">WORKDIR /app<div class="lv-badge badge-cache">CACHED</div></div>
+          </div>
+          <div class="lv-row">
+            <div class="lv-num">3</div>
+            <div class="lv-bar cached">COPY requirements.txt .<div class="lv-badge badge-cache">CACHED — requirements unchanged</div></div>
+          </div>
+          <div class="lv-row">
+            <div class="lv-num">4</div>
+            <div class="lv-bar cached">RUN pip install -r requirements.txt<div class="lv-badge badge-cache">CACHED — skipped pip install</div></div>
+          </div>
+          <div class="lv-row">
+            <div class="lv-num">5</div>
+            <div class="lv-bar rebuilt">COPY . .  ← only app.py changed<div class="lv-badge badge-build">REBUILT</div></div>
+          </div>
+          <div class="lv-row">
+            <div class="lv-num">6</div>
+            <div class="lv-bar rebuilt">CMD ["python", "app.py"]<div class="lv-badge badge-build">REBUILT</div></div>
+          </div>
+        </div>
+
+        <p class="section-body">This is why we <code>COPY requirements.txt .</code> and run <code>pip install</code> <em>before</em> <code>COPY . .</code> — requirements change far less often than application code. If you did it the other way (copy all files first, then pip install), every code change would invalidate the pip layer and force a full re-install of all packages.</p>
+
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Wrong order — slow rebuilds</div>
+            <div class="ic-body">
+              <code>COPY . .</code> ← copies all files<br>
+              <code>RUN pip install ...</code> ← runs after every code change<br><br>
+              Every time <code>app.py</code> changes, Docker sees the COPY layer invalidated, and re-runs pip install from scratch. Dependencies haven't changed but Docker doesn't know that.
+            </div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Correct order — fast rebuilds</div>
+            <div class="ic-body">
+              <code>COPY requirements.txt .</code> ← only the dep list<br>
+              <code>RUN pip install ...</code> ← cached until requirements change<br>
+              <code>COPY . .</code> ← code goes last<br><br>
+              Code changes only invalidate the final COPY layer. Pip install stays cached. Rebuild takes seconds instead of minutes.
+            </div>
+          </div>
+        </div>
+
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>General rule: <b>put instructions that change rarely at the top, and instructions that change often at the bottom</b>. The cache is invalidated from the first changed line downward.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-dockerignore">
+        <div class="section-eyebrow">06 — .dockerignore</div>
+        <div class="section-title">.dockerignore — keep the build context clean</div>
+        <p class="section-body">
+          When you run <code>docker build .</code> Docker sends the entire current directory (the <b>build context</b>) to the Docker daemon before it processes any instructions. If your project contains a large virtual environment (<code>venv/</code>), a <code>.git/</code> history, or compiled <code>__pycache__</code> files — all of that gets sent and potentially copied into the image.
+        </p>
+        <p class="section-body">
+          A <b>.dockerignore</b> file (placed in the same directory as the Dockerfile) lists files and directories to exclude from the build context. It works exactly like <code>.gitignore</code>.
+        </p>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Create .dockerignore for the Flask project</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/.dockerignore</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Python byte-code cache — auto-generated, not needed in image</span>
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+<span class="cm"># Virtual environment — has platform-specific binaries, pip installs inside container instead</span>
+venv/
+.venv/
+env/
+
+<span class="cm"># Git history — not needed in the image, just adds size</span>
+.git/
+.gitignore
+
+<span class="cm"># Development editor files</span>
+.vscode/
+.idea/
+*.swp
+
+<span class="cm"># Test files — not needed in production image</span>
+tests/
+*.test.py
+
+<span class="cm"># Documentation</span>
+*.md
+docs/
+
+<span class="cm"># Environment files with secrets — never copy into image</span>
+.env
+.env.*</pre>
+            </div>
+            <div class="alert warn">
+              <span class="alert-icon">⚠</span>
+              <span>The most important exclusion is <code>venv/</code>. A Python virtual environment contains platform-specific compiled binaries. Copying it into a Linux container image is not only wasteful (100s of MB) — it is also likely to break because the binaries may be compiled for a different platform. Always install dependencies fresh with <code>pip install</code> inside the container.</span>
+            </div>
+          </div>
+        </div>
+        <div class="two-col" style="margin-top:1rem;">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Without .dockerignore</div>
+            <div class="ic-body">Build context includes venv/ (300 MB), .git/ (50 MB), __pycache__ (10 MB). These are sent to the daemon on every build, COPY . . copies them into the image, image size bloats to 600 MB+ and build is slow.</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">With .dockerignore</div>
+            <div class="ic-body">Build context contains only app.py, requirements.txt, templates/, static/. Build context transfer is nearly instant. Image only contains what the app needs. Clean 180 MB image instead of 600 MB.</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-build">
+        <div class="section-eyebrow">01 — Build commands</div>
+        <div class="section-title">docker build — building images</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker build -t flask-app:latest .</div><div class="cmd-desc">Build image from Dockerfile in current directory, tag as flask-app:latest</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker build -t flask-app:v1.0 .</div><div class="cmd-desc">Build with a specific version tag instead of latest</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker build --no-cache -t flask-app:latest .</div><div class="cmd-desc">Build without using cached layers — forces all steps to re-run. Useful when cache seems stale</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker build -f Dockerfile.dev -t flask-app:dev .</div><div class="cmd-desc">Use a differently named Dockerfile with the -f flag</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker build --progress=plain -t flask-app:latest .</div><div class="cmd-desc">Show full build output including all RUN command output — helpful for debugging</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker tag flask-app:latest flask-app:v1.0</div><div class="cmd-desc">Add a new tag to an existing image without rebuilding</div></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="cmd-image">
+        <div class="section-eyebrow">02 — Image commands</div>
+        <div class="section-title">Managing images</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">docker images</div><div class="cmd-desc">List all images on disk — shows repository, tag, image ID, created date, size</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker images flask-app</div><div class="cmd-desc">List only images with the name flask-app — shows all tags</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker inspect flask-app:latest</div><div class="cmd-desc">Show full metadata for an image — layers, environment variables, exposed ports, entrypoint</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker history flask-app:latest</div><div class="cmd-desc">Show the layer history of an image — each layer's instruction, size, and creation time</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker rmi flask-app:latest</div><div class="cmd-desc">Delete an image — fails if a container (even stopped) is using it</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker rmi flask-app:latest --force</div><div class="cmd-desc">Force delete image even if containers reference it (containers lose their image reference)</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker image prune</div><div class="cmd-desc">Remove all dangling images — untagged intermediate layers left over from builds</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker run -d -p 5000:5000 --name flask-app flask-app:latest</div><div class="cmd-desc">Run a container from the image in detached mode with port mapping and a name</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker run --rm -it flask-app:latest /bin/bash</div><div class="cmd-desc">Open an interactive shell inside the image — good for inspecting the filesystem. --rm removes the container on exit</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit while writing the Dockerfile</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">COPY failed — no such file or directory</div>
+          <div class="bb-body">
+            Build failed at the <code>COPY requirements.txt .</code> step with: <code>ERROR: failed to solve: failed to read dockerfile: open /tmp/buildkit-.../requirements.txt: no such file or directory</code>. The file existed on disk but Docker couldn't find it.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">COPY paths are relative to the build context, not the Dockerfile location</div>
+          <div class="fb-body">
+            COPY paths must be relative to the build context directory — the directory you pass to <code>docker build</code> (the <code>.</code> at the end). In this case, the build was being run from a parent directory while the Dockerfile was in a subdirectory: <code>docker build -f spserver-flask/Dockerfile .</code> — so <code>requirements.txt</code> was not at the context root. Fix: always run <code>docker build</code> from inside the project directory: <code>cd spserver-flask && docker build -t flask-app:latest .</code>
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">Container exited immediately — CMD vs RUN confusion</div>
+          <div class="bb-body">
+            The container started and immediately exited. <code>docker ps</code> showed nothing. <code>docker ps -a</code> showed the container with status <code>Exited (2) 1 second ago</code>. The Dockerfile had: <code>RUN python app.py</code> instead of <code>CMD ["python", "app.py"]</code>.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Use CMD for the start command — RUN is build time only</div>
+          <div class="fb-body">
+            <code>RUN python app.py</code> during the build tries to start the Flask server during image construction — which fails because there is no network, no ports mapped, no proper environment. Even if it ran, the command would block the build forever. The correct instruction is <code>CMD ["python", "app.py"]</code> — this tells Docker to run the command when a container is started, not when the image is built.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">Image size was 600 MB — venv copied into image</div>
+          <div class="bb-body">
+            After building, <code>docker images</code> showed the flask-app image at 623 MB. Expected around 180 MB. The local <code>venv/</code> directory (containing platform-specific compiled packages) was being copied into the image by <code>COPY . .</code> because there was no .dockerignore.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Add .dockerignore with venv/ excluded</div>
+          <div class="fb-body">
+            Created <code>.dockerignore</code> in the project root with <code>venv/</code> listed. Docker then excluded the virtual environment from the build context entirely. Rebuilt the image: size dropped to 178 MB. The packages are installed fresh inside the container via <code>pip install -r requirements.txt</code> — which is exactly the right approach, since the pip cache is not included (<code>--no-cache-dir</code>) and the packages are compiled for the container's OS.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Dockerfile problems and fixes</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">COPY fails — no such file or directory</div>
+          <div class="ts-body">The path given to COPY doesn't exist relative to the build context. Check: (1) Are you running <code>docker build .</code> from the right directory? (2) Does the file exist in that directory — <code>ls</code> to confirm. (3) Is the file excluded by .dockerignore? Check <code>cat .dockerignore</code>. (4) Check for typos in the filename — COPY is case-sensitive on Linux. Rule: COPY paths are always relative to the build context directory, not to the Dockerfile location.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Container exits immediately after docker run</div>
+          <div class="ts-body">The CMD process exits or crashes — Docker stops the container when the main process exits. Check logs: <code>docker logs &lt;container-name&gt;</code>. Common causes: (1) Wrong command in CMD — the file doesn't exist or has a path issue. (2) RUN used instead of CMD — app tried to start at build time. (3) App crashes on startup — check for missing env vars, missing files, import errors. Try: <code>docker run --rm -it flask-app:latest /bin/bash</code> to inspect the container filesystem interactively.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Port not reachable — connection refused on localhost:5000</div>
+          <div class="ts-body">The container is running but <code>curl localhost:5000</code> fails. Check: (1) Was <code>-p 5000:5000</code> included in the <code>docker run</code> command? EXPOSE alone does not publish ports. (2) Is the Flask app binding to <code>0.0.0.0</code> and not <code>127.0.0.1</code>? If Flask binds to localhost inside the container, it's unreachable from outside. Fix: <code>app.run(host='0.0.0.0', port=5000)</code> in app.py.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">pip install is slow on every rebuild — cache not working</div>
+          <div class="ts-body">Layer caching is being invalidated before the pip install step. Most likely cause: <code>COPY . .</code> appears before <code>RUN pip install</code> in the Dockerfile. Fix: reorder so <code>COPY requirements.txt .</code> and <code>RUN pip install</code> come before <code>COPY . .</code>. Also check: if you use <code>--no-cache</code> flag in the build command, all caching is disabled.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Image is much larger than expected</div>
+          <div class="ts-body">Inspect the layers: <code>docker history flask-app:latest</code> — look for unusually large layers. Common causes: (1) <code>venv/</code> copied in — add to .dockerignore. (2) <code>.git/</code> copied in — add to .dockerignore. (3) apt package cache not cleaned — add <code>&amp;&amp; rm -rf /var/lib/apt/lists/*</code> after <code>apt-get install</code>. (4) Using the full base image instead of slim — switch from <code>python:3.11</code> to <code>python:3.11-slim</code>.</div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to open a shell inside a running container</div>
+          <div class="ts-body">To inspect the container filesystem or debug from inside: <code>docker exec -it flask-app /bin/bash</code> (if bash is available) or <code>docker exec -it flask-app /bin/sh</code> (always available). For a one-off inspection without starting the main app: <code>docker run --rm -it flask-app:latest /bin/bash</code>. Useful for checking if files were copied correctly, if packages installed, or what environment variables are set.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+    <!-- ══ FUTURE ══ -->
+    <div class="tab-pane" id="pane-future">
+      <div class="section">
+        <div class="section-eyebrow">01 — What's next</div>
+        <div class="section-title">Future scope</div>
+        <div class="future-box">
+          <div class="future-label">⟶ Things to explore from here</div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Multi-stage builds</b> — use multiple FROM instructions in a single Dockerfile to separate the build environment from the runtime environment. Stage 1 installs build tools and compiles the app. Stage 2 is a minimal runtime image that only copies the compiled output. Result: dramatically smaller production images with no build toolchain included.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Gunicorn instead of Flask dev server</b> — <code>CMD ["python", "app.py"]</code> uses Flask's built-in development server which is not production-ready (single-threaded, no auto-restart). Replace with <code>CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]</code> for a production WSGI server. Add <code>gunicorn</code> to requirements.txt.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>HEALTHCHECK instruction</b> — add <code>HEALTHCHECK CMD curl -f http://localhost:5000/health || exit 1</code> to the Dockerfile. Docker polls this periodically and marks containers as healthy or unhealthy. Docker Compose and Kubernetes use this to decide when a container is ready to receive traffic.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Non-root user inside the container</b> — by default, the process inside the container runs as root. Add <code>RUN adduser --disabled-password appuser && USER appuser</code> before CMD. Running as a non-root user limits damage if the app is compromised — a container escape gives attacker a non-privileged user instead of root.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Docker Compose — next topic</b> — the Dockerfile builds a single image. Docker Compose orchestrates multiple containers together (Flask app + database + reverse proxy) from a single YAML file. The <code>build:</code> key in docker-compose.yml points to the Dockerfile — Compose builds and manages the image automatically.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Pushing to Docker Hub</b> — once the image is working on spserver, it can be pushed to Docker Hub for sharing or backup: <code>docker tag flask-app:latest username/flask-app:latest && docker push username/flask-app:latest</code>. Then pull and run on any other machine with a single <code>docker run</code> command.</div></div>
+        </div>
+      </div>
+    </div><!-- end future -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','setup','commands','blockers','troubleshoot','future'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>
