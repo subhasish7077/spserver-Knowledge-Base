@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nginx Web Server — spserver guide</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=DM+Sans:wght@300;400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ── page-specific ── */
+
+/* file tree */
+.ftree {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: .75rem 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.ft-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+}
+.ft-row:last-child { border-bottom: none; }
+.ft-indent { color: var(--text3); flex-shrink: 0; white-space: pre; }
+.ft-name   { flex-shrink: 0; font-weight: 700; }
+.ft-name.dir  { color: var(--blue); }
+.ft-name.file { color: var(--text); }
+.ft-name.key  { color: var(--green); font-weight: 700; }
+.ft-sep   { color: var(--text3); flex-shrink: 0; margin: 0 2px; }
+.ft-desc  { font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text3); font-weight: 400; line-height: 1.4; }
+
+/* two-column config explanation */
+.cfg-explain {
+  margin: .75rem 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.cfg-head {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  padding: .5rem .9rem;
+}
+.cfg-head-label { font-size: 11px; font-weight: 700; color: var(--text3); letter-spacing: .05em; text-transform: uppercase; }
+.cfg-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  align-items: stretch;
+}
+.cfg-row:last-child { border-bottom: none; }
+.cfg-row.section-header {
+  grid-template-columns: 1fr;
+  background: var(--bg3);
+  padding: .4rem .9rem;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+.cfg-line {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: .55rem .9rem;
+  background: var(--bg2);
+  color: var(--text);
+  border-right: 1px solid var(--border);
+  line-height: 1.5;
+  word-break: break-all;
+}
+.cfg-line .kw { color: var(--blue);  font-weight: 700; }
+.cfg-line .val { color: var(--green); }
+.cfg-line .cm  { color: var(--text3); font-style: italic; }
+.cfg-why {
+  font-size: 12px;
+  color: var(--text2);
+  padding: .55rem .9rem;
+  background: var(--bg2);
+  line-height: 1.6;
+}
+.cfg-why b { color: var(--text); font-weight: 600; }
+.cfg-why code { font-family: var(--mono); font-size: 11px; background: var(--bg3); padding: 1px 4px; border-radius: 3px; color: var(--blue); }
+
+/* symlink diagram */
+.symlink-diagram {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.4rem;
+  margin: .75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sl-box {
+  border-radius: 8px;
+  padding: .5rem .9rem;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+.sl-box.avail  { background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.3); color: var(--blue); }
+.sl-box.enabled{ background: rgba(34,197,94,.11);  border: 1px solid rgba(34,197,94,.3);  color: var(--green); }
+.sl-box.nginx  { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+.sl-arrow { color: var(--text3); font-size: 16px; flex-shrink: 0; }
+.sl-label { font-size: 11px; color: var(--text3); }
+
+@media(max-width:700px){
+  .cfg-row           { grid-template-columns: 1fr; }
+  .cfg-head          { grid-template-columns: 1fr; }
+  .cfg-head-label:last-child { display: none; }
+  .cfg-line          { border-right: none; border-bottom: 1px solid var(--border); }
+  .sl-label          { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="spbar"></div>
+<nav>
+  <a class="nav-back" href="index.html">← home</a>
+  <div class="nav-divider"></div>
+  <div class="nav-title">Nginx Web Server</div>
+  <div class="nav-phase">Phase 1 · Nginx Web Server</div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-prog">
+      <div class="sp-label"><span>guide progress</span><span id="sp-pct">0%</span></div>
+      <div class="sp-bar"><div class="sp-fill" id="sp-fill" style="width:0%"></div></div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Overview</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('webserver-vs-proxy')">Web server vs reverse proxy</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('file-structure')">Nginx file structure</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Config</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('nginx-conf')">nginx.conf walkthrough</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('server-block')">Server block explained</div>
+      <div class="sidebar-link" onclick="switchTab('config');scrollToId('sites-pattern')">sites-available vs sites-enabled</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">Setup &amp; Reference</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-install')">Install Nginx</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-serve')">Serve a static page</div>
+      <div class="sidebar-link" onclick="switchTab('commands');scrollToId('cmd-ref')">Commands reference</div>
+      <div class="sidebar-link" onclick="switchTab('blockers');scrollToId('b-list')">Blockers hit</div>
+      <div class="sidebar-link" onclick="switchTab('troubleshoot');scrollToId('t-list')">Troubleshoot</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="guide-header">
+      <div class="gh-eyebrow">Phase 1 · Topic 6 of 14</div>
+      <h1 class="gh-title">Nginx <span>Web Server</span></h1>
+      <p class="gh-sub">Nginx installed on the spserver host — serving the spserver knowledge base from <code>/var/www/dustyserver/</code> at <code>dustyserver.co.in</code>. Every config line explained, every file in the tree mapped, nothing left unexplained.</p>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('config')">Config</button>
+      <button class="tab-btn" onclick="switchTab('setup')">Setup</button>
+      <button class="tab-btn" onclick="switchTab('commands')">Commands</button>
+      <button class="tab-btn" onclick="switchTab('blockers')">Blockers</button>
+      <button class="tab-btn" onclick="switchTab('troubleshoot')">Troubleshoot</button>
+    </div>
+
+    <!-- ══ OVERVIEW ══ -->
+    <div class="tab-pane active" id="pane-overview">
+
+      <div class="section" id="what-why">
+        <div class="section-eyebrow">01 — What &amp; Why</div>
+        <div class="section-title">What a web server is — in plain English</div>
+        <p class="section-body">
+          A <b>web server</b> is a program that listens on a network port (usually port 80 for HTTP, 443 for HTTPS) and responds to requests. When a browser visits a URL, it sends an HTTP request to the server. The web server reads that request, finds the right file or service, and sends back a response.
+        </p>
+        <p class="section-body">
+          <b>Nginx</b> (pronounced "engine-ex") is one of the two dominant web servers in the world (the other being Apache). It is known for being fast, memory-efficient, and capable of handling many simultaneous connections. On spserver it serves the knowledge base HTML files from disk and forwards other requests to Docker backends.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title">What happens when you visit dustyserver.co.in</div>
+            <div class="ic-body">
+              1. Browser sends: <code>GET / HTTP/1.1</code> to spserver's IP on port 80<br>
+              2. Nginx receives the request<br>
+              3. Nginx reads its config — finds the server block for <code>dustyserver.co.in</code><br>
+              4. Nginx looks for <code>/var/www/dustyserver/index.html</code><br>
+              5. Nginx sends the file contents back as an HTTP response<br>
+              6. Browser renders the HTML
+            </div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title">What Nginx does not do</div>
+            <div class="ic-body">
+              Nginx does not execute application code — it serves files. If you put a Python script in <code>/var/www/</code>, Nginx will serve it as raw text, not run it. For dynamic applications (Flask, Node.js), Nginx forwards requests to the application and proxies the response — that is the reverse proxy role, covered in Phase 2.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="webserver-vs-proxy">
+        <div class="section-eyebrow">02 — Two roles</div>
+        <div class="section-title">Nginx as a web server vs as a reverse proxy</div>
+        <p class="section-body">Nginx does both jobs on spserver — understanding which role applies where is important.</p>
+        <table class="kv-table">
+          <thead><tr><th>Role</th><th>What Nginx does</th><th>Used for on spserver</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="key">Web server <span class="tag tag-g">this guide</span></td>
+              <td class="val">Reads files from disk and sends them to the browser. Nginx is the final destination — there is no backend application.</td>
+              <td class="desc">Serving the knowledge base HTML files from <code>/var/www/dustyserver/</code> at <code>dustyserver.co.in</code></td>
+            </tr>
+            <tr>
+              <td class="key">Reverse proxy <span class="tag">Phase 2</span></td>
+              <td class="val">Forwards requests to a backend application (Flask, Jenkins) and relays the response. Nginx is a middleman — the real work happens in the backend.</td>
+              <td class="desc">Proxying <code>jenkins.dustyserver.co.in</code> → Jenkins on port 8090. Covered in guide-nginx-proxy.html.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>The config syntax is the same for both roles — a <code>server</code> block with a <code>server_name</code> and a <code>location</code> block. The only difference is what's inside <code>location</code>: a <code>root</code> and <code>try_files</code> for static files, or a <code>proxy_pass</code> for a backend service.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="file-structure">
+        <div class="section-eyebrow">03 — File structure</div>
+        <div class="section-title">Every Nginx file and directory — what it is and what it does</div>
+        <p class="section-body">Understanding the file layout before touching any config avoids a lot of confusion. Every path below is on the Ubuntu host — not inside a container.</p>
+
+        <div class="ftree">
+          <div class="ft-row">
+            <div class="ft-indent"></div>
+            <div class="ft-name dir">/etc/nginx/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Root of all Nginx configuration. Every file Nginx reads lives here.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name key">nginx.conf</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">The master config file. Sets global settings (worker processes, log paths, connection limits). Includes all other config files. <b>Do not put site configs here</b> — use sites-available instead.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name dir">sites-available/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Holds all site config files you have written. Files here are <b>not active</b> — Nginx doesn't read this directory directly. Think of it as a library of available configs.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">│   ├── </div>
+            <div class="ft-name key">dustyserver</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">The server block for dustyserver.co.in — serves the knowledge base HTML files. Written by us, symlinked to sites-enabled to activate it.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">│   └── </div>
+            <div class="ft-name file">default</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">The default site installed by Nginx — serves the "Welcome to nginx" page. Should be disabled (symlink removed from sites-enabled) once you have your own site.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name dir">sites-enabled/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Contains symlinks to configs in sites-available. Nginx reads <b>only this directory</b>. A config is active if and only if a symlink to it exists here.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">│   └── </div>
+            <div class="ft-name key">dustyserver → ../sites-available/dustyserver</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">A symlink pointing to the dustyserver config. Creating this symlink is what activates the site. Removing it deactivates the site without deleting the config.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name dir">conf.d/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">An alternative location for config snippets — loaded automatically via a glob include in nginx.conf. Commonly used for upstream definitions and shared config. Less common than sites-available on Ubuntu.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name file">mime.types</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Maps file extensions to MIME types. Tells Nginx to send <code>Content-Type: text/html</code> for .html files, <code>image/png</code> for .png files, etc. Included by nginx.conf. Rarely modified.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name file">snippets/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Reusable config fragments that can be included in server blocks. Certbot places its SSL config here (options-ssl-nginx.conf). Include with: <code>include snippets/fastcgi-php.conf;</code></div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">└── </div>
+            <div class="ft-name file">modules-enabled/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Symlinks to compiled Nginx modules. Rarely touched manually — modules are enabled through apt packages (e.g. nginx-extras).</div>
+          </div>
+          <div class="ft-row" style="margin-top:.6rem;"></div>
+          <div class="ft-row">
+            <div class="ft-indent"></div>
+            <div class="ft-name dir">/var/log/nginx/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Nginx log files. The most important files for debugging.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">├── </div>
+            <div class="ft-name key">access.log</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Every HTTP request Nginx handles — client IP, timestamp, request line, status code, response size. One line per request.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">└── </div>
+            <div class="ft-name key">error.log</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Errors — failed connections, config problems, permission denials, upstream failures. Check this first when something doesn't work.</div>
+          </div>
+          <div class="ft-row" style="margin-top:.6rem;"></div>
+          <div class="ft-row">
+            <div class="ft-indent"></div>
+            <div class="ft-name dir">/var/www/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">Convention: where web-served files live. Nginx runs as the <code>www-data</code> user, which has read access here. Put your HTML, CSS, images, and JS here.</div>
+          </div>
+          <div class="ft-row">
+            <div class="ft-indent">└── </div>
+            <div class="ft-name key">dustyserver/</div>
+            <div class="ft-sep">—</div>
+            <div class="ft-desc">The document root for dustyserver.co.in. Contains the knowledge base HTML files. Nginx serves files from here when a request matches the dustyserver server block.</div>
+          </div>
+        </div>
+
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why /var/www/ and not /home/sipu/www/?</b> The Linux Filesystem Hierarchy Standard (FHS) defines <code>/var/www/</code> as the conventional location for web content. Nginx runs as the <code>www-data</code> system user. That user has read access to <code>/var/www/</code> by default — it does not have access to home directories. Putting files in <code>/home/</code> would require manually granting permissions.</span>
+        </div>
+      </div>
+
+    </div><!-- end overview -->
+
+    <!-- ══ CONFIG ══ -->
+    <div class="tab-pane" id="pane-config">
+
+      <div class="section" id="nginx-conf">
+        <div class="section-eyebrow">01 — Master config</div>
+        <div class="section-title">nginx.conf — the master config file, line by line</div>
+        <p class="section-body">
+          <code>/etc/nginx/nginx.conf</code> sets global behaviour for the entire Nginx process. It is not where you put site configs — site-specific configuration lives in <code>sites-available/</code>. The two files in the config below are the most important lines in the whole file.
+        </p>
+        <p class="section-body">The left column is the actual directive. The right column is what it means and <em>why it is there</em>.</p>
+
+        <div class="cfg-explain">
+          <div class="cfg-head">
+            <div class="cfg-head-label">Directive</div>
+            <div class="cfg-head-label">What it does &amp; why</div>
+          </div>
+
+          <div class="cfg-row section-header">Global context — top level, outside any block</div>
+
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">user</span> <span class="val">www-data</span>;</div>
+            <div class="cfg-why">Nginx worker processes run as this system user. <b>www-data</b> is a low-privilege user with no shell — a security measure. Files in <code>/var/www/</code> must be readable by this user, or Nginx will return 403 Forbidden.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">worker_processes</span> <span class="val">auto</span>;</div>
+            <div class="cfg-why"><b>auto</b> tells Nginx to spawn one worker process per CPU core. Workers handle connections — more workers means more concurrent requests can be processed. <code>auto</code> is almost always correct; only change this if you have a specific reason.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">pid</span> <span class="val">/run/nginx.pid</span>;</div>
+            <div class="cfg-why">Nginx writes its master process ID to this file when it starts. systemd uses this file to track the process — it's how <code>systemctl stop nginx</code> knows which process to send the signal to. Don't change this.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">include</span> <span class="val">/etc/nginx/modules-enabled/*.conf</span>;</div>
+            <div class="cfg-why">Loads any compiled Nginx modules. These extend Nginx's capabilities (e.g. stream module for TCP proxying). Managed by apt packages — you rarely need to touch this.</div>
+          </div>
+
+          <div class="cfg-row section-header">events block — controls how workers handle connections</div>
+
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">events</span> {<br>&nbsp;&nbsp;<span class="kw">worker_connections</span> <span class="val">768</span>;<br>}</div>
+            <div class="cfg-why"><b>worker_connections</b> is the maximum number of simultaneous connections a single worker process can handle. Total max connections = worker_processes × worker_connections. 768 per worker is conservative but sufficient for a personal server. Increase if you see "worker_connections are not enough" in error.log.</div>
+          </div>
+
+          <div class="cfg-row section-header">http block — all web traffic settings</div>
+
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">sendfile</span> <span class="val">on</span>;</div>
+            <div class="cfg-why">Enables the <code>sendfile()</code> Linux system call to transfer files directly from disk to the network socket — bypassing the userspace buffer. This makes static file serving significantly faster. Always on.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">tcp_nopush</span> <span class="val">on</span>;</div>
+            <div class="cfg-why">Works with <code>sendfile</code> — buffers TCP packets and sends the HTTP response header and the beginning of the file body in a single packet instead of two. Reduces round trips and improves throughput on busy servers.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">types_hash_max_size</span> <span class="val">2048</span>;</div>
+            <div class="cfg-why">Controls the size of the hash table Nginx builds from mime.types. A larger table speeds up MIME type lookups for files with many different extensions. 2048 is the default — sufficient for the standard mime.types file.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">include</span> <span class="val">/etc/nginx/mime.types</span>;</div>
+            <div class="cfg-why">Loads the MIME type mappings. Without this, Nginx would send every file as <code>application/octet-stream</code> — browsers wouldn't know to render HTML or display images. This file maps extensions like <code>.html → text/html</code>, <code>.png → image/png</code>.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">default_type</span> <span class="val">application/octet-stream</span>;</div>
+            <div class="cfg-why">The fallback MIME type for files not listed in mime.types. <code>application/octet-stream</code> tells the browser: "this is binary data — download it, don't try to render it." A safe default.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">access_log</span> <span class="val">/var/log/nginx/access.log</span>;</div>
+            <div class="cfg-why">Path for the access log — every request Nginx handles is logged here with client IP, timestamp, request, and status code. Can be overridden per server block to write to a different file per site.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">error_log</span> <span class="val">/var/log/nginx/error.log</span>;</div>
+            <div class="cfg-why">Path for the error log. This is the first place to look when something isn't working. Log level defaults to <code>error</code> — only errors are written. Change to <code>error_log ... debug;</code> for verbose troubleshooting (then set it back — debug logs are huge).</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">gzip</span> <span class="val">on</span>;</div>
+            <div class="cfg-why">Compresses responses before sending them. HTML, CSS, and JS typically compress to 20–30% of their original size. Faster page loads for visitors, less bandwidth. The browser sends an <code>Accept-Encoding: gzip</code> header to signal it supports compression.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">include</span> <span class="val">/etc/nginx/conf.d/*.conf</span>;<br><span class="kw">include</span> <span class="val">/etc/nginx/sites-enabled/*</span>;</div>
+            <div class="cfg-why">These two lines are what connect sites-enabled to the master config. <b>Every file in sites-enabled/ is loaded as part of the Nginx config.</b> This is why creating a symlink in sites-enabled/ activates a site — nginx.conf automatically includes it on the next reload.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="server-block">
+        <div class="section-eyebrow">02 — Server block</div>
+        <div class="section-title">The dustyserver server block — every line explained</div>
+        <p class="section-body">
+          A <b>server block</b> is the unit of configuration for a single website or service. Nginx can have many server blocks — each one handles a different domain. The <code>server_name</code> directive is how Nginx decides which block handles each incoming request.
+        </p>
+        <p class="section-body">This is the exact server block used for dustyserver.co.in on spserver. Not a single line is left unexplained.</p>
+
+        <div class="cfg-explain">
+          <div class="cfg-head">
+            <div class="cfg-head-label">Line</div>
+            <div class="cfg-head-label">What it does &amp; why</div>
+          </div>
+
+          <div class="cfg-row section-header">/etc/nginx/sites-available/dustyserver — full server block</div>
+
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">server</span> {</div>
+            <div class="cfg-why">Opens the server block. Everything inside this block defines the configuration for one virtual host — one domain. Nginx can have many server blocks, one per site. The closing brace at the end of the file closes this block.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;<span class="kw">listen</span> <span class="val">80</span>;</div>
+            <div class="cfg-why"><b>80</b> is the standard port for HTTP. This tells Nginx to accept connections arriving on port 80. When a browser visits <code>http://dustyserver.co.in</code>, the browser connects to port 80 by default — this is the instruction that intercepts it. After Certbot runs, this line becomes a redirect to port 443.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;<span class="kw">listen</span> <span class="val">[::]:80</span>;</div>
+            <div class="cfg-why">Same as the line above but for IPv6. <code>[::]</code> is the IPv6 wildcard address — equivalent to <code>0.0.0.0</code> for IPv4. Both are needed so the site is reachable whether the visitor connects via IPv4 or IPv6.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;<span class="kw">server_name</span> <span class="val">dustyserver.co.in</span>;</div>
+            <div class="cfg-why">The domain name this block responds to. When a request arrives on port 80, Nginx reads the <code>Host</code> header of the HTTP request and compares it to all <code>server_name</code> values across all server blocks. The block with a matching <code>server_name</code> handles the request. This is how one Nginx can serve many different domains on the same IP.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;<span class="kw">root</span> <span class="val">/var/www/dustyserver</span>;</div>
+            <div class="cfg-why">The document root — the directory on disk where Nginx looks for files. When a browser requests <code>/index.html</code>, Nginx looks for the file at <code>/var/www/dustyserver/index.html</code>. When it requests <code>/style.css</code>, Nginx looks for <code>/var/www/dustyserver/style.css</code>. The URL path is appended to this root.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;<span class="kw">index</span> <span class="val">index.html index.htm</span>;</div>
+            <div class="cfg-why">When a request comes in for a <em>directory</em> (e.g. just <code>/</code> with no filename), Nginx tries these filenames in order and serves the first one it finds. So <code>GET /</code> becomes <code>GET /index.html</code> automatically. Both <code>index.html</code> and <code>index.htm</code> are listed as fallbacks — <code>index.html</code> is checked first.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;<span class="kw">location</span> <span class="val">/</span> {</div>
+            <div class="cfg-why">A location block matches incoming URL paths. <code>/</code> matches <em>everything</em> — it is the catch-all. More specific location blocks (e.g. <code>location /api/</code>) would take precedence over this one when a URL starts with <code>/api/</code>. For a simple static site, one <code>location /</code> block is all you need.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">try_files</span> <span class="val">$uri $uri/ =404</span>;</div>
+            <div class="cfg-why">Nginx tries to serve the request in three steps in order: <b>1.</b> <code>$uri</code> — look for a file at the exact URL path (e.g. <code>/style.css</code>). <b>2.</b> <code>$uri/</code> — look for a directory with that name and serve its index file. <b>3.</b> <code>=404</code> — if neither exists, return an HTTP 404 Not Found response. Without this, Nginx would return a confusing empty response for missing files.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">&nbsp;&nbsp;}</div>
+            <div class="cfg-why">Closes the location block. Everything between the opening brace above and this closing brace applies only to URLs matching <code>location /</code>.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line">}</div>
+            <div class="cfg-why">Closes the server block. Everything between the first opening brace and this closing brace defines the configuration for dustyserver.co.in.</div>
+          </div>
+        </div>
+
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>Every directive inside a server block ends with a semicolon. Every opening brace <code>{</code> must have a matching closing brace <code>}</code>. These are the two most common causes of <code>nginx -t</code> failures — a missing semicolon or an unmatched brace.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="sites-pattern">
+        <div class="section-eyebrow">03 — Enable / disable pattern</div>
+        <div class="section-title">sites-available vs sites-enabled — why two directories</div>
+        <p class="section-body">
+          This two-directory pattern solves a specific problem: how do you have a config file ready to go but not yet active? You might want to write a site's config, test it, and only activate it when everything is correct — or temporarily disable a site without deleting its config.
+        </p>
+
+        <div class="symlink-diagram">
+          <div class="sl-row">
+            <div class="sl-box avail">/etc/nginx/sites-available/dustyserver<br><span style="font-weight:400;font-size:10px">the real config file — always here</span></div>
+          </div>
+          <div class="sl-row">
+            <div class="sl-label" style="color:var(--text3);font-size:11px;">symlink<br>ln -s</div>
+            <div class="sl-arrow">↓</div>
+            <div class="sl-box enabled">/etc/nginx/sites-enabled/dustyserver<br><span style="font-weight:400;font-size:10px">a symlink pointing to the file above</span></div>
+          </div>
+          <div class="sl-row">
+            <div class="sl-label" style="color:var(--text3);font-size:11px;">nginx.conf<br>includes</div>
+            <div class="sl-arrow">↓</div>
+            <div class="sl-box nginx">Nginx reads sites-enabled/* on startup and reload<br><span style="font-weight:400;font-size:10px">→ site is active</span></div>
+          </div>
+        </div>
+
+        <div class="cfg-explain" style="margin-top:1rem;">
+          <div class="cfg-head">
+            <div class="cfg-head-label">Action</div>
+            <div class="cfg-head-label">What it does &amp; why</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">sudo ln -s</span> <span class="val">/etc/nginx/sites-available/dustyserver</span><br>&nbsp;&nbsp;&nbsp;&nbsp;<span class="val">/etc/nginx/sites-enabled/dustyserver</span></div>
+            <div class="cfg-why"><b>Enable a site.</b> Creates a symlink (a pointer) in sites-enabled that points to the config in sites-available. Nginx reads sites-enabled/ and follows the symlink to read the actual config file. Only one copy of the config exists — the one in sites-available. The symlink is just a pointer. Edit sites-available and the change is immediately reflected through the symlink.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">sudo rm</span> <span class="val">/etc/nginx/sites-enabled/dustyserver</span></div>
+            <div class="cfg-why"><b>Disable a site.</b> Removes only the symlink — the actual config in sites-available is untouched. After a reload, Nginx no longer reads this config and the site goes offline. To re-enable: recreate the symlink. This is far safer than editing or deleting the config file itself.</div>
+          </div>
+          <div class="cfg-row">
+            <div class="cfg-line"><span class="kw">sudo rm</span> <span class="val">/etc/nginx/sites-enabled/default</span></div>
+            <div class="cfg-why"><b>Disable the default site.</b> The default site Nginx installs intercepts all requests that don't match any server_name. If it stays enabled, visitors to dustyserver.co.in might see the "Welcome to nginx" page instead of your content. Always disable it once your own site config is working.</div>
+          </div>
+        </div>
+
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>Always use absolute paths in symlinks.</b> <code>sudo ln -s /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/dustyserver</code> — both paths absolute. A relative path like <code>../sites-available/dustyserver</code> is resolved from the directory where you ran <code>ln -s</code>, not from sites-enabled/ — which usually gives you a broken symlink that silently does nothing.</span>
+        </div>
+      </div>
+
+    </div><!-- end config -->
+
+    <!-- ══ SETUP ══ -->
+    <div class="tab-pane" id="pane-setup">
+
+      <div class="section" id="s-install">
+        <div class="section-eyebrow">01 — Install</div>
+        <div class="section-title">Step 1 — Install Nginx</div>
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">1</div>
+            <div class="step-title">Install, enable, and verify</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Update the package list before installing</span>
+<span class="cm"># Without this, apt may install an outdated version</span>
+<span class="nm">sudo apt update</span>
+
+<span class="cm"># Install Nginx from Ubuntu's official repository</span>
+<span class="nm">sudo apt install -y nginx</span>
+
+<span class="cm"># Enable the systemd service — Nginx will start automatically on every boot</span>
+<span class="nm">sudo systemctl enable nginx</span>
+
+<span class="cm"># Start Nginx now (the install doesn't always start it immediately)</span>
+<span class="nm">sudo systemctl start nginx</span>
+
+<span class="cm"># Confirm Nginx is running</span>
+<span class="nm">sudo systemctl status nginx</span>
+<span class="cm"># Look for: Active: active (running)</span>
+
+<span class="cm"># Confirm Nginx responds on port 80 — should return the default welcome page</span>
+<span class="nm">curl -s http://localhost | head -10</span>
+
+<span class="cm"># Check which version is installed</span>
+<span class="nm">nginx -v</span>
+<span class="cm"># nginx version: nginx/1.24.x</span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-serve">
+        <div class="section-eyebrow">02 — Serve a static page</div>
+        <div class="section-title">Step 2 — Serve the spserver knowledge base</div>
+
+        <div class="step-card">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">2</div>
+            <div class="step-title">Create the document root and add files</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">The document root is where Nginx looks for files to serve. We use <code>/var/www/dustyserver/</code> — following the Linux convention for web files. The directory must exist and be readable by the <code>www-data</code> user.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Create the directory for dustyserver's web files</span>
+<span class="cm"># -p creates parent directories if they don't exist</span>
+<span class="nm">sudo mkdir -p /var/www/dustyserver</span>
+
+<span class="cm"># Set ownership to the www-data user and group</span>
+<span class="cm"># Nginx runs as www-data and must be able to read these files</span>
+<span class="nm">sudo chown -R www-data:www-data /var/www/dustyserver</span>
+
+<span class="cm"># Set permissions: owner can read/write, group and others can read</span>
+<span class="cm"># 755 on directories: allows Nginx to list directory contents</span>
+<span class="cm"># 644 on files: allows Nginx to read files, but not execute them</span>
+<span class="nm">sudo chmod -R 755 /var/www/dustyserver</span>
+
+<span class="cm"># Copy the knowledge base HTML files into the document root</span>
+<span class="cm"># (adjust the source path to wherever your files are)</span>
+<span class="nm">sudo cp -r ~/spserver-Knowledge-Base/* /var/www/dustyserver/</span>
+
+<span class="cm"># Confirm the files are there</span>
+<span class="nm">ls /var/www/dustyserver/</span>
+<span class="cm"># index.html  style.css  guide-ubuntu.html  guide-ssh.html  ...</span></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card" style="margin-top:1rem;">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">3</div>
+            <div class="step-title">Write the server block config</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <p class="step-why">We write the config into sites-available first — it won't be active yet. We'll enable it with a symlink in the next step, after verifying the syntax.</p>
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Open a new config file in sites-available</span>
+<span class="nm">sudo nano /etc/nginx/sites-available/dustyserver</span></pre>
+            </div>
+            <div class="code-block" style="margin-top:.75rem;">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre>server {
+    listen 80;               <span class="cm"># accept HTTP connections on port 80</span>
+    listen [::]:80;          <span class="cm"># same, for IPv6</span>
+
+    server_name dustyserver.co.in;  <span class="cm"># only handle this domain</span>
+
+    root /var/www/dustyserver;      <span class="cm"># serve files from this directory</span>
+    index index.html index.htm;     <span class="cm"># serve index.html when / is requested</span>
+
+    location / {
+        try_files $uri $uri/ =404; <span class="cm"># serve file, or directory, or 404</span>
+    }
+}</pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card" style="margin-top:1rem;">
+          <div class="step-header" onclick="toggleStep(this)">
+            <div class="step-num done">4</div>
+            <div class="step-title">Enable the site, disable the default, test, and reload</div>
+            <div class="step-toggle">▼</div>
+          </div>
+          <div class="step-body">
+            <div class="code-block">
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Enable the site by creating a symlink in sites-enabled</span>
+<span class="cm"># Absolute paths only — relative paths produce broken symlinks</span>
+<span class="nm">sudo ln -s</span> /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/dustyserver
+
+<span class="cm"># Disable the default site — it would intercept requests that should go to dustyserver</span>
+<span class="nm">sudo rm /etc/nginx/sites-enabled/default</span>
+
+<span class="cm"># ALWAYS test the config before reloading</span>
+<span class="cm"># A syntax error would leave Nginx in a broken state on restart</span>
+<span class="nm">sudo nginx -t</span>
+<span class="cm"># nginx: the configuration file /etc/nginx/nginx.conf syntax is ok</span>
+<span class="cm"># nginx: configuration file /etc/nginx/nginx.conf test is successful</span>
+<span class="cm">#</span>
+<span class="cm"># If you see errors: fix the config, run nginx -t again before continuing</span>
+
+<span class="cm"># Reload Nginx — applies the new config without dropping connections</span>
+<span class="nm">sudo systemctl reload nginx</span>
+
+<span class="cm"># Test locally using the Host header (before DNS is set up)</span>
+<span class="nm">curl -H "Host: dustyserver.co.in" http://localhost/</span>
+<span class="cm"># Should return the index.html content</span>
+
+<span class="cm"># Once DNS is pointing to spserver — test with the real domain</span>
+<span class="nm">curl http://dustyserver.co.in/</span></pre>
+            </div>
+            <div class="alert success">
+              <span class="alert-icon">✓</span>
+              <span>If <code>nginx -t</code> reports "test is successful" and <code>curl -H "Host: dustyserver.co.in" http://localhost/</code> returns your HTML — Nginx is correctly serving the site. Point the DNS A record at spserver's IP and the domain goes live.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end setup -->
+
+    <!-- ══ COMMANDS ══ -->
+    <div class="tab-pane" id="pane-commands">
+
+      <div class="section" id="cmd-ref">
+        <div class="section-eyebrow">01 — Commands</div>
+        <div class="section-title">Essential Nginx commands — what each one does</div>
+
+        <div class="section-title" style="font-size:14px;margin-top:0;margin-bottom:.5rem;">Service management</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -t</div><div class="cmd-desc">Test the entire Nginx config for syntax errors. Reports the exact file and line number of any error. <b>Run this before every reload.</b> Safe — does not touch the running Nginx process.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -T</div><div class="cmd-desc">Same as <code>-t</code> but also prints the full merged config to stdout. Useful to see exactly what Nginx will load — including all included files.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl reload nginx</div><div class="cmd-desc">Apply config changes gracefully. Existing connections finish serving — no requests are dropped. The correct way to apply config changes in production.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo nginx -s reload</div><div class="cmd-desc">Identical to <code>systemctl reload nginx</code>. Sends a reload signal directly to the Nginx master process. Both work — use whichever you prefer.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl restart nginx</div><div class="cmd-desc">Full stop and start. Drops all active connections briefly. Use only when reload is insufficient — e.g. after upgrading Nginx itself. Never use this in production without warning.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl status nginx</div><div class="cmd-desc">Show current state — running or stopped, PID, recent log lines. The first command to run when something isn't working.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl enable nginx</div><div class="cmd-desc">Configure Nginx to start automatically on boot. Creates a systemd symlink. Run once after installation.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo systemctl disable nginx</div><div class="cmd-desc">Remove the boot-start symlink. Nginx will no longer start on reboot. Does not stop a currently running Nginx.</div></div>
+        </div>
+
+        <div class="section-title" style="font-size:14px;margin-top:1.5rem;margin-bottom:.5rem;">Sites management</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo ln -s /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/dustyserver</div><div class="cmd-desc">Enable a site. Creates a symlink — Nginx reads sites-enabled/ and follows it to load the config. Always use absolute paths.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo rm /etc/nginx/sites-enabled/dustyserver</div><div class="cmd-desc">Disable a site. Removes the symlink only — the config in sites-available/ is preserved. After a reload, the site is offline.</div></div>
+          <div class="cmd-row"><div class="cmd-code">ls -la /etc/nginx/sites-enabled/</div><div class="cmd-desc">List all enabled sites and their symlink targets. Use this to confirm which configs are active and that symlinks point to the right files.</div></div>
+          <div class="cmd-row"><div class="cmd-code">readlink -f /etc/nginx/sites-enabled/dustyserver</div><div class="cmd-desc">Print the absolute path the symlink resolves to. Use this to debug a broken symlink — if it shows a path that doesn't exist, the symlink is broken.</div></div>
+        </div>
+
+        <div class="section-title" style="font-size:14px;margin-top:1.5rem;margin-bottom:.5rem;">Logs</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo tail -f /var/log/nginx/access.log</div><div class="cmd-desc">Follow the access log live — every request as it arrives. Shows client IP, HTTP method, URL, status code, and response size.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo tail -f /var/log/nginx/error.log</div><div class="cmd-desc">Follow the error log live. Shows config errors at startup, permission denials, upstream failures, and all other problems. Check this when something isn't working.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo grep "dustyserver.co.in" /var/log/nginx/access.log | tail -20</div><div class="cmd-desc">Filter access log to show only requests for a specific domain. Useful when multiple sites share the same access.log.</div></div>
+          <div class="cmd-row"><div class="cmd-code">sudo journalctl -u nginx -f</div><div class="cmd-desc">Follow Nginx's systemd logs — shows start/stop events and critical errors that may not appear in error.log.</div></div>
+        </div>
+
+        <div class="section-title" style="font-size:14px;margin-top:1.5rem;margin-bottom:.5rem;">Diagnostics</div>
+        <div class="cmd-list">
+          <div class="cmd-row"><div class="cmd-code">sudo ss -tlnp | grep :80</div><div class="cmd-desc">Show which process is listening on port 80. If something other than Nginx is shown, port 80 is occupied and Nginx won't be able to start.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -H "Host: dustyserver.co.in" http://localhost/</div><div class="cmd-desc">Test a specific server block locally by spoofing the Host header. Nginx routes by Host header — this simulates a real domain request without needing DNS.</div></div>
+          <div class="cmd-row"><div class="cmd-code">curl -I http://dustyserver.co.in/</div><div class="cmd-desc">Fetch only the HTTP response headers — shows status code, Content-Type, Server header, and cache headers. Useful for checking redirects and MIME types without downloading the body.</div></div>
+          <div class="cmd-row"><div class="cmd-code">nginx -v</div><div class="cmd-desc">Print the Nginx version number. Use <code>nginx -V</code> (capital V) to also see compile-time modules and flags.</div></div>
+        </div>
+      </div>
+
+    </div><!-- end commands -->
+
+    <!-- ══ BLOCKERS ══ -->
+    <div class="tab-pane" id="pane-blockers">
+
+      <div class="section" id="b-list">
+        <div class="section-eyebrow">01 — What went wrong</div>
+        <div class="section-title">Blockers hit while setting up Nginx on spserver</div>
+
+        <div class="blocker-banner">
+          <div class="bb-label">⚠ Blocker 1</div>
+          <div class="bb-title">Site still showing "Welcome to nginx" after adding own server block</div>
+          <div class="bb-body">
+            Wrote the dustyserver config in sites-available, created the symlink, reloaded Nginx — but visiting dustyserver.co.in still showed the default Nginx welcome page. The new server block appeared to do nothing.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">The default site's server block was intercepting requests before dustyserver's block</div>
+          <div class="fb-body">
+            The default server block in <code>/etc/nginx/sites-enabled/default</code> uses <code>server_name _;</code> — the underscore is a catch-all that matches any domain not handled by another server block. When Nginx gets a request for <code>dustyserver.co.in</code>, it compares it against all <code>server_name</code> directives. Since <code>dustyserver</code> was the new block but <code>default</code> was also loaded, the default was winning (alphabetically first in some cases, or due to the <code>default_server</code> flag). Fix: <code>sudo rm /etc/nginx/sites-enabled/default</code> then <code>sudo nginx -t && sudo systemctl reload nginx</code>. The site immediately started serving the correct content.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 2</div>
+          <div class="bb-title">nginx -t passed but the config was silently not loaded — symlink was broken</div>
+          <div class="bb-body">
+            Created the symlink with a relative path: <code>sudo ln -s ../sites-available/dustyserver /etc/nginx/sites-enabled/dustyserver</code>. The <code>nginx -t</code> test passed (Nginx only checks files it can find — a missing include isn't an error), but the dustyserver site wasn't working.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Symlinks must use absolute paths — relative paths resolve from the wrong directory</div>
+          <div class="fb-body">
+            Confirmed with <code>readlink -f /etc/nginx/sites-enabled/dustyserver</code> — it showed a path like <code>/home/sipu/../sites-available/dustyserver</code> which doesn't exist. Deleted the broken symlink (<code>sudo rm /etc/nginx/sites-enabled/dustyserver</code>) and recreated with the full absolute path: <code>sudo ln -s /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/dustyserver</code>. The config was then loaded correctly on the next <code>nginx -t</code>.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 3</div>
+          <div class="bb-title">403 Forbidden when visiting the site — files not readable by www-data</div>
+          <div class="bb-body">
+            Nginx was running and the server block was active, but visiting dustyserver.co.in returned <code>403 Forbidden</code>. The error log showed: <code>"/var/www/dustyserver/index.html" is forbidden (13: Permission denied)</code>.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Files in the document root must be readable by www-data</div>
+          <div class="fb-body">
+            The files were copied with <code>cp</code> which preserved the original ownership (<code>sipu:sipu</code>). Nginx runs as <code>www-data</code> and had no read permission on those files. Fix: <code>sudo chown -R www-data:www-data /var/www/dustyserver</code> and <code>sudo chmod -R 755 /var/www/dustyserver</code>. The 755 permission gives <code>www-data</code> read and execute access (execute is needed on directories to traverse them). Files should be 644 (read for all, write for owner only). After the permission fix, the site loaded correctly.
+          </div>
+        </div>
+
+        <div class="blocker-banner" style="margin-top:1.5rem;">
+          <div class="bb-label">⚠ Blocker 4</div>
+          <div class="bb-title">Nginx failed to start — "Address already in use" on port 80</div>
+          <div class="bb-body">
+            After an OS restart, Nginx failed to start. <code>sudo systemctl status nginx</code> showed: <code>nginx: [emerg] bind() to 0.0.0.0:80 failed (98: Address already in use)</code>.
+          </div>
+        </div>
+        <div class="fix-banner">
+          <div class="fb-label">✓ Fix</div>
+          <div class="fb-title">Another process was already listening on port 80 — identified and stopped it</div>
+          <div class="fb-body">
+            Ran <code>sudo ss -tlnp | grep :80</code> to identify what was using port 80. It showed Apache2 had auto-started (it was installed as a dependency of something else). Stopped it: <code>sudo systemctl stop apache2</code> and disabled it from auto-starting: <code>sudo systemctl disable apache2</code>. Then started Nginx: <code>sudo systemctl start nginx</code> — it bound to port 80 successfully.
+          </div>
+        </div>
+
+      </div>
+    </div><!-- end blockers -->
+
+    <!-- ══ TROUBLESHOOT ══ -->
+    <div class="tab-pane" id="pane-troubleshoot">
+      <div class="section" id="t-list">
+        <div class="section-eyebrow">01 — Issues and fixes</div>
+        <div class="section-title">Common Nginx web server problems and fixes</div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">403 Forbidden</div>
+          <div class="ts-body">Nginx found the file but can't read it. Check permissions: <code>ls -la /var/www/dustyserver/</code>. Files should be readable by www-data (owner www-data, permissions 644 or 755 for directories). Fix: <code>sudo chown -R www-data:www-data /var/www/dustyserver && sudo chmod -R 755 /var/www/dustyserver</code>. Also check: is the <code>root</code> directory itself traversable? Each parent directory in the path must have execute permission for www-data. Check <code>namei -l /var/www/dustyserver/index.html</code> to see permissions on every directory in the path.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">404 Not Found</div>
+          <div class="ts-body">Nginx is running and the server block is matched, but the requested file doesn't exist at the path constructed from <code>root + $uri</code>. Check: (1) Is the file actually at <code>/var/www/dustyserver/index.html</code>? Run <code>ls /var/www/dustyserver/</code>. (2) Is the <code>root</code> directive correct in the server block? (3) Is the <code>index</code> directive set? Without it, a request for <code>/</code> won't find <code>index.html</code>. (4) Check the error log: <code>sudo tail /var/log/nginx/error.log</code> — it shows the full path Nginx tried to open.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">nginx: [emerg] ... — reload or restart fails</div>
+          <div class="ts-body">Config syntax error. Run <code>sudo nginx -t</code> — it reports the exact file and line. Common causes: missing semicolon at the end of a directive, unmatched braces, wrong directive name (typo), or a <code>server_name</code> value that conflicts with another block. Fix the error, run <code>nginx -t</code> again, confirm "test is successful", then reload. Never run <code>systemctl restart</code> with a failing <code>nginx -t</code> — if Nginx is running, it will stop and fail to start again.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Site still shows default Nginx page after adding server block</div>
+          <div class="ts-body">The default site is still enabled and intercepting requests. Check: <code>ls /etc/nginx/sites-enabled/</code> — if <code>default</code> is listed, remove it: <code>sudo rm /etc/nginx/sites-enabled/default</code> then reload. Also check: is the symlink for your site actually in sites-enabled? <code>ls -la /etc/nginx/sites-enabled/</code>. If the symlink is missing or broken, the config isn't loaded.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Config file exists but nginx -t doesn't mention it</div>
+          <div class="ts-body">The config is in sites-available but not symlinked into sites-enabled — Nginx ignores sites-available entirely, it only reads sites-enabled. Or the symlink is broken. Check: <code>readlink -f /etc/nginx/sites-enabled/dustyserver</code> — if the output path doesn't exist, the symlink is broken. Delete and recreate with absolute paths: <code>sudo ln -s /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/dustyserver</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Address already in use — port 80 occupied</div>
+          <div class="ts-body">Another process is listening on port 80. Find it: <code>sudo ss -tlnp | grep :80</code> — the last column shows the process name and PID. Common culprits: Apache2, another Nginx instance, or a Node.js server. Stop the conflicting service (<code>sudo systemctl stop apache2</code>) and disable it from autostart (<code>sudo systemctl disable apache2</code>). Then start Nginx: <code>sudo systemctl start nginx</code>.</td></div>
+        </div>
+
+        <div class="ts-card info">
+          <div class="ts-title">How to test a server block without DNS</div>
+          <div class="ts-body">Nginx routes by the <code>Host</code> HTTP header — not by the URL in the browser. You can fake this with curl: <code>curl -H "Host: dustyserver.co.in" http://localhost/</code>. If this returns your site content, the server block is correct and the issue is DNS. If DNS is set up correctly (<code>nslookup dustyserver.co.in</code> resolves to spserver's IP), the domain should work in a browser. DNS propagation can take minutes to 48 hours depending on TTL settings.</div>
+        </div>
+
+      </div>
+    </div><!-- end troubleshoot -->
+
+  </main>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${name}'`));
+  if (btn) btn.classList.add('active');
+  const pane = document.getElementById('pane-' + name);
+  if (pane) pane.classList.add('active');
+  visited.add(name);
+  updateProgress();
+}
+function toggleStep(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.step-toggle');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+function copyCode(btn) {
+  const pre = btn.closest('.code-block').querySelector('pre');
+  navigator.clipboard.writeText(pre.innerText).then(() => {
+    btn.textContent = 'copied!';
+    btn.style.color = 'var(--green)';
+    setTimeout(() => { btn.textContent = 'copy'; btn.style.color = ''; }, 2000);
+  });
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+}
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const pct = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100;
+  document.getElementById('spbar').style.width = pct + '%';
+});
+const tabOrder = ['overview','config','setup','commands','blockers','troubleshoot'];
+let visited = new Set(['overview']);
+function updateProgress() {
+  const pct = Math.round((visited.size / tabOrder.length) * 100);
+  document.getElementById('sp-fill').style.width = pct + '%';
+  document.getElementById('sp-pct').textContent = pct + '%';
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const match = btn.getAttribute('onclick') && btn.getAttribute('onclick').match(/'(\w+)'/);
+    if (match) { visited.add(match[1]); updateProgress(); }
+  });
+});
+setTimeout(() => {
+  document.getElementById('sp-fill').style.width = '17%';
+  document.getElementById('sp-pct').textContent = '17%';
+}, 300);
+</script>
+</body>
+</html>
