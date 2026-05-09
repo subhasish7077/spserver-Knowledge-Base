@@ -81,6 +81,8 @@
       <div class="sidebar-section-label">Overview</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('architecture')">Architecture</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('nginx-why')">Why Nginx in front of Flask</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('request-lifecycle')">Full request lifecycle</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('networking')">Inter-container networking</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('volumes')">Named volume &amp; persistence</div>
     </div>
@@ -89,6 +91,7 @@
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-compose')">docker-compose.yml</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-mysql-config')">MySQL container config</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-flask-config')">Flask container config</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-nginx')">Nginx server block</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-start')">Start the stack</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify the stack</div>
     </div>
@@ -150,12 +153,15 @@
 
         <div class="stack-diagram">
           <div class="sd-row">
-            <div class="sd-box host">Browser / curl<br><span style="font-weight:400;font-size:10px">192.168.31.150 (LAN) or via Nginx</span></div>
+            <div class="sd-box host">Browser<br><span style="font-weight:400;font-size:10px">dustyserver.co.in · HTTPS</span></div>
             <div class="sd-arrow">→</div>
-            <div class="sd-label">port 5000<br>host → container</div>
+            <div class="sd-label">HTTPS :443<br>Cloudflare → host</div>
+            <div class="sd-box host" style="border-color:rgba(168,85,247,.4);color:#c084fc;">Nginx (host)<br><span style="font-weight:400;font-size:10px">/etc/nginx/sites-available/dustyserver · SSL termination</span></div>
+            <div class="sd-arrow">→</div>
+            <div class="sd-label">HTTP :5000<br>proxy_pass</div>
             <div class="sd-box flask">flask-app container<br><span style="font-weight:400;font-size:10px">built from Dockerfile · 0.0.0.0:5000</span></div>
           </div>
-          <div style="padding-left:1rem;">
+          <div style="padding-left:1rem;margin-top:4px;">
             <div class="sd-box network">Docker bridge network — spserver-flask_default</div>
           </div>
           <div class="sd-row" style="padding-left:2rem;">
@@ -172,14 +178,19 @@
           <thead><tr><th>Component</th><th>What it is</th><th>Key decisions</th></tr></thead>
           <tbody>
             <tr>
+              <td class="key">Nginx (host)</td>
+              <td class="val">Nginx installed on the host OS — not in Docker</td>
+              <td class="desc">Handles HTTPS :443, terminates SSL, proxies to Flask on :5000. All public traffic goes through here. Flask is never reached directly from the internet.</td>
+            </tr>
+            <tr>
               <td class="key">flask-app</td>
               <td class="val">Custom image built from Dockerfile in the repo</td>
-              <td class="desc">Port 5000 mapped to host. Reads DB config from env vars. Binds to 0.0.0.0 so port mapping works.</td>
+              <td class="desc">Port 5000 mapped to host (127.0.0.1:5000). Reads DB config from env vars. Binds to 0.0.0.0 inside the container so the port mapping works.</td>
             </tr>
             <tr>
               <td class="key">mysql</td>
               <td class="val">Official mysql:8.0 image from Docker Hub</td>
-              <td class="desc">No host port — only reachable from within Docker network. Data in named volume. Initialised from env vars on first start.</td>
+              <td class="desc">No host port — only reachable from within the Docker network. Data in named volume. Initialised from env vars on first start.</td>
             </tr>
             <tr>
               <td class="key">mysql-data</td>
@@ -197,8 +208,78 @@
 
       <div class="divider"></div>
 
+      <div class="section" id="nginx-why">
+        <div class="section-eyebrow">03 — Nginx</div>
+        <div class="section-title">Why Nginx sits in front of Flask</div>
+        <p class="section-body">
+          Flask ships with a development server — it works, but it is single-threaded, has no SSL support, and is not designed to handle concurrent connections or serve static files efficiently. Nginx is a production-grade web server purpose-built for exactly these things.
+        </p>
+        <div class="two-col">
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--red)">Flask dev server exposed directly</div>
+            <div class="ic-body">Flask's Werkzeug dev server handles one request at a time. No SSL — all traffic is plaintext HTTP. No compression, no caching headers, no rate limiting. Gunicorn would improve concurrency, but you'd still need something in front for SSL termination. Flask itself warns you: "Do not use the development server in a production environment."</div>
+          </div>
+          <div class="info-card">
+            <div class="ic-title" style="color:var(--green)">Nginx in front of Flask</div>
+            <div class="ic-body">Nginx handles SSL termination — Certbot provisions and auto-renews the certificate, Nginx serves HTTPS. Nginx passes decrypted HTTP to Flask on localhost:5000. Flask never sees raw TLS. This is the standard pattern: one Nginx instance can proxy multiple services (Flask, Filebrowser, ttyd, Jenkins) all on the same port 443.</div>
+          </div>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why HTTPS is handled at Nginx, not Flask</b> — Nginx manages one certificate for <code>dustyserver.co.in</code> and its subdomains. All services behind it (Flask, ttyd, Filebrowser) automatically get HTTPS without each one needing its own SSL setup. Certbot auto-renews the cert and Nginx reloads it — Flask and MySQL don't need to know HTTPS exists.</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why Flask port 5000 is not exposed publicly</b> — the Docker Compose file maps Flask to port 5000 on the host, but only Nginx needs to reach it. Traffic from the internet never hits port 5000 directly — Nginx receives it on port 443 and proxies it to 127.0.0.1:5000 on the host. There is no reason to open port 5000 in UFW or expose it publicly.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="request-lifecycle">
+        <div class="section-eyebrow">04 — Request lifecycle</div>
+        <div class="section-title">What happens when the browser hits dustyserver.co.in</div>
+        <p class="section-body">
+          Every request through the full stack crosses four boundaries: Cloudflare → Nginx → Flask container → MySQL container. Here is exactly what happens at each step.
+        </p>
+        <div class="diagram">
+<span class="dm">① Browser → Cloudflare → Nginx</span>
+<span class="dg">Browser sends: GET https://dustyserver.co.in/</span>
+<span class="dr">Cloudflare resolves the domain, terminates the public TLS connection, forwards to spserver via the Cloudflare Tunnel</span>
+<span class="dr">Nginx receives the request on port 443, terminates the inner TLS, reads the Host header: dustyserver.co.in</span>
+<span class="dr">Nginx server block matches — proxy_pass http://127.0.0.1:5000 kicks in</span>
+
+<span class="dm">② Nginx → Flask container</span>
+<span class="dg">Nginx sends: GET http://127.0.0.1:5000/</span>
+<span class="dr">Flask container is mapped to host port 5000 — the request lands in the flask-app container</span>
+<span class="dr">Flask routes the request based on app.py URL rules</span>
+
+<span class="dm">③ Flask → MySQL container</span>
+<span class="dg">Flask runs: mysql.connector.connect(host='mysql', port=3306, ...)</span>
+<span class="dr">Docker's embedded DNS resolves 'mysql' to the MySQL container's IP on the bridge network</span>
+<span class="dr">MySQL receives the query, reads from /var/lib/mysql (backed by mysql-data volume), returns rows</span>
+
+<span class="dm">④ Response flows back</span>
+<span class="dr">MySQL → Flask (query result)</span>
+<span class="dr">Flask → Nginx (HTTP 200 + JSON/HTML body)</span>
+<span class="dr">Nginx → Cloudflare → Browser (HTTPS response)</span>
+<span class="dr">Browser renders the page — user sees https://dustyserver.co.in, no port number</span>
+        </div>
+        <table class="kv-table" style="margin-top:1rem;">
+          <thead><tr><th>Hop</th><th>Protocol</th><th>Port</th><th>Who handles it</th></tr></thead>
+          <tbody>
+            <tr><td class="key">Browser → Nginx</td><td class="val">HTTPS</td><td class="desc">443</td><td class="desc">Cloudflare Tunnel + Nginx SSL termination</td></tr>
+            <tr><td class="key">Nginx → Flask</td><td class="val">HTTP</td><td class="desc">5000 (localhost)</td><td class="desc">Nginx proxy_pass to host-mapped container port</td></tr>
+            <tr><td class="key">Flask → MySQL</td><td class="val">MySQL protocol</td><td class="desc">3306 (internal)</td><td class="desc">Docker bridge network + Compose DNS</td></tr>
+            <tr><td class="key">MySQL → volume</td><td class="val">Filesystem</td><td class="desc">—</td><td class="desc">Named volume mounted at /var/lib/mysql</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="divider"></div>
+
       <div class="section" id="networking">
-        <div class="section-eyebrow">03 — Networking</div>
+        <div class="section-eyebrow">05 — Networking</div>
         <div class="section-title">How Flask reaches MySQL — Compose internal DNS</div>
         <p class="section-body">
           Compose creates a private bridge network for the stack and registers each service's name as a hostname in its internal DNS. From inside the <code>flask-app</code> container, the hostname <code>mysql</code> resolves to the MySQL container's IP automatically. No IP addresses, no host port mapping required between the two services.
@@ -224,7 +305,7 @@
       <div class="divider"></div>
 
       <div class="section" id="volumes">
-        <div class="section-eyebrow">04 — Persistence</div>
+        <div class="section-eyebrow">06 — Persistence</div>
         <div class="section-title">Why MySQL data must be in a named volume</div>
         <p class="section-body">
           A Docker container's filesystem is <b>ephemeral</b> — it exists only as long as the container exists. When a container is removed (by <code>docker compose down</code>, rebuild, or crash recovery), everything written to the container's own filesystem is gone. For a database, this would mean losing all data on every restart.
@@ -422,8 +503,83 @@ if __name__ == '__main__':
 
       <div class="divider"></div>
 
+      <div class="section" id="s-nginx">
+        <div class="section-eyebrow">04 — Nginx</div>
+        <div class="section-title">Nginx server block for Flask — every line explained</div>
+        <p class="section-body">
+          Nginx is installed on the host OS (not in Docker). This server block tells Nginx: when a request arrives for <code>dustyserver.co.in</code>, forward it to Flask running on localhost:5000. Certbot adds the HTTPS blocks automatically after running <code>certbot --nginx</code>.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># HTTP block — Certbot will redirect this to HTTPS after running certbot --nginx</span>
+<span class="nm">server</span> {
+    <span class="nm">listen</span> <span class="dr">80</span>;
+    <span class="nm">server_name</span> <span class="dg">dustyserver.co.in</span>;
+
+    <span class="cm"># All HTTP traffic → HTTPS (added by Certbot)</span>
+    <span class="nm">return</span> <span class="dr">301</span> https://$host$request_uri;
+}
+
+<span class="cm"># HTTPS block — handles all inbound traffic for the domain</span>
+<span class="nm">server</span> {
+    <span class="nm">listen</span> <span class="dr">443 ssl</span>;
+    <span class="nm">server_name</span> <span class="dg">dustyserver.co.in</span>;
+
+    <span class="cm"># SSL certificate managed by Certbot — auto-renewed every 90 days</span>
+    <span class="nm">ssl_certificate</span>     /etc/letsencrypt/live/dustyserver.co.in/fullchain.pem;
+    <span class="nm">ssl_certificate_key</span> /etc/letsencrypt/live/dustyserver.co.in/privkey.pem;
+    <span class="nm">include</span>             /etc/letsencrypt/options-ssl-nginx.conf;
+    <span class="nm">ssl_dhparam</span>         /etc/letsencrypt/ssl-dhparams.pem;
+
+    <span class="cm"># location / matches all requests — nothing is served statically by Nginx here</span>
+    <span class="nm">location</span> / {
+        <span class="cm"># proxy_pass — forward the request to Flask on the host at port 5000</span>
+        <span class="cm"># 127.0.0.1:5000 is where Docker maps the flask-app container's port 5000</span>
+        <span class="cm"># Do NOT use the container's internal port — Nginx is on the host, not in Docker</span>
+        <span class="nm">proxy_pass</span> http://127.0.0.1:5000;
+
+        <span class="cm"># Pass the real Host header so Flask knows which domain was requested</span>
+        <span class="nm">proxy_set_header</span> Host $host;
+
+        <span class="cm"># Pass the client's real IP — without this, Flask sees Nginx's IP (127.0.0.1) as the client</span>
+        <span class="nm">proxy_set_header</span> X-Real-IP $remote_addr;
+
+        <span class="cm"># Tells Flask the original request was HTTPS, even though Nginx → Flask is HTTP</span>
+        <span class="nm">proxy_set_header</span> X-Forwarded-Proto $scheme;
+
+        <span class="cm"># Pass the full chain of IPs if there are multiple proxies (Cloudflare → Nginx → Flask)</span>
+        <span class="nm">proxy_set_header</span> X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}</pre>
+        </div>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>proxy_pass must use the host port, not the container port.</b> Nginx runs on the host OS. The Docker Compose file maps Flask's internal port 5000 to host port 5000. Nginx proxies to <code>127.0.0.1:5000</code> — the host port. If Flask were mapped to host port 8000 instead, proxy_pass would need to be <code>http://127.0.0.1:8000</code>. Nginx cannot reach the container's internal IP directly.</span>
+        </div>
+        <div class="code-block" style="margin-top:1rem;">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — enable the config and get HTTPS</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm"># Enable the config by creating a symlink in sites-enabled</span>
+<span class="nm">sudo ln -s</span> /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/
+
+<span class="cm"># Test the config for syntax errors before reloading</span>
+<span class="nm">sudo nginx -t</span>
+<span class="cm"># nginx: configuration file /etc/nginx/nginx.conf test is successful</span>
+
+<span class="cm"># Reload Nginx to apply the new server block</span>
+<span class="nm">sudo systemctl reload nginx</span>
+
+<span class="cm"># Run Certbot — it detects the server_name, gets a certificate, and rewrites the config</span>
+<span class="nm">sudo certbot --nginx -d dustyserver.co.in</span>
+<span class="cm"># Follow prompts — Certbot adds the ssl_certificate lines and HTTP redirect automatically</span>
+<span class="cm"># Certificate stored at: /etc/letsencrypt/live/dustyserver.co.in/</span>
+<span class="cm"># Auto-renewal via systemd timer: systemctl status certbot.timer</span></pre>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
       <div class="section" id="s-start">
-        <div class="section-eyebrow">04 — Start</div>
+        <div class="section-eyebrow">05 — Start</div>
         <div class="section-title">Step 1 — Start the stack</div>
         <div class="step-card">
           <div class="step-header" onclick="toggleStep(this)">
@@ -459,7 +615,7 @@ if __name__ == '__main__':
       <div class="divider"></div>
 
       <div class="section" id="s-verify">
-        <div class="section-eyebrow">05 — Verify</div>
+        <div class="section-eyebrow">06 — Verify</div>
         <div class="section-title">Step 2 — Verify the stack is working</div>
         <div class="step-card">
           <div class="step-header" onclick="toggleStep(this)">
@@ -470,13 +626,25 @@ if __name__ == '__main__':
           <div class="step-body">
             <div class="code-block">
               <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
-              <pre><span class="cm"># Confirm Flask is responding</span>
+              <pre><span class="cm"># ── Layer 1: Flask container directly ──</span>
 <span class="nm">curl http://localhost:5000/</span>
 <span class="cm"># {"service": "spserver-flask", "status": "ok"}</span>
 
 <span class="cm"># Confirm Flask can reach MySQL</span>
 <span class="nm">curl http://localhost:5000/health</span>
 <span class="cm"># {"db": "reachable", "status": "ok"}</span>
+
+<span class="cm"># ── Layer 2: Nginx proxy → Flask ──</span>
+<span class="cm"># Nginx should proxy this to Flask on localhost:5000</span>
+<span class="nm">curl -I http://dustyserver.co.in/</span>
+<span class="cm"># HTTP/1.1 301 — redirecting to HTTPS (Certbot redirect block is working)</span>
+
+<span class="cm"># ── Layer 3: Full HTTPS stack via domain ──</span>
+<span class="nm">curl https://dustyserver.co.in/</span>
+<span class="cm"># {"service": "spserver-flask", "status": "ok"}</span>
+
+<span class="nm">curl https://dustyserver.co.in/health</span>
+<span class="cm"># {"db": "reachable", "status": "ok"} ← full stack verified: Browser→Nginx→Flask→MySQL</span>
 
 <span class="cm"># From another machine on the LAN</span>
 <span class="nm">curl http://192.168.31.150:5000/health</span>
@@ -695,6 +863,21 @@ if __name__ == '__main__':
         <div class="ts-card info">
           <div class="ts-title">How to create tables and seed data on first start</div>
           <div class="ts-body">Two approaches: (1) Manual — once the stack is up and MySQL is healthy, run <code>docker compose exec mysql mysql -u flaskuser -pflaskpass flaskdb</code> and execute CREATE TABLE and INSERT statements interactively. (2) Automatic — create an <code>init.sql</code> file with all DDL and seed data, then add to the mysql service in compose: <code>volumes: - ./init.sql:/docker-entrypoint-initdb.d/init.sql</code>. MySQL runs any <code>.sql</code> files in <code>/docker-entrypoint-initdb.d/</code> on first start. On subsequent starts (when the volume already has data), the file is ignored.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Nginx 502 Bad Gateway — Flask not reachable on port 5000</div>
+          <div class="ts-body">Nginx is running but cannot connect to Flask. Check: (1) Is the Docker stack up? <code>docker compose ps</code> — both containers should show "Up". (2) Is Flask mapped to the host? <code>docker compose port flask-app 5000</code> should return <code>0.0.0.0:5000</code>. (3) Test Flask directly on the host: <code>curl http://localhost:5000/</code> — if this fails, Flask is down, not Nginx. (4) Check Nginx error log: <code>sudo tail -50 /var/log/nginx/error.log</code>. (5) Confirm proxy_pass points to the correct host port — if Flask is mapped to 5000, proxy_pass must be <code>http://127.0.0.1:5000</code>, not the container's internal IP or port.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Domain works on HTTP but not HTTPS — certificate error</div>
+          <div class="ts-body">Certbot may not have run yet, or the certificate has expired. Check: (1) <code>sudo certbot certificates</code> — lists all certs and their expiry dates. (2) If no cert exists: run <code>sudo certbot --nginx -d dustyserver.co.in</code>. (3) If the cert is expired: <code>sudo certbot renew</code>. Auto-renewal should handle this — check the timer: <code>systemctl status certbot.timer</code>. (4) After any cert change: <code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code>.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">Nginx config change not taking effect</div>
+          <div class="ts-body">Nginx must be reloaded after any config edit. (1) Always test first: <code>sudo nginx -t</code> — a syntax error here means the reload will fail and the old config stays active (which is safe). (2) Reload: <code>sudo systemctl reload nginx</code>. (3) Confirm the site is enabled: <code>ls -la /etc/nginx/sites-enabled/</code> — the dustyserver symlink must be present. If sites-enabled only has the default block, the Flask server block isn't active.</div>
         </div>
 
       </div>
