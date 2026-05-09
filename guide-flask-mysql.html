@@ -32,10 +32,11 @@
   font-weight: 600;
 }
 .sd-box.host    { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+.sd-box.nginx   { background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.35); color: #c084fc; }
 .sd-box.flask   { background: rgba(59,130,246,.13); border: 1px solid rgba(59,130,246,.35); color: var(--blue); }
 .sd-box.mysql   { background: rgba(249,115,22,.12); border: 1px solid rgba(249,115,22,.3);  color: var(--amber); }
 .sd-box.vol     { background: rgba(34,197,94,.12);  border: 1px solid rgba(34,197,94,.3);   color: var(--green); }
-.sd-box.network { background: rgba(168,85,247,.1);  border: 1px solid rgba(168,85,247,.3);  color: #c084fc; font-size: 11px; padding: .35rem .9rem; }
+.sd-box.network { background: rgba(168,85,247,.08);  border: 1px solid rgba(168,85,247,.25); color: #c084fc; font-size: 11px; padding: .35rem .9rem; }
 .sd-arrow { color: var(--text3); font-size: 18px; flex-shrink: 0; }
 .sd-label { font-size: 11px; color: var(--text3); min-width: 90px; }
 
@@ -54,6 +55,30 @@
 .lc-cmd  { font-family: var(--mono); font-size: 12px; color: var(--blue); font-weight: 700; margin-bottom: .3rem; }
 .lc-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
 .lc-warn { font-size: 11px; color: var(--amber); margin-top: .35rem; font-weight: 600; }
+
+.file-tree {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.1rem 1.4rem;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 2;
+  color: var(--text2);
+  margin: .75rem 0;
+}
+.ft-dir  { color: var(--blue); }
+.ft-file { color: var(--text); }
+.ft-note { color: var(--text3); font-size: 11px; margin-left: 8px; }
+
+.compare-table { width: 100%; border-collapse: collapse; margin: .75rem 0; font-size: 13px; }
+.compare-table th { background: var(--bg3); color: var(--text3); font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: .6rem 1rem; text-align: left; border-bottom: 1px solid var(--border2); }
+.compare-table td { padding: .65rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table td:first-child { font-family: var(--mono); font-size: 12px; color: var(--blue); white-space: nowrap; }
+.compare-table td.good { color: var(--green); font-size: 12px; }
+.compare-table td.bad  { color: var(--red); font-size: 12px; }
+.compare-table td.neutral { color: var(--text2); font-size: 12px; }
 
 @media(max-width:600px){
   .lifecycle-grid { grid-template-columns: 1fr 1fr; }
@@ -81,17 +106,18 @@
       <div class="sidebar-section-label">Overview</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('what-why')">What &amp; Why</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('architecture')">Architecture</div>
-      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('nginx-why')">Why Nginx in front of Flask</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('expose-vs-ports')">expose vs ports</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('appnet')">Custom network &amp; DNS</div>
       <div class="sidebar-link" onclick="switchTab('overview');scrollToId('request-lifecycle')">Full request lifecycle</div>
-      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('networking')">Inter-container networking</div>
-      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('volumes')">Named volume &amp; persistence</div>
+      <div class="sidebar-link" onclick="switchTab('overview');scrollToId('volumes')">Volume &amp; init.sql</div>
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-label">Setup</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-files')">Project file structure</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-compose')">docker-compose.yml</div>
-      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-mysql-config')">MySQL container config</div>
-      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-flask-config')">Flask container config</div>
-      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-nginx')">Nginx server block</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-nginx-conf')">nginx.conf walkthrough</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-mysql-config')">MySQL + init.sql</div>
+      <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-flask-config')">Flask container</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-start')">Start the stack</div>
       <div class="sidebar-link" onclick="switchTab('setup');scrollToId('s-verify')">Verify the stack</div>
     </div>
@@ -108,7 +134,7 @@
     <div class="guide-header">
       <div class="gh-eyebrow">Phase 2 · Topic 7 of 7</div>
       <h1 class="gh-title">Flask + MySQL <span>Stack</span></h1>
-      <p class="gh-sub">The full spserver-flask multi-container stack — Flask and MySQL running as separate containers, communicating over Docker's internal network, with persistent data in a named volume. This is Phase 2 complete.</p>
+      <p class="gh-sub">The full spserver-flask 3-container Docker Compose stack — Nginx, Flask, and MySQL running as separate containers on a shared custom network, with persistent MySQL data in a named volume. This is Phase 2 complete.</p>
     </div>
 
     <div class="tab-bar">
@@ -125,23 +151,23 @@
 
       <div class="section" id="what-why">
         <div class="section-eyebrow">01 — What &amp; Why</div>
-        <div class="section-title">Why Flask and MySQL run as separate containers</div>
+        <div class="section-title">Three containers — one job each</div>
         <p class="section-body">
-          The multi-container pattern — one container per service — is the foundation of how Docker is used in practice. Flask and MySQL are separated because they have completely different lifecycles, resource profiles, and failure modes. Keeping them separate means you can restart, update, or replace one without touching the other.
+          The final Phase 2 stack runs three containers: <b>Nginx</b> as the reverse proxy, <b>Flask</b> as the application, and <b>MySQL</b> as the database. Each does exactly one job. They talk to each other over a custom Docker bridge network called <code>appnet</code>, using service names as hostnames — Docker's internal DNS resolves them automatically.
         </p>
         <div class="two-col">
           <div class="info-card">
-            <div class="ic-title" style="color:var(--red)">Single container — Flask + MySQL together</div>
-            <div class="ic-body">Running both in one container requires a process manager (supervisord) inside the container. You can't update MySQL without rebuilding the Flask image. The container is large and complex. MySQL data lives inside the container and is lost on rebuild. You can't scale Flask independently of MySQL.</div>
+            <div class="ic-title" style="color:var(--red)">Single container — everything together</div>
+            <div class="ic-body">Nginx, Flask, and MySQL all in one container requires a process manager inside (supervisord or similar). You can't restart Flask without restarting Nginx and risking MySQL. The image becomes large and complex. Data lives inside the container and is lost on rebuild. You can't update any one component independently.</div>
           </div>
           <div class="info-card">
-            <div class="ic-title" style="color:var(--green)">Two containers — Flask + MySQL separated</div>
-            <div class="ic-body">Each container does one thing. Flask can be rebuilt and redeployed without touching MySQL or its data. MySQL can be upgraded independently. MySQL data lives in a named volume that outlasts both containers. This is the separation of concerns principle applied to infrastructure.</div>
+            <div class="ic-title" style="color:var(--green)">Three containers — one job each</div>
+            <div class="ic-body">Each container has a single, well-defined responsibility. Nginx handles routing and SSL offload. Flask handles application logic. MySQL handles data. You can rebuild Flask after a code change without touching MySQL or its data. Nginx can be reconfigured with a <code>nginx -s reload</code> inside the container. This is the separation of concerns principle applied to infrastructure.</div>
           </div>
         </div>
         <div class="alert info">
           <span class="alert-icon">ℹ</span>
-          <span>This guide is the culmination of Phase 2. It brings together the Dockerfile, Docker Compose, Flask app, and Nginx knowledge from the previous guides into a single working production-like stack. The individual pieces are covered in depth in their own guides — this guide focuses on how they fit together and operate as a unit.</span>
+          <span>This guide is the culmination of Phase 2. It brings together the Dockerfile, Docker Compose, Flask app, Nginx, and networking knowledge from the previous guides into a single working production-like stack. The individual pieces are covered in depth in their own guides — this guide focuses on how they fit together and operate as a unit.</span>
         </div>
       </div>
 
@@ -153,24 +179,27 @@
 
         <div class="stack-diagram">
           <div class="sd-row">
-            <div class="sd-box host">Browser<br><span style="font-weight:400;font-size:10px">dustyserver.co.in · HTTPS</span></div>
+            <div class="sd-box host">Browser<br><span style="font-weight:400;font-size:10px">flask.dustyserver.co.in · HTTPS</span></div>
             <div class="sd-arrow">→</div>
             <div class="sd-label">HTTPS :443<br>Cloudflare → host</div>
-            <div class="sd-box host" style="border-color:rgba(168,85,247,.4);color:#c084fc;">Nginx (host)<br><span style="font-weight:400;font-size:10px">/etc/nginx/sites-available/dustyserver · SSL termination</span></div>
+            <div class="sd-box host" style="border-color:rgba(255,255,255,.2);">Host Nginx<br><span style="font-weight:400;font-size:10px">443 → localhost:8082 · SSL termination</span></div>
             <div class="sd-arrow">→</div>
-            <div class="sd-label">HTTP :5000<br>proxy_pass</div>
-            <div class="sd-box flask">flask-app container<br><span style="font-weight:400;font-size:10px">built from Dockerfile · 0.0.0.0:5000</span></div>
+            <div class="sd-label">HTTP :8082<br>host → container</div>
+            <div class="sd-box nginx">nginx-proxy container<br><span style="font-weight:400;font-size:10px">nginx:alpine · listens on :80 inside</span></div>
           </div>
-          <div style="padding-left:1rem;margin-top:4px;">
-            <div class="sd-box network">Docker bridge network — spserver-flask_default</div>
+          <div style="padding-left:1rem;margin-top:2px;">
+            <div class="sd-box network">appnet — custom Docker bridge network · all 3 containers on this network</div>
           </div>
-          <div class="sd-row" style="padding-left:2rem;">
-            <div class="sd-label" style="color:var(--text3);font-size:11px;">service name: mysql<br>port 3306 internal</div>
+          <div class="sd-row" style="padding-left:2rem;margin-top:2px;">
+            <div class="sd-label" style="color:var(--text3);font-size:11px;">proxy_pass<br>flask:5000</div>
             <div class="sd-arrow">→</div>
-            <div class="sd-box mysql">mysql container<br><span style="font-weight:400;font-size:10px">mysql:8.0 · no host port mapping</span></div>
+            <div class="sd-box flask">flask container<br><span style="font-weight:400;font-size:10px">built from Dockerfile · expose 5000</span></div>
+            <div class="sd-arrow">→</div>
+            <div class="sd-label" style="color:var(--text3);font-size:11px;">mysql:3306<br>Docker DNS</div>
+            <div class="sd-arrow">→</div>
+            <div class="sd-box mysql">mysql container<br><span style="font-weight:400;font-size:10px">mysql:8.0 · expose 3306</span></div>
             <div class="sd-arrow">↔</div>
-            <div class="sd-label" style="color:var(--text3);font-size:11px;">named volume</div>
-            <div class="sd-box vol">mysql-data volume<br><span style="font-weight:400;font-size:10px">/var/lib/mysql inside container</span></div>
+            <div class="sd-box vol">mysql-data<br><span style="font-weight:400;font-size:10px">/var/lib/mysql</span></div>
           </div>
         </div>
 
@@ -178,29 +207,34 @@
           <thead><tr><th>Component</th><th>What it is</th><th>Key decisions</th></tr></thead>
           <tbody>
             <tr>
-              <td class="key">Nginx (host)</td>
-              <td class="val">Nginx installed on the host OS — not in Docker</td>
-              <td class="desc">Handles HTTPS :443, terminates SSL, proxies to Flask on :5000. All public traffic goes through here. Flask is never reached directly from the internet.</td>
+              <td class="key">Host Nginx</td>
+              <td class="val">Nginx on the host OS — handles HTTPS for all services</td>
+              <td class="desc">Receives traffic on :443, terminates SSL, proxies to localhost:8082 where the Nginx container listens. Manages TLS certs via Certbot.</td>
             </tr>
             <tr>
-              <td class="key">flask-app</td>
-              <td class="val">Custom image built from Dockerfile in the repo</td>
-              <td class="desc">Port 5000 mapped to host (127.0.0.1:5000). Reads DB config from env vars. Binds to 0.0.0.0 inside the container so the port mapping works.</td>
+              <td class="key">nginx-proxy</td>
+              <td class="val">nginx:alpine container — reverse proxy in front of Flask</td>
+              <td class="desc">Host port 8082 → container port 80. Reads nginx.conf mounted from host. Proxies requests to Flask by service name: <code>proxy_pass http://flask:5000</code>.</td>
+            </tr>
+            <tr>
+              <td class="key">flask</td>
+              <td class="val">Custom image built from local Dockerfile</td>
+              <td class="desc"><code>expose: 5000</code> — internal only. Not reachable from the host directly. Only the Nginx container (on appnet) can reach it by name.</td>
             </tr>
             <tr>
               <td class="key">mysql</td>
-              <td class="val">Official mysql:8.0 image from Docker Hub</td>
-              <td class="desc">No host port — only reachable from within the Docker network. Data in named volume. Initialised from env vars on first start.</td>
+              <td class="val">Official mysql:8.0 image</td>
+              <td class="desc"><code>expose: 3306</code> — internal only. Only reachable from containers on appnet. Data persists in named volume. Schema initialised from init.sql.</td>
+            </tr>
+            <tr>
+              <td class="key">appnet</td>
+              <td class="val">Custom Docker bridge network</td>
+              <td class="desc">All three containers join this network. Docker's embedded DNS registers each service name as a hostname — containers reach each other by name, not IP.</td>
             </tr>
             <tr>
               <td class="key">mysql-data</td>
               <td class="val">Docker named volume</td>
-              <td class="desc">Docker manages the storage path. Survives <code>docker compose down</code>. Only deleted with <code>down -v</code>.</td>
-            </tr>
-            <tr>
-              <td class="key">spserver-flask_default</td>
-              <td class="val">Docker bridge network created by Compose</td>
-              <td class="desc">Both containers join this network automatically. Flask reaches MySQL by the hostname <code>mysql</code> — Compose DNS resolves it.</td>
+              <td class="desc">Survives <code>docker compose down</code>. Deleted only with <code>down -v</code>. Docker manages the path on the host filesystem.</td>
             </tr>
           </tbody>
         </table>
@@ -208,69 +242,129 @@
 
       <div class="divider"></div>
 
-      <div class="section" id="nginx-why">
-        <div class="section-eyebrow">03 — Nginx</div>
-        <div class="section-title">Why Nginx sits in front of Flask</div>
+      <div class="section" id="expose-vs-ports">
+        <div class="section-eyebrow">03 — expose vs ports</div>
+        <div class="section-title">Why Flask and MySQL use expose, not ports</div>
         <p class="section-body">
-          Flask ships with a development server — it works, but it is single-threaded, has no SSL support, and is not designed to handle concurrent connections or serve static files efficiently. Nginx is a production-grade web server purpose-built for exactly these things.
+          <code>ports</code> and <code>expose</code> are not the same thing. The difference is about who can reach the container — the host machine, or only other containers on the same Docker network.
+        </p>
+        <table class="compare-table">
+          <thead><tr><th>Property</th><th>ports: "8082:80"</th><th>expose: "5000"</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>What it does</td>
+              <td class="neutral">Binds a port on the host to a port inside the container. Traffic from outside the host (or from the host itself) can reach the container.</td>
+              <td class="neutral">Documents that the container listens on this port. Makes the port reachable from other containers on the same Docker network — not from the host.</td>
+            </tr>
+            <tr>
+              <td>Reachable from host</td>
+              <td class="good">Yes — localhost:8082 on the host reaches the container</td>
+              <td class="bad">No — nothing on the host can reach port 5000 or 3306</td>
+            </tr>
+            <tr>
+              <td>Reachable from other containers</td>
+              <td class="good">Yes (via the host port mapping)</td>
+              <td class="good">Yes — by service name on the shared Docker network</td>
+            </tr>
+            <tr>
+              <td>Appears in docker ps PORTS column</td>
+              <td class="good">Yes — 0.0.0.0:8082→80/tcp</td>
+              <td class="bad">No — not visible in PORTS column</td>
+            </tr>
+            <tr>
+              <td>Used for</td>
+              <td class="neutral">Nginx — needs to be reachable from the host (host Nginx proxies to it)</td>
+              <td class="neutral">Flask, MySQL — only other containers on appnet need to reach them. No reason to expose them to the host.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>expose is mostly documentation.</b> On a custom bridge network, containers can reach each other's ports by service name even without <code>expose</code> — Docker bridge networking allows it. The real purpose of <code>expose</code> is documentation: it declares which ports the container is designed to receive traffic on. The enforced restriction is the absence of <code>ports</code>: without a <code>ports</code> mapping, the host cannot reach the port regardless of what <code>expose</code> says.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="appnet">
+        <div class="section-eyebrow">04 — Networking</div>
+        <div class="section-title">Custom network appnet — why and how</div>
+        <p class="section-body">
+          Docker Compose creates a default network for each project, but a manually declared custom network gives clearer control and guarantees Docker DNS works reliably for all containers on it.
         </p>
         <div class="two-col">
           <div class="info-card">
-            <div class="ic-title" style="color:var(--red)">Flask dev server exposed directly</div>
-            <div class="ic-body">Flask's Werkzeug dev server handles one request at a time. No SSL — all traffic is plaintext HTTP. No compression, no caching headers, no rate limiting. Gunicorn would improve concurrency, but you'd still need something in front for SSL termination. Flask itself warns you: "Do not use the development server in a production environment."</div>
+            <div class="ic-title" style="color:var(--red)">Default network (no custom network declared)</div>
+            <div class="ic-body">Compose creates an automatic network named <code>projectname_default</code>. Containers can reach each other by service name on this network too, but it's implicit — nothing in the compose file declares it. If you add services across multiple compose files, they end up on different default networks and cannot reach each other by name.</div>
           </div>
           <div class="info-card">
-            <div class="ic-title" style="color:var(--green)">Nginx in front of Flask</div>
-            <div class="ic-body">Nginx handles SSL termination — Certbot provisions and auto-renews the certificate, Nginx serves HTTPS. Nginx passes decrypted HTTP to Flask on localhost:5000. Flask never sees raw TLS. This is the standard pattern: one Nginx instance can proxy multiple services (Flask, Filebrowser, ttyd, Jenkins) all on the same port 443.</div>
+            <div class="ic-title" style="color:var(--green)">Custom network appnet (explicit declaration)</div>
+            <div class="ic-body">Declaring <code>appnet</code> in the <code>networks:</code> block and adding <code>networks: appnet</code> to each service makes the intent explicit. All three containers are on <code>appnet</code>. Docker's embedded DNS registers each service name — nginx, flask, mysql — as a hostname on this network. Any container on appnet can reach any other by service name.</div>
           </div>
         </div>
-        <div class="alert info">
-          <span class="alert-icon">ℹ</span>
-          <span><b>Why HTTPS is handled at Nginx, not Flask</b> — Nginx manages one certificate for <code>dustyserver.co.in</code> and its subdomains. All services behind it (Flask, ttyd, Filebrowser) automatically get HTTPS without each one needing its own SSL setup. Certbot auto-renews the cert and Nginx reloads it — Flask and MySQL don't need to know HTTPS exists.</span>
+        <div class="diagram">
+<span class="dm">Inside the nginx-proxy container:</span>
+<span class="dg">$ nslookup flask</span>
+<span class="dr">Server:   127.0.0.11   ← Docker's embedded DNS resolver (always this IP)</span>
+<span class="dr">Address:  172.20.0.x   ← flask container's IP on appnet</span>
+
+<span class="dg">$ nslookup mysql</span>
+<span class="dr">Server:   127.0.0.11</span>
+<span class="dr">Address:  172.20.0.y   ← mysql container's IP on appnet</span>
+
+<span class="dm">This is why proxy_pass uses 'flask', not 'localhost' or an IP:</span>
+<span class="dm">localhost inside the Nginx container = the Nginx container itself</span>
+<span class="dm">flask = resolved by Docker DNS to the Flask container's IP</span>
         </div>
         <div class="alert info">
           <span class="alert-icon">ℹ</span>
-          <span><b>Why Flask port 5000 is not exposed publicly</b> — the Docker Compose file maps Flask to port 5000 on the host, but only Nginx needs to reach it. Traffic from the internet never hits port 5000 directly — Nginx receives it on port 443 and proxies it to 127.0.0.1:5000 on the host. There is no reason to open port 5000 in UFW or expose it publicly.</span>
+          <span>When a container is restarted and gets a new internal IP on the bridge network, Docker's DNS record updates automatically. The service name stays constant — code never needs to know IPs.</span>
         </div>
       </div>
 
       <div class="divider"></div>
 
       <div class="section" id="request-lifecycle">
-        <div class="section-eyebrow">04 — Request lifecycle</div>
-        <div class="section-title">What happens when the browser hits dustyserver.co.in</div>
+        <div class="section-eyebrow">05 — Request lifecycle</div>
+        <div class="section-title">What happens when the browser hits flask.dustyserver.co.in</div>
         <p class="section-body">
-          Every request through the full stack crosses four boundaries: Cloudflare → Nginx → Flask container → MySQL container. Here is exactly what happens at each step.
+          Every request crosses five boundaries before a response returns. Here is what happens at each step.
         </p>
         <div class="diagram">
-<span class="dm">① Browser → Cloudflare → Nginx</span>
-<span class="dg">Browser sends: GET https://dustyserver.co.in/</span>
-<span class="dr">Cloudflare resolves the domain, terminates the public TLS connection, forwards to spserver via the Cloudflare Tunnel</span>
-<span class="dr">Nginx receives the request on port 443, terminates the inner TLS, reads the Host header: dustyserver.co.in</span>
-<span class="dr">Nginx server block matches — proxy_pass http://127.0.0.1:5000 kicks in</span>
+<span class="dm">① Browser → Cloudflare → Host Nginx</span>
+<span class="dg">Browser: GET https://flask.dustyserver.co.in/</span>
+<span class="dr">Cloudflare resolves the domain, forwards via Tunnel to spserver</span>
+<span class="dr">Host Nginx receives on :443, terminates TLS, matches server_name flask.dustyserver.co.in</span>
+<span class="dr">proxy_pass http://localhost:8082 → forwards to the Nginx container</span>
 
-<span class="dm">② Nginx → Flask container</span>
-<span class="dg">Nginx sends: GET http://127.0.0.1:5000/</span>
-<span class="dr">Flask container is mapped to host port 5000 — the request lands in the flask-app container</span>
-<span class="dr">Flask routes the request based on app.py URL rules</span>
+<span class="dm">② Host Nginx → Nginx container</span>
+<span class="dg">HTTP GET to localhost:8082 on the host</span>
+<span class="dr">Docker maps host:8082 → nginx-proxy container:80</span>
+<span class="dr">nginx-proxy receives the request, reads nginx.conf</span>
+<span class="dr">location / matches — proxy_pass http://flask:5000</span>
 
-<span class="dm">③ Flask → MySQL container</span>
-<span class="dg">Flask runs: mysql.connector.connect(host='mysql', port=3306, ...)</span>
-<span class="dr">Docker's embedded DNS resolves 'mysql' to the MySQL container's IP on the bridge network</span>
-<span class="dr">MySQL receives the query, reads from /var/lib/mysql (backed by mysql-data volume), returns rows</span>
+<span class="dm">③ Nginx container → Flask container</span>
+<span class="dg">HTTP GET to flask:5000 (Docker DNS resolves 'flask' to Flask container IP on appnet)</span>
+<span class="dr">Flask container receives the request (expose 5000, reachable on appnet)</span>
+<span class="dr">Flask routes the request, runs application logic</span>
 
-<span class="dm">④ Response flows back</span>
-<span class="dr">MySQL → Flask (query result)</span>
-<span class="dr">Flask → Nginx (HTTP 200 + JSON/HTML body)</span>
-<span class="dr">Nginx → Cloudflare → Browser (HTTPS response)</span>
-<span class="dr">Browser renders the page — user sees https://dustyserver.co.in, no port number</span>
+<span class="dm">④ Flask → MySQL container</span>
+<span class="dg">mysql.connector.connect(host='mysql', port=3306, ...)</span>
+<span class="dr">Docker DNS resolves 'mysql' to MySQL container IP on appnet</span>
+<span class="dr">MySQL runs the query against /var/lib/mysql (mysql-data volume)</span>
+
+<span class="dm">⑤ Response flows back</span>
+<span class="dr">MySQL → Flask (query result) → Nginx container (HTTP response)</span>
+<span class="dr">→ Host Nginx → Cloudflare → Browser (HTTPS)</span>
+<span class="dr">User sees https://flask.dustyserver.co.in — no port number in the URL</span>
         </div>
         <table class="kv-table" style="margin-top:1rem;">
-          <thead><tr><th>Hop</th><th>Protocol</th><th>Port</th><th>Who handles it</th></tr></thead>
+          <thead><tr><th>Hop</th><th>Protocol</th><th>Port</th><th>How the target is reached</th></tr></thead>
           <tbody>
-            <tr><td class="key">Browser → Nginx</td><td class="val">HTTPS</td><td class="desc">443</td><td class="desc">Cloudflare Tunnel + Nginx SSL termination</td></tr>
-            <tr><td class="key">Nginx → Flask</td><td class="val">HTTP</td><td class="desc">5000 (localhost)</td><td class="desc">Nginx proxy_pass to host-mapped container port</td></tr>
-            <tr><td class="key">Flask → MySQL</td><td class="val">MySQL protocol</td><td class="desc">3306 (internal)</td><td class="desc">Docker bridge network + Compose DNS</td></tr>
+            <tr><td class="key">Browser → Host Nginx</td><td class="val">HTTPS</td><td class="desc">443</td><td class="desc">Cloudflare Tunnel + host Nginx SSL termination</td></tr>
+            <tr><td class="key">Host Nginx → Nginx container</td><td class="val">HTTP</td><td class="desc">8082 (host) → 80 (container)</td><td class="desc">Docker ports mapping</td></tr>
+            <tr><td class="key">Nginx container → Flask</td><td class="val">HTTP</td><td class="desc">5000 (appnet internal)</td><td class="desc">proxy_pass http://flask:5000 — Docker DNS</td></tr>
+            <tr><td class="key">Flask → MySQL</td><td class="val">MySQL protocol</td><td class="desc">3306 (appnet internal)</td><td class="desc">host='mysql' — Docker DNS</td></tr>
             <tr><td class="key">MySQL → volume</td><td class="val">Filesystem</td><td class="desc">—</td><td class="desc">Named volume mounted at /var/lib/mysql</td></tr>
           </tbody>
         </table>
@@ -278,50 +372,28 @@
 
       <div class="divider"></div>
 
-      <div class="section" id="networking">
-        <div class="section-eyebrow">05 — Networking</div>
-        <div class="section-title">How Flask reaches MySQL — Compose internal DNS</div>
-        <p class="section-body">
-          Compose creates a private bridge network for the stack and registers each service's name as a hostname in its internal DNS. From inside the <code>flask-app</code> container, the hostname <code>mysql</code> resolves to the MySQL container's IP automatically. No IP addresses, no host port mapping required between the two services.
-        </p>
-        <div class="diagram">
-<span class="dm">Flask connection string:</span>
-<span class="dg">host=mysql   port=3306   user=flaskuser   password=flaskpass   database=flaskdb</span>
-
-<span class="dm">Inside flask-app container:</span>
-<span class="dg">$ nslookup mysql</span>
-<span class="dr">Server:   127.0.0.11   ← Docker's embedded DNS resolver</span>
-<span class="dr">Address:  172.18.0.x   ← mysql container's IP on the bridge network</span>
-
-<span class="dm">mysql:3306 is not accessible from the host — no ports: mapping in compose</span>
-<span class="dm">Only flask-app (on the same network) can reach it</span>
-        </div>
-        <div class="alert info">
-          <span class="alert-icon">ℹ</span>
-          <span>The embedded DNS server is always at <code>127.0.0.11</code> inside any Docker container. It resolves service names defined in the Compose file to their current container IPs. If a container is restarted and gets a new IP, the DNS record updates automatically — the service name stays constant.</span>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
       <div class="section" id="volumes">
-        <div class="section-eyebrow">06 — Persistence</div>
-        <div class="section-title">Why MySQL data must be in a named volume</div>
+        <div class="section-eyebrow">06 — Persistence &amp; init.sql</div>
+        <div class="section-title">Named volume and automatic schema initialisation</div>
         <p class="section-body">
-          A Docker container's filesystem is <b>ephemeral</b> — it exists only as long as the container exists. When a container is removed (by <code>docker compose down</code>, rebuild, or crash recovery), everything written to the container's own filesystem is gone. For a database, this would mean losing all data on every restart.
-        </p>
-        <p class="section-body">
-          A <b>named volume</b> exists outside the container lifecycle. Docker creates and manages it at <code>/var/lib/docker/volumes/spserver-flask_mysql-data/</code> on the host. The MySQL container mounts this directory as <code>/var/lib/mysql</code> inside the container. When the container is recreated, it mounts the same volume — all the data is still there.
+          A Docker container's filesystem is ephemeral — anything written to it is lost when the container is removed. The <code>mysql-data</code> named volume mounts at <code>/var/lib/mysql</code> inside the MySQL container, keeping all database files outside the container lifecycle.
         </p>
         <div class="two-col">
           <div class="info-card">
             <div class="ic-title" style="color:var(--green)">docker compose down</div>
-            <div class="ic-body">Stops and removes containers and the Docker network. The <code>mysql-data</code> volume is <b>not</b> touched. All database data survives. Start again with <code>docker compose up -d</code> and MySQL picks up exactly where it left off.</div>
+            <div class="ic-body">Stops and removes containers and the Docker network. The <code>mysql-data</code> volume is <b>not</b> touched. All database data survives. Restart with <code>docker compose up -d</code> — MySQL picks up exactly where it left off.</div>
           </div>
           <div class="info-card">
             <div class="ic-title" style="color:var(--red)">docker compose down -v</div>
-            <div class="ic-body">Stops and removes containers, network, <b>and all named volumes</b>. The <code>mysql-data</code> volume is deleted — all database data is permanently gone. Only use this intentionally: to completely reset the stack to a clean state.</div>
+            <div class="ic-body">Stops and removes containers, network, <b>and all named volumes</b>. The <code>mysql-data</code> volume is permanently deleted. Only use this intentionally for a full reset. There is no undo.</div>
           </div>
+        </div>
+        <p class="section-body" style="margin-top:1rem;">
+          <b>init.sql</b> — the MySQL official image auto-runs any <code>.sql</code> file mounted into <code>/docker-entrypoint-initdb.d/</code> on first startup, when <code>/var/lib/mysql</code> is empty. This is used to create the schema and seed initial data automatically.
+        </p>
+        <div class="alert warn">
+          <span class="alert-icon">⚠</span>
+          <span><b>init.sql only runs once — on first startup.</b> If the <code>mysql-data</code> volume already exists (i.e. the DB was previously initialised), MySQL skips <code>/docker-entrypoint-initdb.d/</code> entirely. To re-run init.sql after changes: <code>docker compose down -v</code> to wipe the volume, then <code>docker compose up -d</code>. This deletes all data.</span>
         </div>
       </div>
 
@@ -330,81 +402,150 @@
     <!-- ══ SETUP ══ -->
     <div class="tab-pane" id="pane-setup">
 
-      <div class="section" id="s-compose">
-        <div class="section-eyebrow">01 — Compose file</div>
-        <div class="section-title">The full docker-compose.yml — annotated</div>
+      <div class="section" id="s-files">
+        <div class="section-eyebrow">01 — Project structure</div>
+        <div class="section-title">File layout on spserver</div>
         <p class="section-body">
-          This is the complete, production-ready Compose file for the spserver-flask stack. Every field is annotated — read the comments to understand the decisions behind each line.
+          The project lives at <code>/home/sipu/projects/flaskapp</code>. The Compose file, Nginx config, and MySQL init script are all in the repo — the stack is fully defined in code.
         </p>
+        <div class="file-tree">
+          <span class="ft-dir">flaskapp/</span><br>
+          ├── <span class="ft-file">docker-compose.yml</span><span class="ft-note">— defines all 3 services, appnet, mysql-data volume</span><br>
+          ├── <span class="ft-file">Dockerfile</span><span class="ft-note">— builds the Flask image</span><br>
+          ├── <span class="ft-file">app.py</span><span class="ft-note">— Flask application</span><br>
+          ├── <span class="ft-file">requirements.txt</span><span class="ft-note">— Flask + mysql-connector-python</span><br>
+          ├── <span class="ft-dir">nginx/</span><br>
+          │&nbsp;&nbsp;&nbsp;└── <span class="ft-file">nginx.conf</span><span class="ft-note">— mounted into Nginx container as read-only</span><br>
+          └── <span class="ft-dir">mysql/</span><br>
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="ft-file">init.sql</span><span class="ft-note">— auto-run by MySQL on first startup</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span>The Nginx config and MySQL init script are on the host, not baked into images. Nginx gets its config via a <code>:ro</code> volume mount. MySQL gets init.sql via a volume mount into <code>/docker-entrypoint-initdb.d/</code>. Any change to these files is picked up without rebuilding images — Nginx needs a reload (<code>docker compose exec nginx-proxy nginx -s reload</code>), MySQL reads init.sql only on first start.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-compose">
+        <div class="section-eyebrow">02 — Compose file</div>
+        <div class="section-title">The full docker-compose.yml — every line explained</div>
         <div class="code-block">
-          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">spserver-flask/docker-compose.yml</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">flaskapp/docker-compose.yml</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
           <pre><span class="nm">services:</span>
 
-  <span class="dg">flask-app:</span>
-    <span class="cm"># Build the Flask image from the Dockerfile in this directory</span>
-    <span class="cm"># Use --build flag when running docker compose up to rebuild after code changes</span>
-    <span class="nm">build:</span> .
+  <span class="cm"># ── NGINX CONTAINER ─────────────────────────────────────────────</span>
+  <span class="dg">nginx:</span>
+    <span class="cm"># nginx:alpine — alpine-based image, much smaller than nginx:latest</span>
+    <span class="cm"># fewer packages = smaller attack surface, faster pulls</span>
+    <span class="nm">image:</span> nginx:alpine
 
-    <span class="cm"># Expose Flask to the host on port 5000</span>
-    <span class="cm"># MySQL has no ports: entry — it is internal-only</span>
-    <span class="nm">ports:</span>
-      - <span class="dr">"5000:5000"</span>
+    <span class="cm"># Fixed container name instead of the random Compose-generated one</span>
+    <span class="cm"># Makes docker exec, docker logs, and docker inspect easier to use</span>
+    <span class="nm">container_name:</span> nginx-proxy
 
-    <span class="cm"># DB config passed as environment variables</span>
-    <span class="cm"># Flask reads these with os.environ.get() in app.py</span>
-    <span class="cm"># DB_HOST must match the MySQL service name below — Compose DNS resolves it</span>
-    <span class="nm">environment:</span>
-      - <span class="dr">DB_HOST=mysql</span>
-      - <span class="dr">DB_PORT=3306</span>
-      - <span class="dr">DB_NAME=flaskdb</span>
-      - <span class="dr">DB_USER=flaskuser</span>
-      - <span class="dr">DB_PASSWORD=flaskpass</span>
-
-    <span class="cm"># Wait for MySQL to be healthy before starting Flask</span>
-    <span class="cm"># depends_on alone only waits for the container to start, not MySQL to be ready</span>
-    <span class="cm"># condition: service_healthy requires the healthcheck below to pass first</span>
-    <span class="nm">depends_on:</span>
-      <span class="dg">mysql:</span>
-        <span class="nm">condition:</span> service_healthy
-
-    <span class="cm"># Auto-restart Flask if it crashes or if spserver reboots</span>
+    <span class="cm"># Restart automatically if the container crashes</span>
+    <span class="cm"># unless-stopped: respects manual 'docker compose stop' — won't restart after that</span>
     <span class="nm">restart:</span> unless-stopped
 
-  <span class="dr">mysql:</span>
-    <span class="cm"># Official MySQL 8.0 image — stable, well-maintained, widely used</span>
+    <span class="cm"># ports — maps host port 8082 to container port 80</span>
+    <span class="cm"># This is how traffic from outside Docker reaches this container</span>
+    <span class="cm"># Host Nginx proxies flask.dustyserver.co.in → localhost:8082</span>
+    <span class="cm"># Nginx inside the container listens on :80</span>
+    <span class="nm">ports:</span>
+      - <span class="dr">"8082:80"</span>
+
+    <span class="cm"># Mount the nginx config from the host into the container</span>
+    <span class="cm"># ./nginx/nginx.conf → this file on the host</span>
+    <span class="cm"># /etc/nginx/conf.d/default.conf → where Nginx looks for site configs</span>
+    <span class="cm"># Why conf.d/? nginx:alpine includes conf.d/*.conf automatically via nginx.conf include</span>
+    <span class="cm"># :ro — read-only mount, the container cannot modify the config file</span>
+    <span class="cm"># Changes on the host take effect after: docker compose exec nginx-proxy nginx -s reload</span>
+    <span class="nm">volumes:</span>
+      - <span class="dg">./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro</span>
+
+    <span class="cm"># Start flask container before nginx</span>
+    <span class="cm"># WARNING: depends_on only waits for the container to start, not for Flask to be ready</span>
+    <span class="cm"># If Flask is slow to start, Nginx may send requests before Flask can handle them</span>
+    <span class="nm">depends_on:</span>
+      - flask
+
+    <span class="nm">networks:</span>
+      - appnet
+
+  <span class="cm"># ── FLASK CONTAINER ─────────────────────────────────────────────</span>
+  <span class="dr">flask:</span>
+    <span class="cm"># Build the Flask image from the Dockerfile in the project directory</span>
+    <span class="cm"># Absolute path used because the compose file may be run from different locations</span>
+    <span class="nm">build:</span> /home/sipu/projects/flaskapp
+
+    <span class="cm"># expose makes port 5000 reachable from other containers on appnet</span>
+    <span class="cm"># It does NOT create a mapping to the host — the host cannot reach :5000 directly</span>
+    <span class="cm"># Only the Nginx container (on the same appnet) needs to reach Flask</span>
+    <span class="nm">expose:</span>
+      - <span class="dr">"5000"</span>
+
+    <span class="cm"># DB connection config passed as environment variables</span>
+    <span class="cm"># MYSQL_HOST=mysql — 'mysql' is the service name below, resolved by Docker DNS</span>
+    <span class="cm"># Flask reads these with os.environ.get() in app.py</span>
+    <span class="nm">environment:</span>
+      - <span class="dr">MYSQL_HOST=mysql</span>
+      - <span class="dr">MYSQL_USER=flaskuser</span>
+      - <span class="dr">MYSQL_PASSWORD=flaskpass</span>
+      - <span class="dr">MYSQL_DATABASE=flaskdb</span>
+
+    <span class="cm"># Start mysql before flask</span>
+    <span class="cm"># Same caveat: only waits for MySQL container to start, not for MySQL to be ready</span>
+    <span class="nm">depends_on:</span>
+      - mysql
+
+    <span class="nm">networks:</span>
+      - appnet
+
+    <span class="nm">restart:</span> unless-stopped
+
+  <span class="cm"># ── MYSQL CONTAINER ─────────────────────────────────────────────</span>
+  <span class="nm">mysql:</span>
+    <span class="cm"># Official MySQL 8.0 image — stable, well-maintained</span>
     <span class="nm">image:</span> mysql:8.0
 
-    <span class="cm"># No ports: entry — MySQL is accessible only within the Docker network</span>
-    <span class="cm"># Exposing 3306 to the host would allow LAN access to the raw database</span>
+    <span class="cm"># expose makes :3306 reachable from other containers on appnet</span>
+    <span class="cm"># No host port mapping — MySQL is not reachable from the host machine</span>
+    <span class="nm">expose:</span>
+      - <span class="dr">"3306"</span>
 
-    <span class="cm"># MySQL official image reads these on first start to initialise the database</span>
-    <span class="cm"># On subsequent starts (when /var/lib/mysql already has data), these are ignored</span>
+    <span class="cm"># MySQL reads these on FIRST startup only (when /var/lib/mysql is empty)</span>
+    <span class="cm"># On subsequent starts, the existing data is used and these are ignored</span>
     <span class="nm">environment:</span>
       - <span class="dr">MYSQL_ROOT_PASSWORD=rootsecret</span>
       - <span class="dr">MYSQL_DATABASE=flaskdb</span>
       - <span class="dr">MYSQL_USER=flaskuser</span>
       - <span class="dr">MYSQL_PASSWORD=flaskpass</span>
 
-    <span class="cm"># Named volume — Docker manages the storage location on the host</span>
-    <span class="cm"># /var/lib/mysql is where MySQL stores all its data files</span>
-    <span class="cm"># This data survives docker compose down — only deleted with down -v</span>
     <span class="nm">volumes:</span>
+      <span class="cm"># Named volume — persists MySQL data files outside the container lifecycle</span>
       - <span class="dg">mysql-data:/var/lib/mysql</span>
+      <span class="cm"># init.sql — MySQL auto-runs this on first startup to create the schema</span>
+      <span class="cm"># docker-entrypoint-initdb.d/ is the MySQL image's convention for init scripts</span>
+      <span class="cm"># Only runs when /var/lib/mysql is empty (i.e. the volume is new)</span>
+      - <span class="dg">./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql</span>
 
-    <span class="cm"># Health check — polls mysqladmin to detect when MySQL is actually accepting connections</span>
-    <span class="cm"># MySQL takes 20–40 seconds to initialise on first start</span>
-    <span class="cm"># start_period gives it time before failures start counting against retries</span>
-    <span class="nm">healthcheck:</span>
-      <span class="nm">test:</span> [<span class="dr">"CMD"</span>, <span class="dr">"mysqladmin"</span>, <span class="dr">"ping"</span>, <span class="dr">"-h"</span>, <span class="dr">"localhost"</span>, <span class="dr">"-u"</span>, <span class="dr">"root"</span>, <span class="dr">"-prootsecret"</span>]
-      <span class="nm">interval:</span>     10s
-      <span class="nm">timeout:</span>       5s
-      <span class="nm">retries:</span>        5
-      <span class="nm">start_period:</span> 30s
+    <span class="nm">networks:</span>
+      - appnet
 
     <span class="nm">restart:</span> unless-stopped
 
-<span class="cm"># Declare the named volume used by the mysql service</span>
-<span class="cm"># Without this top-level declaration, docker compose will error</span>
+<span class="cm"># ── NETWORKS ────────────────────────────────────────────────────</span>
+<span class="cm"># Declaring appnet explicitly creates a custom bridge network</span>
+<span class="cm"># All containers on this network can reach each other by service name</span>
+<span class="cm"># Docker's embedded DNS (127.0.0.11) resolves service names to container IPs</span>
+<span class="nm">networks:</span>
+  <span class="dg">appnet:</span>
+    <span class="nm">driver:</span> bridge
+
+<span class="cm"># ── VOLUMES ─────────────────────────────────────────────────────</span>
+<span class="cm"># Top-level declaration required — without this, docker compose errors on startup</span>
+<span class="cm"># Docker manages the actual storage path: /var/lib/docker/volumes/flaskapp_mysql-data/</span>
 <span class="nm">volumes:</span>
   <span class="dg">mysql-data:</span></pre>
         </div>
@@ -412,61 +553,148 @@
 
       <div class="divider"></div>
 
-      <div class="section" id="s-mysql-config">
-        <div class="section-eyebrow">02 — MySQL container</div>
-        <div class="section-title">MySQL container configuration — what each env var does</div>
+      <div class="section" id="s-nginx-conf">
+        <div class="section-eyebrow">03 — Nginx config</div>
+        <div class="section-title">nginx.conf walkthrough — every directive explained</div>
         <p class="section-body">
-          The MySQL official image reads specific environment variables on <b>first start only</b> — when <code>/var/lib/mysql</code> is empty. These create the initial database, user, and set passwords. On every subsequent start, these values are ignored and the existing data is used.
+          This file lives at <code>./nginx/nginx.conf</code> on the host and is mounted read-only into the Nginx container at <code>/etc/nginx/conf.d/default.conf</code>. The Nginx alpine image's main nginx.conf already includes <code>conf.d/*.conf</code> — so this file is automatically loaded.
+        </p>
+        <div class="code-block">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">flaskapp/nginx/nginx.conf</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="nm">server</span> {
+    <span class="cm"># Nginx inside the container listens on port 80</span>
+    <span class="cm"># The docker-compose ports mapping (8082:80) connects host:8082 to this port</span>
+    <span class="nm">listen</span> <span class="dr">80</span>;
+
+    <span class="cm"># Which domain this server block handles</span>
+    <span class="cm"># Matches the Host header from incoming requests</span>
+    <span class="nm">server_name</span> <span class="dg">flask.dustyserver.co.in</span>;
+
+    <span class="cm"># location / matches ALL request paths (/, /api/, /health, etc.)</span>
+    <span class="cm"># Everything is forwarded to Flask — Nginx serves nothing statically here</span>
+    <span class="nm">location</span> / {
+
+        <span class="cm"># proxy_pass — forward the request to Flask</span>
+        <span class="cm"># 'flask' is the Docker Compose service name, resolved by Docker DNS (127.0.0.11)</span>
+        <span class="cm"># Do NOT use localhost — inside this container, localhost = the Nginx container itself</span>
+        <span class="cm"># Do NOT use an IP — Docker assigns IPs dynamically, they change on restarts</span>
+        <span class="nm">proxy_pass</span> http://flask:5000;
+
+        <span class="cm"># Pass the original Host header to Flask</span>
+        <span class="cm"># Without this, Flask sees 'flask:5000' as the host instead of 'flask.dustyserver.co.in'</span>
+        <span class="nm">proxy_set_header</span> Host $host;
+
+        <span class="cm"># Pass the real client IP to Flask</span>
+        <span class="cm"># Without this, Flask sees Nginx's IP (the Nginx container's IP) as the client</span>
+        <span class="nm">proxy_set_header</span> X-Real-IP $remote_addr;
+
+        <span class="cm"># Full chain of IPs the request passed through (Cloudflare → Host Nginx → Nginx container)</span>
+        <span class="cm"># Useful for logging and rate limiting in Flask</span>
+        <span class="nm">proxy_set_header</span> X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        <span class="cm"># Tells Flask whether the original request was HTTP or HTTPS</span>
+        <span class="cm"># Flask uses this to build correct redirect URLs and set secure cookies</span>
+        <span class="nm">proxy_set_header</span> X-Forwarded-Proto $scheme;
+
+        <span class="cm"># Prevent Nginx from rewriting Location headers in Flask redirect responses</span>
+        <span class="cm"># Without this, Nginx may change Flask's redirect target URL</span>
+        <span class="nm">proxy_redirect</span> off;
+
+        <span class="cm"># How long Nginx waits for Flask to send back a response</span>
+        <span class="cm"># 300s is generous — Flask should respond much faster, but long-running</span>
+        <span class="cm"># endpoints (file uploads, slow DB queries) won't time out prematurely</span>
+        <span class="nm">proxy_read_timeout</span> 300s;
+
+        <span class="cm"># How long Nginx waits to finish sending the request body to Flask</span>
+        <span class="nm">proxy_send_timeout</span> 300s;
+    }
+}</pre>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why :ro on the volume mount?</b> The container should never modify its own config — config is always managed from the host. The <code>:ro</code> flag enforces this: any attempt by a process inside the container to write to the file will be rejected by the OS. To apply a config change: edit the file on the host, then <code>docker compose exec nginx-proxy nginx -s reload</code> — no container restart needed.</span>
+        </div>
+        <div class="alert info">
+          <span class="alert-icon">ℹ</span>
+          <span><b>Why /etc/nginx/conf.d/default.conf?</b> The nginx:alpine image's main <code>nginx.conf</code> includes the line <code>include /etc/nginx/conf.d/*.conf;</code>. Any <code>.conf</code> file dropped into <code>conf.d/</code> is automatically loaded. This is the standard pattern — you can add multiple site configs without touching the main nginx.conf.</span>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section" id="s-mysql-config">
+        <div class="section-eyebrow">04 — MySQL container</div>
+        <div class="section-title">MySQL config and automatic schema initialisation</div>
+        <p class="section-body">
+          The MySQL container is initialised on first startup by environment variables and a mounted <code>init.sql</code> script. Both are ignored on subsequent starts when the volume already contains data.
         </p>
         <table class="kv-table">
-          <thead><tr><th>Variable</th><th>Value used</th><th>What it does</th></tr></thead>
+          <thead><tr><th>Variable</th><th>Value</th><th>What it does</th></tr></thead>
           <tbody>
             <tr>
               <td class="key">MYSQL_ROOT_PASSWORD</td>
               <td class="val"><code>rootsecret</code></td>
-              <td class="desc">Sets the root user password. Required — MySQL won't start without it. Used in the healthcheck command.</td>
+              <td class="desc">Sets the root user password. Required — MySQL won't start without it.</td>
             </tr>
             <tr>
               <td class="key">MYSQL_DATABASE</td>
               <td class="val"><code>flaskdb</code></td>
-              <td class="desc">Creates this database on first start. Must match DB_NAME in the flask-app environment.</td>
+              <td class="desc">Creates this database on first start. Must match MYSQL_DATABASE in the Flask environment.</td>
             </tr>
             <tr>
               <td class="key">MYSQL_USER</td>
               <td class="val"><code>flaskuser</code></td>
-              <td class="desc">Creates this user with full privileges on MYSQL_DATABASE. Flask connects as this user — not root.</td>
+              <td class="desc">Creates this user with full privileges on MYSQL_DATABASE. Flask connects as this user.</td>
             </tr>
             <tr>
               <td class="key">MYSQL_PASSWORD</td>
               <td class="val"><code>flaskpass</code></td>
-              <td class="desc">Password for MYSQL_USER. Must match DB_PASSWORD in the flask-app environment.</td>
+              <td class="desc">Password for MYSQL_USER. Must match MYSQL_PASSWORD in the Flask environment.</td>
             </tr>
           </tbody>
         </table>
+        <div class="code-block" style="margin-top:1rem;">
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">flaskapp/mysql/init.sql — auto-run on first startup</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <pre><span class="cm">-- This file is mounted at /docker-entrypoint-initdb.d/init.sql</span>
+<span class="cm">-- MySQL auto-runs it on first startup, after creating the database and user</span>
+<span class="cm">-- On subsequent starts (volume already has data), this file is ignored</span>
+
+<span class="nm">USE</span> flaskdb;
+
+<span class="nm">CREATE TABLE IF NOT EXISTS</span> items (
+    id       INT AUTO_INCREMENT <span class="nm">PRIMARY KEY</span>,
+    name     VARCHAR(100) <span class="nm">NOT NULL</span>,
+    created  TIMESTAMP <span class="nm">DEFAULT</span> CURRENT_TIMESTAMP
+);
+
+<span class="cm">-- Seed some initial data</span>
+<span class="nm">INSERT INTO</span> items (name) <span class="nm">VALUES</span>
+    (<span class="dr">'first item'</span>),
+    (<span class="dr">'second item'</span>);</pre>
+        </div>
         <div class="alert warn">
           <span class="alert-icon">⚠</span>
-          <span>MySQL only initialises from these env vars when <code>/var/lib/mysql</code> is empty — i.e. when the <code>mysql-data</code> volume is new or has been deleted. If you change these values after the stack has run once, the changes have no effect. To apply new credentials, run <code>docker compose down -v</code> to wipe the volume, then <code>docker compose up -d</code> to reinitialise. This deletes all data.</span>
+          <span>MySQL only reads environment variables and runs init.sql when <code>/var/lib/mysql</code> is empty — i.e. when <code>mysql-data</code> is a new or wiped volume. If you change env vars or init.sql after the stack has run once, the changes have no effect. To apply them: <code>docker compose down -v</code> to delete the volume, then <code>docker compose up -d</code>. This permanently deletes all data.</span>
         </div>
       </div>
 
       <div class="divider"></div>
 
       <div class="section" id="s-flask-config">
-        <div class="section-eyebrow">03 — Flask container</div>
-        <div class="section-title">Flask container configuration — connector and connection string</div>
+        <div class="section-eyebrow">05 — Flask container</div>
+        <div class="section-title">Flask container — Dockerfile and DB connection</div>
         <p class="section-body">
-          The Flask container is built from the project's Dockerfile using <code>python:3.11-slim</code> as the base image. The key configuration decisions that affect the DB connection:
+          The Flask image is built from the local Dockerfile. The key connector choice and how Flask reads its DB config from environment variables:
         </p>
         <div class="code-block">
-          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">requirements.txt — the connector that matters</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">requirements.txt</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
           <pre>Flask
 mysql-connector-python
-<span class="cm"># mysql-connector-python — pure Python, no system dependencies, installs cleanly</span>
-<span class="cm"># mysqlclient — C extension, requires pkg-config + libmysqlclient-dev in the image</span>
-<span class="cm">#               python:3.11-slim does not include these → build fails at pip install</span></pre>
+<span class="cm"># mysql-connector-python — pure Python, no system dependencies, installs cleanly in python:slim</span>
+<span class="cm"># mysqlclient — C extension, requires pkg-config + libmysqlclient-dev → build fails in slim images</span></pre>
         </div>
         <div class="code-block">
-          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">app.py — how Flask reads the DB config</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">app.py — DB config from environment variables</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
           <pre>import os
 import mysql.connector
 from flask import Flask, jsonify
@@ -474,16 +702,14 @@ from flask import Flask, jsonify
 app = Flask(__name__)
 
 DB_CONFIG = {
-    'host':     os.environ.get('DB_HOST',     'localhost'),
-    'port':     int(os.environ.get('DB_PORT', '3306')),
-    'database': os.environ.get('DB_NAME',     'flaskdb'),
-    'user':     os.environ.get('DB_USER',     'flaskuser'),
-    'password': os.environ.get('DB_PASSWORD', ''),
+    <span class="cm"># MYSQL_HOST is set to 'mysql' in docker-compose.yml</span>
+    <span class="cm"># Docker DNS on appnet resolves 'mysql' to the MySQL container's IP</span>
+    'host':     os.environ.get('MYSQL_HOST',     'localhost'),
+    'port':     3306,
+    'database': os.environ.get('MYSQL_DATABASE', 'flaskdb'),
+    'user':     os.environ.get('MYSQL_USER',     'flaskuser'),
+    'password': os.environ.get('MYSQL_PASSWORD', ''),
 }
-
-<span class="cm"># DB_HOST is set to 'mysql' in docker-compose.yml</span>
-<span class="cm"># Compose DNS resolves 'mysql' to the MySQL container's internal IP</span>
-<span class="cm"># This is why Flask doesn't use localhost or a hardcoded IP</span>
 
 @app.route('/health')
 def health():
@@ -496,91 +722,16 @@ def health():
 
 if __name__ == '__main__':
     <span class="cm"># 0.0.0.0 — listen on all interfaces inside the container</span>
-    <span class="cm"># Without this, Flask binds to 127.0.0.1 and is unreachable from outside</span>
+    <span class="cm"># Required for the expose + Docker network to work correctly</span>
     app.run(host='0.0.0.0', port=5000, debug=False)</pre>
         </div>
       </div>
 
       <div class="divider"></div>
 
-      <div class="section" id="s-nginx">
-        <div class="section-eyebrow">04 — Nginx</div>
-        <div class="section-title">Nginx server block for Flask — every line explained</div>
-        <p class="section-body">
-          Nginx is installed on the host OS (not in Docker). This server block tells Nginx: when a request arrives for <code>dustyserver.co.in</code>, forward it to Flask running on localhost:5000. Certbot adds the HTTPS blocks automatically after running <code>certbot --nginx</code>.
-        </p>
-        <div class="code-block">
-          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">/etc/nginx/sites-available/dustyserver</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
-          <pre><span class="cm"># HTTP block — Certbot will redirect this to HTTPS after running certbot --nginx</span>
-<span class="nm">server</span> {
-    <span class="nm">listen</span> <span class="dr">80</span>;
-    <span class="nm">server_name</span> <span class="dg">dustyserver.co.in</span>;
-
-    <span class="cm"># All HTTP traffic → HTTPS (added by Certbot)</span>
-    <span class="nm">return</span> <span class="dr">301</span> https://$host$request_uri;
-}
-
-<span class="cm"># HTTPS block — handles all inbound traffic for the domain</span>
-<span class="nm">server</span> {
-    <span class="nm">listen</span> <span class="dr">443 ssl</span>;
-    <span class="nm">server_name</span> <span class="dg">dustyserver.co.in</span>;
-
-    <span class="cm"># SSL certificate managed by Certbot — auto-renewed every 90 days</span>
-    <span class="nm">ssl_certificate</span>     /etc/letsencrypt/live/dustyserver.co.in/fullchain.pem;
-    <span class="nm">ssl_certificate_key</span> /etc/letsencrypt/live/dustyserver.co.in/privkey.pem;
-    <span class="nm">include</span>             /etc/letsencrypt/options-ssl-nginx.conf;
-    <span class="nm">ssl_dhparam</span>         /etc/letsencrypt/ssl-dhparams.pem;
-
-    <span class="cm"># location / matches all requests — nothing is served statically by Nginx here</span>
-    <span class="nm">location</span> / {
-        <span class="cm"># proxy_pass — forward the request to Flask on the host at port 5000</span>
-        <span class="cm"># 127.0.0.1:5000 is where Docker maps the flask-app container's port 5000</span>
-        <span class="cm"># Do NOT use the container's internal port — Nginx is on the host, not in Docker</span>
-        <span class="nm">proxy_pass</span> http://127.0.0.1:5000;
-
-        <span class="cm"># Pass the real Host header so Flask knows which domain was requested</span>
-        <span class="nm">proxy_set_header</span> Host $host;
-
-        <span class="cm"># Pass the client's real IP — without this, Flask sees Nginx's IP (127.0.0.1) as the client</span>
-        <span class="nm">proxy_set_header</span> X-Real-IP $remote_addr;
-
-        <span class="cm"># Tells Flask the original request was HTTPS, even though Nginx → Flask is HTTP</span>
-        <span class="nm">proxy_set_header</span> X-Forwarded-Proto $scheme;
-
-        <span class="cm"># Pass the full chain of IPs if there are multiple proxies (Cloudflare → Nginx → Flask)</span>
-        <span class="nm">proxy_set_header</span> X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}</pre>
-        </div>
-        <div class="alert warn">
-          <span class="alert-icon">⚠</span>
-          <span><b>proxy_pass must use the host port, not the container port.</b> Nginx runs on the host OS. The Docker Compose file maps Flask's internal port 5000 to host port 5000. Nginx proxies to <code>127.0.0.1:5000</code> — the host port. If Flask were mapped to host port 8000 instead, proxy_pass would need to be <code>http://127.0.0.1:8000</code>. Nginx cannot reach the container's internal IP directly.</span>
-        </div>
-        <div class="code-block" style="margin-top:1rem;">
-          <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — enable the config and get HTTPS</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
-          <pre><span class="cm"># Enable the config by creating a symlink in sites-enabled</span>
-<span class="nm">sudo ln -s</span> /etc/nginx/sites-available/dustyserver /etc/nginx/sites-enabled/
-
-<span class="cm"># Test the config for syntax errors before reloading</span>
-<span class="nm">sudo nginx -t</span>
-<span class="cm"># nginx: configuration file /etc/nginx/nginx.conf test is successful</span>
-
-<span class="cm"># Reload Nginx to apply the new server block</span>
-<span class="nm">sudo systemctl reload nginx</span>
-
-<span class="cm"># Run Certbot — it detects the server_name, gets a certificate, and rewrites the config</span>
-<span class="nm">sudo certbot --nginx -d dustyserver.co.in</span>
-<span class="cm"># Follow prompts — Certbot adds the ssl_certificate lines and HTTP redirect automatically</span>
-<span class="cm"># Certificate stored at: /etc/letsencrypt/live/dustyserver.co.in/</span>
-<span class="cm"># Auto-renewal via systemd timer: systemctl status certbot.timer</span></pre>
-        </div>
-      </div>
-
-      <div class="divider"></div>
-
       <div class="section" id="s-start">
-        <div class="section-eyebrow">05 — Start</div>
-        <div class="section-title">Step 1 — Start the stack</div>
+        <div class="section-eyebrow">06 — Start</div>
+        <div class="section-title">Starting the stack</div>
         <div class="step-card">
           <div class="step-header" onclick="toggleStep(this)">
             <div class="step-num done">1</div>
@@ -588,25 +739,29 @@ if __name__ == '__main__':
             <div class="step-toggle">▼</div>
           </div>
           <div class="step-body">
-            <p class="step-why">Run from the <code>spserver-flask/</code> directory. The first run builds the Flask image, pulls <code>mysql:8.0</code>, creates the volume and network, starts MySQL, waits for it to pass the healthcheck, then starts Flask. On a fresh system this takes 60–90 seconds.</p>
+            <p class="step-why">Run from <code>/home/sipu/projects/flaskapp/</code>. The first run builds the Flask image, pulls nginx:alpine and mysql:8.0, creates the appnet network and mysql-data volume, starts MySQL, then starts Flask and Nginx. MySQL initialisation takes 20–40 seconds on first start.</p>
             <div class="code-block">
-              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run from spserver-flask/</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
-              <pre><span class="cm"># Build flask-app image and start both services</span>
+              <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash — run from flaskapp/</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
+              <pre><span class="cm"># Build flask image and start all 3 containers in background</span>
 <span class="nm">docker compose up -d --build</span>
 
-<span class="cm"># Watch status — wait for mysql to become (healthy)</span>
+<span class="cm"># Check status of all services</span>
 <span class="nm">docker compose ps</span>
-<span class="cm"># NAME                            STATUS</span>
-<span class="cm"># spserver-flask-mysql-1      Up (healthy)      ← wait for this</span>
-<span class="cm"># spserver-flask-flask-app-1  Up</span>
+<span class="cm"># NAME           IMAGE          STATUS</span>
+<span class="cm"># nginx-proxy    nginx:alpine   Up</span>
+<span class="cm"># flaskapp-flask custom         Up</span>
+<span class="cm"># flaskapp-mysql mysql:8.0      Up</span>
 
-<span class="cm"># Follow startup logs from both services</span>
+<span class="cm"># Follow startup logs from all services</span>
 <span class="nm">docker compose logs -f</span>
-<span class="cm"># Ctrl+C stops following — does NOT stop the containers</span></pre>
+<span class="cm"># Ctrl+C stops following — does NOT stop the containers</span>
+
+<span class="cm"># Watch MySQL logs to confirm it finished initialising</span>
+<span class="nm">docker compose logs mysql | grep "ready for connections"</span></pre>
             </div>
             <div class="alert info">
               <span class="alert-icon">ℹ</span>
-              <span>On the very first start, MySQL initialisation takes 20–40 seconds before the healthcheck can pass. During this time, <code>docker compose ps</code> shows mysql as "Up (health: starting)". Flask won't start until the healthcheck passes — this is correct behaviour, not a hang.</span>
+              <span>On first start, MySQL initialisation takes 20–40 seconds. Flask may start before MySQL is ready and crash with a connection error — just restart Flask: <code>docker compose restart flask</code>. The healthcheck-based depends_on pattern was not used here — see Blockers tab for this and how to add it.</span>
             </div>
           </div>
         </div>
@@ -615,67 +770,56 @@ if __name__ == '__main__':
       <div class="divider"></div>
 
       <div class="section" id="s-verify">
-        <div class="section-eyebrow">06 — Verify</div>
-        <div class="section-title">Step 2 — Verify the stack is working</div>
+        <div class="section-eyebrow">07 — Verify</div>
+        <div class="section-title">Verifying each layer of the stack</div>
         <div class="step-card">
           <div class="step-header" onclick="toggleStep(this)">
             <div class="step-num done">2</div>
-            <div class="step-title">Test endpoints and inspect MySQL</div>
+            <div class="step-title">Test each layer from the outside in</div>
             <div class="step-toggle">▼</div>
           </div>
           <div class="step-body">
             <div class="code-block">
               <div class="code-header"><div class="code-dots"><div class="code-dot cd-r"></div><div class="code-dot cd-y"></div><div class="code-dot cd-g"></div></div><div class="code-filename">bash</div><button class="code-copy" onclick="copyCode(this)">copy</button></div>
-              <pre><span class="cm"># ── Layer 1: Flask container directly ──</span>
-<span class="nm">curl http://localhost:5000/</span>
-<span class="cm"># {"service": "spserver-flask", "status": "ok"}</span>
+              <pre><span class="cm"># ── Layer 1: Nginx container reachable from host ──</span>
+<span class="nm">curl http://localhost:8082/</span>
+<span class="cm"># Flask response — confirms host:8082 → Nginx container → Flask is working</span>
 
-<span class="cm"># Confirm Flask can reach MySQL</span>
-<span class="nm">curl http://localhost:5000/health</span>
+<span class="cm"># ── Layer 2: Full stack via domain ──</span>
+<span class="nm">curl https://flask.dustyserver.co.in/</span>
+<span class="cm"># Browser-equivalent test: confirms Host Nginx → Nginx container → Flask</span>
+
+<span class="nm">curl https://flask.dustyserver.co.in/health</span>
+<span class="cm"># {"db": "reachable", "status": "ok"} ← full stack: Nginx→Flask→MySQL verified</span>
+
+<span class="cm"># ── Layer 3: Flask internal ──</span>
+<span class="cm"># Flask has no host port mapping (expose only), so test via docker exec</span>
+<span class="nm">docker compose exec flask</span> curl http://localhost:5000/health
 <span class="cm"># {"db": "reachable", "status": "ok"}</span>
 
-<span class="cm"># ── Layer 2: Nginx proxy → Flask ──</span>
-<span class="cm"># Nginx should proxy this to Flask on localhost:5000</span>
-<span class="nm">curl -I http://dustyserver.co.in/</span>
-<span class="cm"># HTTP/1.1 301 — redirecting to HTTPS (Certbot redirect block is working)</span>
-
-<span class="cm"># ── Layer 3: Full HTTPS stack via domain ──</span>
-<span class="nm">curl https://dustyserver.co.in/</span>
-<span class="cm"># {"service": "spserver-flask", "status": "ok"}</span>
-
-<span class="nm">curl https://dustyserver.co.in/health</span>
-<span class="cm"># {"db": "reachable", "status": "ok"} ← full stack verified: Browser→Nginx→Flask→MySQL</span>
-
-<span class="cm"># From another machine on the LAN</span>
-<span class="nm">curl http://192.168.31.150:5000/health</span>
-
-<span class="cm"># Open a MySQL shell inside the running MySQL container</span>
+<span class="cm"># ── Layer 4: MySQL shell ──</span>
 <span class="nm">docker compose exec mysql</span> mysql -u flaskuser -pflaskpass flaskdb
 <span class="cm"># mysql> SHOW TABLES;</span>
 <span class="cm"># mysql> SELECT * FROM items;</span>
-<span class="cm"># mysql> EXIT;</span>
 
-<span class="cm"># Open a MySQL shell as root (useful for admin tasks)</span>
-<span class="nm">docker compose exec mysql</span> mysql -u root -prootsecret
-<span class="cm"># mysql> SHOW DATABASES;</span>
-<span class="cm"># mysql> USE flaskdb; SHOW TABLES;</span>
-
-<span class="cm"># Check environment variables inside the Flask container</span>
-<span class="nm">docker compose exec flask-app env | grep DB_</span>
-<span class="cm"># DB_HOST=mysql</span>
-<span class="cm"># DB_PORT=3306</span>
-<span class="cm"># DB_NAME=flaskdb</span>
-<span class="cm"># DB_USER=flaskuser</span>
-<span class="cm"># DB_PASSWORD=flaskpass</span>
-
-<span class="cm"># Confirm Flask can resolve the MySQL service name via Compose DNS</span>
-<span class="nm">docker compose exec flask-app</span> python -c \
+<span class="cm"># ── Layer 5: DNS resolution on appnet ──</span>
+<span class="nm">docker compose exec flask</span> python -c \
   "import socket; print(socket.gethostbyname('mysql'))"
-<span class="cm"># 172.18.0.x  ← MySQL container's IP on the Docker bridge network</span></pre>
+<span class="cm"># 172.20.0.x  ← MySQL container's IP on appnet</span>
+
+<span class="nm">docker compose exec nginx-proxy</span> wget -qO- http://flask:5000/health
+<span class="cm"># {"db": "reachable", "status": "ok"} ← Nginx container reaching Flask by service name</span>
+
+<span class="cm"># ── Layer 6: Confirm Flask has no host port ──</span>
+<span class="nm">docker compose port flask 5000</span>
+<span class="cm"># (no output) ← expose only, no host port mapping</span>
+
+<span class="nm">curl http://localhost:5000/</span>
+<span class="cm"># curl: (7) Failed to connect — correct, Flask not reachable from host</span></pre>
             </div>
             <div class="alert success">
               <span class="alert-icon">✓</span>
-              <span>If <code>/health</code> returns <code>"db": "reachable"</code> and the MySQL shell connects successfully — the full stack is working. Flask is containerised, MySQL is containerised, they communicate by service name, and MySQL data persists in the named volume.</span>
+              <span>Stack is fully working when: <code>localhost:8082</code> returns Flask response, <code>/health</code> via domain returns <code>"db": "reachable"</code>, Flask has no host port, and MySQL is only reachable via <code>docker compose exec</code>.</span>
             </div>
           </div>
         </div>
@@ -692,44 +836,44 @@ if __name__ == '__main__':
         <div class="lifecycle-grid">
           <div class="lc-card">
             <div class="lc-cmd">docker compose up -d --build</div>
-            <div class="lc-desc">Build flask-app image and start all services in background. Use after any code or Dockerfile change.</div>
+            <div class="lc-desc">Build Flask image and start all 3 containers. Use after any code or Dockerfile change.</div>
           </div>
           <div class="lc-card">
             <div class="lc-cmd">docker compose up -d</div>
-            <div class="lc-desc">Start the stack using the existing image. Use after a reboot or when nothing has changed.</div>
+            <div class="lc-desc">Start the stack using existing images. Use after a reboot or when nothing has changed.</div>
           </div>
           <div class="lc-card">
             <div class="lc-cmd">docker compose down</div>
-            <div class="lc-desc">Stop and remove containers and network. Volume is kept — MySQL data survives.</div>
+            <div class="lc-desc">Stop and remove containers and network. mysql-data volume is kept — data survives.</div>
           </div>
           <div class="lc-card">
             <div class="lc-cmd">docker compose down -v</div>
             <div class="lc-desc">Stop, remove containers, network, and all named volumes.</div>
-            <div class="lc-warn">⚠ Deletes all MySQL data permanently</div>
+            <div class="lc-warn">⚠ Permanently deletes all MySQL data</div>
           </div>
           <div class="lc-card">
-            <div class="lc-cmd">docker compose restart flask-app</div>
-            <div class="lc-desc">Restart only the Flask container. MySQL keeps running — data and connections unaffected.</div>
+            <div class="lc-cmd">docker compose restart flask</div>
+            <div class="lc-desc">Restart only Flask. Nginx and MySQL keep running — useful when Flask crashes on startup.</div>
           </div>
           <div class="lc-card">
-            <div class="lc-cmd">docker compose stop</div>
-            <div class="lc-desc">Stop all containers without removing them. Resume with <code>docker compose start</code>.</div>
+            <div class="lc-cmd">docker compose restart nginx</div>
+            <div class="lc-desc">Restart the Nginx container. Use after nginx.conf changes if reload isn't enough.</div>
           </div>
           <div class="lc-card">
             <div class="lc-cmd">docker compose ps</div>
-            <div class="lc-desc">Show status of all services. MySQL should show <code>(healthy)</code> when fully ready.</div>
+            <div class="lc-desc">Show status of all 3 services. All should show "Up".</div>
           </div>
           <div class="lc-card">
             <div class="lc-cmd">docker compose logs -f</div>
-            <div class="lc-desc">Follow logs from all services live. Ctrl+C stops following — does not stop containers.</div>
+            <div class="lc-desc">Follow logs from all 3 services live. Ctrl+C stops following — does not stop containers.</div>
           </div>
           <div class="lc-card">
-            <div class="lc-cmd">docker compose logs -f flask-app</div>
-            <div class="lc-desc">Follow logs from Flask only — requests, errors, print statements.</div>
+            <div class="lc-cmd">docker compose logs -f flask</div>
+            <div class="lc-desc">Follow Flask logs only — requests, errors, print statements from app.py.</div>
           </div>
           <div class="lc-card">
             <div class="lc-cmd">docker compose logs --tail=100 mysql</div>
-            <div class="lc-desc">Show last 100 lines of MySQL logs — useful for diagnosing startup issues.</div>
+            <div class="lc-desc">Last 100 lines of MySQL logs — useful for diagnosing startup or query issues.</div>
           </div>
         </div>
       </div>
@@ -740,15 +884,18 @@ if __name__ == '__main__':
         <div class="section-eyebrow">02 — Inspect &amp; debug</div>
         <div class="section-title">Inspecting the running stack</div>
         <div class="cmd-list">
-          <div class="cmd-row"><div class="cmd-code">docker compose exec mysql mysql -u flaskuser -pflaskpass flaskdb</div><div class="cmd-desc">Open MySQL shell as flaskuser — inspect tables, run queries, verify data</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec mysql mysql -u flaskuser -pflaskpass flaskdb</div><div class="cmd-desc">Open MySQL shell as flaskuser — inspect tables, run queries, verify data and schema</div></div>
           <div class="cmd-row"><div class="cmd-code">docker compose exec mysql mysql -u root -prootsecret</div><div class="cmd-desc">Open MySQL shell as root — full admin access, show all databases and users</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app /bin/bash</div><div class="cmd-desc">Open a shell inside the Flask container — inspect filesystem, check installed packages, test imports</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app env | grep DB_</div><div class="cmd-desc">Print DB environment variables inside the Flask container — verify values match the compose file</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker compose exec flask-app ping -c 3 mysql</div><div class="cmd-desc">Ping MySQL by service name from inside Flask — confirms Compose DNS is resolving correctly</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker volume inspect spserver-flask_mysql-data</div><div class="cmd-desc">Show metadata for the named volume — host path, creation date, driver</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker volume ls</div><div class="cmd-desc">List all Docker volumes — confirm mysql-data exists</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker stats</div><div class="cmd-desc">Live CPU and memory usage for all running containers — useful for spotting resource issues</div></div>
-          <div class="cmd-row"><div class="cmd-code">docker compose config</div><div class="cmd-desc">Print the resolved docker-compose.yml — confirms env var substitution and merge of any override files</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask /bin/sh</div><div class="cmd-desc">Open a shell inside the Flask container — inspect filesystem, test imports, check env vars</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec flask env | grep MYSQL</div><div class="cmd-desc">Print MySQL env vars inside Flask — verify they match docker-compose.yml</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec nginx-proxy nginx -t</div><div class="cmd-desc">Test Nginx config for syntax errors inside the container — always run before reloading</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec nginx-proxy nginx -s reload</div><div class="cmd-desc">Reload Nginx config without restarting the container — apply nginx.conf changes</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose exec nginx-proxy cat /etc/nginx/conf.d/default.conf</div><div class="cmd-desc">Confirm the mounted nginx.conf is visible inside the container with the expected content</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker network inspect flaskapp_appnet</div><div class="cmd-desc">Show details of the appnet network — which containers are on it and their internal IPs</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker volume inspect flaskapp_mysql-data</div><div class="cmd-desc">Show metadata for the named volume — host path, creation date, driver</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose port nginx 80</div><div class="cmd-desc">Show host port mapping for Nginx container port 80 — should return 0.0.0.0:8082</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker compose port flask 5000</div><div class="cmd-desc">Check if Flask has a host port mapping — should return nothing (expose only)</div></div>
+          <div class="cmd-row"><div class="cmd-code">docker stats</div><div class="cmd-desc">Live CPU and memory usage for all running containers</div></div>
         </div>
       </div>
 
@@ -759,20 +906,20 @@ if __name__ == '__main__':
 
       <div class="section" id="b-list">
         <div class="section-eyebrow">01 — What went wrong</div>
-        <div class="section-title">Blockers hit while running the Flask + MySQL stack</div>
+        <div class="section-title">Blockers hit while building the stack</div>
 
         <div class="blocker-banner">
           <div class="bb-label">⚠ Blocker 1</div>
           <div class="bb-title">Flask crashed on first startup — "Can't connect to MySQL server on 'mysql'"</div>
           <div class="bb-body">
-            The first time the stack was started, Flask came up before MySQL finished initialising. Even with <code>depends_on</code>, Flask started and immediately tried to connect to MySQL — which was still running its first-time setup (creating the database, user, and tables). The connection attempt failed and Flask exited with a MySQL connection error.
+            The first time the stack was started, Flask came up before MySQL finished initialising. <code>depends_on: mysql</code> only waits for the MySQL container to start — not for MySQL to finish its first-time database setup (creating the database, user, and running init.sql). Flask started, immediately tried to connect, got a connection refused, and exited.
           </div>
         </div>
         <div class="fix-banner">
           <div class="fb-label">✓ Fix</div>
-          <div class="fb-title">Restart the Flask container once MySQL is healthy — then add a healthcheck</div>
+          <div class="fb-title">Wait for MySQL logs to show "ready for connections", then restart Flask</div>
           <div class="fb-body">
-            Short-term fix: waited for <code>docker compose ps</code> to show MySQL as <code>(healthy)</code>, then ran <code>docker compose restart flask-app</code>. Flask connected successfully on the second attempt. Long-term fix: added the <code>healthcheck</code> block to the MySQL service and changed <code>depends_on</code> to use <code>condition: service_healthy</code>. Now Compose waits until MySQL passes the healthcheck before starting Flask — the crash on first boot no longer happens.
+            Short-term fix: <code>docker compose logs -f mysql</code> — wait for "ready for connections" to appear, then <code>docker compose restart flask</code>. Flask connected successfully on the second attempt. A permanent fix is to add a <code>healthcheck</code> block to the mysql service and change <code>depends_on</code> to <code>condition: service_healthy</code> — Compose then waits for MySQL to pass the healthcheck before starting Flask.
           </div>
         </div>
 
@@ -780,29 +927,29 @@ if __name__ == '__main__':
           <div class="bb-label">⚠ Blocker 2</div>
           <div class="bb-title">pip install failed during build — mysqlclient gcc compilation error</div>
           <div class="bb-body">
-            The initial <code>requirements.txt</code> included <code>mysqlclient</code>. The Docker build failed at <code>RUN pip install -r requirements.txt</code> with a long gcc compiler error: <code>mysql_config not found</code> and <code>EnvironmentError: mysql_config not found</code>. The <code>python:3.11-slim</code> base image doesn't include <code>pkg-config</code> or <code>libmysqlclient-dev</code>.
+            The initial <code>requirements.txt</code> had <code>mysqlclient</code>. The Docker build failed at <code>RUN pip install -r requirements.txt</code> with a gcc compiler error: <code>mysql_config not found</code>. The <code>python:3.11-slim</code> base image doesn't include <code>pkg-config</code> or <code>libmysqlclient-dev</code>.
           </div>
         </div>
         <div class="fix-banner">
           <div class="fb-label">✓ Fix</div>
-          <div class="fb-title">Replace mysqlclient with mysql-connector-python in requirements.txt</div>
+          <div class="fb-title">Replace mysqlclient with mysql-connector-python</div>
           <div class="fb-body">
-            Replaced <code>mysqlclient</code> with <code>mysql-connector-python</code> in <code>requirements.txt</code>. This is a pure-Python MySQL driver that compiles nothing — it installs in the slim image without any system dependencies. The Python API is slightly different (<code>import mysql.connector</code> instead of <code>import MySQLdb</code>) but fully featured for our use case. Rebuilt the image and the pip install completed cleanly.
+            Replaced <code>mysqlclient</code> with <code>mysql-connector-python</code> in <code>requirements.txt</code>. This is a pure-Python MySQL driver — no C compilation, no system dependencies, installs cleanly in slim images. The API is slightly different (<code>import mysql.connector</code> vs <code>import MySQLdb</code>) but fully featured. Rebuilt the image and pip install completed without errors.
           </div>
         </div>
 
         <div class="blocker-banner" style="margin-top:1.5rem;">
           <div class="bb-label">⚠ Blocker 3</div>
-          <div class="bb-title">MySQL data wiped unexpectedly — docker compose down -v used by mistake</div>
+          <div class="bb-title">MySQL data wiped — docker compose down -v used by mistake</div>
           <div class="bb-body">
-            During a troubleshooting session, ran <code>docker compose down -v</code> intending to just restart cleanly. This deleted the <code>mysql-data</code> volume — all tables and data were gone. The stack restarted with a completely empty database.
+            During a troubleshooting session, ran <code>docker compose down -v</code> intending to restart cleanly. The <code>-v</code> flag deleted the <code>mysql-data</code> volume — all tables and data were gone. The stack restarted with an empty database.
           </div>
         </div>
         <div class="fix-banner">
           <div class="fb-label">✓ Fix</div>
-          <div class="fb-title">Use docker compose down (without -v) for normal restarts</div>
+          <div class="fb-title">Use docker compose down (no -v) for normal restarts</div>
           <div class="fb-body">
-            The <code>-v</code> flag is a destructive operation — it should only be used intentionally when a full database reset is desired. For all normal stop/start cycles, use plain <code>docker compose down</code>. To verify the volume exists before starting: <code>docker volume ls | grep mysql-data</code>. Set up a <code>.aliases</code> or just always double-check the command before running it. In dev, losing data is inconvenient — in production, it would be catastrophic.
+            Plain <code>docker compose down</code> stops containers and removes the network but leaves volumes untouched. Only use <code>-v</code> intentionally when a full DB reset is needed. Before any <code>down</code> command, verify: <code>docker volume ls | grep mysql-data</code>. In this stack, init.sql re-creates the schema on the next start after a volume wipe — but any data inserted since initial setup is gone permanently.
           </div>
         </div>
 
@@ -810,14 +957,14 @@ if __name__ == '__main__':
           <div class="bb-label">⚠ Blocker 4</div>
           <div class="bb-title">.bashrc alias for "free" caused division-by-zero error in MOTD on SSH login</div>
           <div class="bb-body">
-            After adding a custom alias for <code>free</code> in <code>.bashrc</code> (to format the output differently), SSH logins started showing a Python traceback in the MOTD: <code>ZeroDivisionError: integer division or modulo by zero</code>. The MOTD script was calling <code>free</code> expecting standard output, but the alias was intercepting the call and returning reformatted output that the script couldn't parse.
+            After adding a custom alias for <code>free</code> in <code>.bashrc</code>, SSH logins started showing a Python traceback in the MOTD: <code>ZeroDivisionError: integer division or modulo by zero</code>. The MOTD script called <code>free</code> expecting standard output, but the alias intercepted the call and returned reformatted output the script couldn't parse.
           </div>
         </div>
         <div class="fix-banner">
           <div class="fb-label">✓ Fix</div>
-          <div class="fb-title">Use /usr/bin/free explicitly in scripts — aliases don't apply to non-interactive shells</div>
+          <div class="fb-title">Use /usr/bin/free in scripts — rename the alias to avoid shadowing the system command</div>
           <div class="fb-body">
-            The MOTD script was using <code>free</code> expecting the standard GNU coreutils output. The alias was only intended for interactive terminal use but it was overriding the command globally. Fix: changed the alias in <code>.bashrc</code> to use a different name (e.g. <code>alias freeh='free -h'</code>) instead of overriding <code>free</code> directly. Also updated any custom scripts to call <code>/usr/bin/free</code> with the full path — full paths bypass aliases. Aliases are not expanded in non-interactive shells, but the MOTD was calling <code>free</code> in a context where the alias was active.
+            Changed the alias name from <code>free</code> to <code>freeh</code> so it no longer shadows the system command. Updated any custom scripts that called <code>free</code> to use the full path <code>/usr/bin/free</code> — full paths bypass aliases entirely. Aliases are expanded in interactive shells but using the full path is more explicit and unambiguous in scripts.
           </div>
         </div>
 
@@ -828,56 +975,51 @@ if __name__ == '__main__':
     <div class="tab-pane" id="pane-troubleshoot">
       <div class="section" id="t-list">
         <div class="section-eyebrow">01 — Issues and fixes</div>
-        <div class="section-title">Common Flask + MySQL stack problems and fixes</div>
+        <div class="section-title">Common problems and fixes</div>
 
         <div class="ts-card danger">
           <div class="ts-title">Flask exits on startup — MySQL connection refused</div>
-          <div class="ts-body">MySQL isn't ready yet. Check: (1) <code>docker compose ps</code> — does MySQL show <code>(healthy)</code>? If it shows "starting", wait and check again. (2) <code>docker compose logs mysql</code> — look for "ready for connections" or "mysqld: ready for connections". (3) Once MySQL is healthy, run <code>docker compose restart flask-app</code>. Permanent fix: add a healthcheck to the mysql service and use <code>condition: service_healthy</code> in depends_on — Compose will then wait for MySQL readiness before starting Flask.</div>
+          <div class="ts-body">MySQL isn't ready yet. <code>depends_on</code> only waits for the container to start, not for MySQL to finish initialising. Fix: (1) <code>docker compose logs mysql | grep "ready for connections"</code> — wait for this message. (2) Once MySQL is ready: <code>docker compose restart flask</code>. Permanent fix: add a healthcheck to the mysql service and use <code>condition: service_healthy</code> in depends_on — Compose then waits for MySQL readiness before starting Flask.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">Nginx 502 Bad Gateway — proxy_pass http://flask:5000 failing</div>
+          <div class="ts-body">Nginx can't reach Flask. Check: (1) Is Flask running? <code>docker compose ps</code> — flask should show "Up". (2) Are both containers on appnet? <code>docker network inspect flaskapp_appnet</code> — both should be listed. (3) Test DNS from inside Nginx: <code>docker compose exec nginx-proxy wget -qO- http://flask:5000/health</code>. (4) Check Nginx logs: <code>docker compose logs nginx</code>. If DNS fails, both services must declare <code>networks: appnet</code> in docker-compose.yml.</div>
+        </div>
+
+        <div class="ts-card danger">
+          <div class="ts-title">proxy_pass http://localhost:5000 not working in nginx.conf</div>
+          <div class="ts-body"><code>localhost</code> inside the Nginx container refers to the Nginx container itself — not the Flask container. Flask is on a separate container. <code>proxy_pass</code> must use the service name: <code>proxy_pass http://flask:5000;</code>. Docker DNS resolves <code>flask</code> to the Flask container's IP on appnet. This is the most common Nginx container misconfiguration.</div>
         </div>
 
         <div class="ts-card danger">
           <div class="ts-title">Flask can't reach MySQL — "Unknown MySQL server host 'mysql'"</div>
-          <div class="ts-body">Compose DNS isn't resolving the service name. Check: (1) Is <code>DB_HOST</code> set to <code>mysql</code> (the exact service name in docker-compose.yml)? Verify: <code>docker compose exec flask-app env | grep DB_HOST</code>. (2) Are both services in the same docker-compose.yml? Services in different files are on different networks. (3) Test DNS: <code>docker compose exec flask-app python -c "import socket; print(socket.gethostbyname('mysql'))"</code>. If this fails, the services aren't on the same network — check the compose file structure.</div>
+          <div class="ts-body">Docker DNS isn't resolving the service name. Check: (1) Is <code>MYSQL_HOST</code> set to <code>mysql</code>? Verify: <code>docker compose exec flask env | grep MYSQL_HOST</code>. (2) Are both flask and mysql in the same <code>networks: appnet</code> block? Services on different networks cannot reach each other by name. (3) Test DNS: <code>docker compose exec flask python -c "import socket; print(socket.gethostbyname('mysql'))"</code>.</div>
         </div>
 
-        <div class="ts-card danger">
-          <div class="ts-title">ModuleNotFoundError: No module named 'mysql'</div>
-          <div class="ts-body"><code>mysql-connector-python</code> is missing from <code>requirements.txt</code> or the image wasn't rebuilt after adding it. Fix: (1) Confirm the package is in requirements.txt. (2) Rebuild: <code>docker compose up -d --build</code>. (3) Verify it's in the container: <code>docker compose exec flask-app pip show mysql-connector-python</code>. If it shows "not found", the image is stale — force a rebuild with <code>docker compose build --no-cache flask-app</code>.</div>
+        <div class="ts-card warn">
+          <div class="ts-title">init.sql changes not taking effect after compose up</div>
+          <div class="ts-body">init.sql only runs when <code>/var/lib/mysql</code> is empty — i.e. when the mysql-data volume is new. If the volume already has data from a previous run, MySQL skips <code>/docker-entrypoint-initdb.d/</code> entirely. To re-run init.sql: <code>docker compose down -v</code> to wipe the volume, then <code>docker compose up -d</code>. Warning: this permanently deletes all existing data.</div>
         </div>
 
         <div class="ts-card warn">
           <div class="ts-title">MySQL data gone after docker compose down</div>
-          <div class="ts-body">Was <code>-v</code> used? <code>docker compose down -v</code> deletes named volumes — this is irreversible. Check: <code>docker volume ls | grep mysql</code> — if the volume is missing, the data was deleted. Without a backup, the data is unrecoverable. Going forward: only use <code>docker compose down</code> (no <code>-v</code>) for normal stop/restart cycles. Use <code>docker compose down -v</code> only intentionally for a full reset.</div>
+          <div class="ts-body">Was <code>-v</code> used? <code>docker compose down -v</code> deletes named volumes permanently. Check: <code>docker volume ls | grep mysql</code> — if the volume is missing, the data was deleted. Without a backup this is unrecoverable. Going forward: only use plain <code>docker compose down</code> for normal restarts. Use <code>docker compose down -v</code> only intentionally for a full reset.</div>
+        </div>
+
+        <div class="ts-card warn">
+          <div class="ts-title">nginx.conf change not taking effect</div>
+          <div class="ts-body">The config is mounted <code>:ro</code> from the host, so changes on the host are immediately visible inside the container — but Nginx still needs to reload to apply them. (1) Test first: <code>docker compose exec nginx-proxy nginx -t</code>. (2) Reload: <code>docker compose exec nginx-proxy nginx -s reload</code>. No container restart needed. If nginx -t shows errors, fix them before reloading — the current working config stays active.</div>
         </div>
 
         <div class="ts-card warn">
           <div class="ts-title">MySQL env var changes not taking effect after restart</div>
-          <div class="ts-body">MySQL only reads env vars on first start — when <code>/var/lib/mysql</code> is empty. The volume already has data so the env vars are ignored. To apply new credentials: (1) Run <code>docker compose down -v</code> to wipe the volume. (2) Run <code>docker compose up -d</code> to reinitialise from the new env vars. Warning: this deletes all data. In production, use SQL commands (<code>ALTER USER</code>, <code>CREATE DATABASE</code>) to change config without data loss.</td></div>
-        </div>
-
-        <div class="ts-card warn">
-          <div class="ts-title">Access denied for MySQL user from Flask</div>
-          <div class="ts-body">Credentials mismatch between flask-app environment and mysql environment. Check: (1) <code>docker compose exec flask-app env | grep DB_</code> — print Flask's DB config. (2) Compare DB_USER/DB_PASSWORD with MYSQL_USER/MYSQL_PASSWORD in the mysql service. They must match exactly — including case. (3) If credentials were changed after the volume was created: wipe with <code>docker compose down -v</code> and reinitialise. (4) Test the credentials directly: <code>docker compose exec mysql mysql -u flaskuser -pflaskpass flaskdb -e "SELECT 1;"</code>.</td></div>
+          <div class="ts-body">MySQL only reads env vars on first start when the volume is empty. The existing volume's data takes precedence. To apply new credentials: (1) <code>docker compose down -v</code> to wipe the volume. (2) <code>docker compose up -d</code> to reinitialise from the new env vars. Warning: this deletes all data. In production, use SQL commands (<code>ALTER USER</code>, <code>CREATE DATABASE</code>) to change config without data loss.</div>
         </div>
 
         <div class="ts-card info">
-          <div class="ts-title">How to create tables and seed data on first start</div>
-          <div class="ts-body">Two approaches: (1) Manual — once the stack is up and MySQL is healthy, run <code>docker compose exec mysql mysql -u flaskuser -pflaskpass flaskdb</code> and execute CREATE TABLE and INSERT statements interactively. (2) Automatic — create an <code>init.sql</code> file with all DDL and seed data, then add to the mysql service in compose: <code>volumes: - ./init.sql:/docker-entrypoint-initdb.d/init.sql</code>. MySQL runs any <code>.sql</code> files in <code>/docker-entrypoint-initdb.d/</code> on first start. On subsequent starts (when the volume already has data), the file is ignored.</div>
-        </div>
-
-        <div class="ts-card danger">
-          <div class="ts-title">Nginx 502 Bad Gateway — Flask not reachable on port 5000</div>
-          <div class="ts-body">Nginx is running but cannot connect to Flask. Check: (1) Is the Docker stack up? <code>docker compose ps</code> — both containers should show "Up". (2) Is Flask mapped to the host? <code>docker compose port flask-app 5000</code> should return <code>0.0.0.0:5000</code>. (3) Test Flask directly on the host: <code>curl http://localhost:5000/</code> — if this fails, Flask is down, not Nginx. (4) Check Nginx error log: <code>sudo tail -50 /var/log/nginx/error.log</code>. (5) Confirm proxy_pass points to the correct host port — if Flask is mapped to 5000, proxy_pass must be <code>http://127.0.0.1:5000</code>, not the container's internal IP or port.</div>
-        </div>
-
-        <div class="ts-card warn">
-          <div class="ts-title">Domain works on HTTP but not HTTPS — certificate error</div>
-          <div class="ts-body">Certbot may not have run yet, or the certificate has expired. Check: (1) <code>sudo certbot certificates</code> — lists all certs and their expiry dates. (2) If no cert exists: run <code>sudo certbot --nginx -d dustyserver.co.in</code>. (3) If the cert is expired: <code>sudo certbot renew</code>. Auto-renewal should handle this — check the timer: <code>systemctl status certbot.timer</code>. (4) After any cert change: <code>sudo nginx -t &amp;&amp; sudo systemctl reload nginx</code>.</div>
-        </div>
-
-        <div class="ts-card warn">
-          <div class="ts-title">Nginx config change not taking effect</div>
-          <div class="ts-body">Nginx must be reloaded after any config edit. (1) Always test first: <code>sudo nginx -t</code> — a syntax error here means the reload will fail and the old config stays active (which is safe). (2) Reload: <code>sudo systemctl reload nginx</code>. (3) Confirm the site is enabled: <code>ls -la /etc/nginx/sites-enabled/</code> — the dustyserver symlink must be present. If sites-enabled only has the default block, the Flask server block isn't active.</div>
+          <div class="ts-title">How to confirm which containers are on appnet</div>
+          <div class="ts-body">Run <code>docker network inspect flaskapp_appnet</code> — the output lists all containers currently connected to the network with their internal IPs and aliases. All three containers (nginx-proxy, flask, mysql) should appear. If one is missing, check that its service definition in docker-compose.yml includes <code>networks: appnet</code> and restart it.</div>
         </div>
 
       </div>
@@ -890,15 +1032,15 @@ if __name__ == '__main__':
         <div class="section-title">Future scope — Phase 2 complete, Phase 3 ahead</div>
         <div class="future-box">
           <div class="future-label">⟶ Immediate improvements to this stack</div>
-          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Move credentials to a .env file</b> — instead of hardcoding <code>DB_PASSWORD=flaskpass</code> in docker-compose.yml, create a <code>.env</code> file in the project root and add it to <code>.gitignore</code>. Docker Compose automatically loads <code>.env</code> for variable substitution: <code>DB_PASSWORD=${DB_PASSWORD}</code>. Credentials stay out of version control — the single most important security improvement for this stack.</div></div>
-          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Automatic schema initialisation</b> — add an <code>init.sql</code> file to the repo containing all CREATE TABLE statements and seed data. Bind-mount it into MySQL: <code>./init.sql:/docker-entrypoint-initdb.d/init.sql</code>. On first start, MySQL runs it automatically. Anyone who clones the repo and runs <code>docker compose up -d</code> gets a fully initialised database — no manual SQL required.</div></div>
-          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Connection retry in Flask</b> — add a startup retry loop in <code>app.py</code> so Flask retries the MySQL connection on failure instead of crashing. Use exponential backoff: try, wait 2s, try, wait 4s, try, wait 8s, up to ~10 attempts. This makes the healthcheck-based wait unnecessary for most restarts and makes the app robust to transient network blips inside Docker.</div></div>
-          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>MySQL backup strategy</b> — the named volume persists data but is on spserver's local disk. If the disk fails, data is lost. Set up a cron job on the host: <code>docker compose exec mysql mysqldump -u root -prootsecret flaskdb > /backups/flaskdb-$(date +%F).sql</code>. Run daily, rotate old backups. For off-site backup, sync the dump files to a remote location via rsync or rclone to a cloud storage bucket.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Move credentials to a .env file</b> — instead of hardcoding passwords in docker-compose.yml, create a <code>.env</code> file in the project root and add it to <code>.gitignore</code>. Docker Compose auto-loads <code>.env</code>: use <code>MYSQL_PASSWORD=${MYSQL_PASSWORD}</code> in the compose file. Credentials stay out of version control — the single most important security improvement for this stack.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>MySQL healthcheck and depends_on condition</b> — add a <code>healthcheck</code> block to the mysql service using <code>mysqladmin ping</code>, and change flask's <code>depends_on</code> to <code>condition: service_healthy</code>. Compose then waits until MySQL passes the healthcheck before starting Flask — eliminating the startup race condition that causes Flask to crash on first boot.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Connection retry in Flask</b> — add a startup retry loop in app.py: try to connect, wait, retry with backoff. This makes Flask robust to transient connection failures without needing the healthcheck-based Compose wait.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>MySQL backup strategy</b> — the named volume persists data but lives on spserver's local disk. Set up a cron job: <code>docker compose exec mysql mysqldump -u root -prootsecret flaskdb > /backups/flaskdb-$(date +%F).sql</code>. Run daily, sync dumps to off-site storage via rsync or rclone.</div></div>
         </div>
         <div class="future-box" style="margin-top:1rem;">
           <div class="future-label">⟶ Phase 3 — Jenkins Deep Dive</div>
-          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Jenkins in Docker</b> — Phase 3 adds Jenkins to the spserver stack, running as a Docker container with its own data volume. The Nginx reverse proxy (guide-nginx-proxy.html) already proxies <code>jenkins.dustyserver.co.in</code> to port 8090. Phase 3 covers Jenkins setup, pipeline creation, and CI/CD for the spserver-flask repo — automatically rebuilding and redeploying the Flask container when code is pushed to GitHub.</div></div>
-          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Automated deployment pipeline</b> — the end state of Phase 3 is a pipeline that watches the spserver-flask GitHub repo, runs tests, builds a new Docker image, and restarts the flask-app container — all automatically on every push to main. The Flask + MySQL stack built in Phase 2 becomes the deployment target for this pipeline.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Jenkins in Docker</b> — Phase 3 adds Jenkins running as a Docker container with its own data volume. The host Nginx reverse proxy already routes <code>jenkins.dustyserver.co.in</code> to port 8090. Phase 3 covers Jenkins setup, pipeline creation, and CI/CD for the spserver-flask repo.</div></div>
+          <div class="future-item"><div class="fi-dot"></div><div class="fi-text"><b>Automated deployment pipeline</b> — the end state of Phase 3 is a pipeline that watches the spserver-flask GitHub repo, runs tests, builds a new Docker image, and restarts the flask container on every push to main. The Flask + MySQL + Nginx stack built in Phase 2 becomes the deployment target.</div></div>
         </div>
       </div>
     </div><!-- end future -->
